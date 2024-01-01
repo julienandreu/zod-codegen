@@ -1,0 +1,39 @@
+{
+  "compilerOptions": {
+    "allowSyntheticDefaultImports": true,
+    "downlevelIteration": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "lib": [
+      "es5",
+      "es6",
+      "es7",
+      "esnext",
+      "dom"
+    ],
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "outDir": "dist",
+    "removeComments": false,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "strictPropertyInitialization": false,
+    "target": "es2018"
+  },
+  "include": [
+    "src/**/*.ts",
+    "scripts/**/*.ts",
+    "generated/**/*.ts",
+  ],
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "dev": "npm run build && npm run start",
+    "start": "chmod +x dist/cli.js && dist/cli.js"
+  }
+}
