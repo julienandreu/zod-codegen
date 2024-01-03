@@ -18,10 +18,6 @@ if (!isManifest(manifestData)) {
   process.exit(1);
 }
 
-const rootT = performance.now();
-console.log(`Done ${performance.now() - rootT}`);
-process.exit(0);
-
 // Get manifest data
 const { name, description, version } = manifestData;
 
