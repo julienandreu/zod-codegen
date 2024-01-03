@@ -61,10 +61,10 @@ const { input, output } = program.opts<CLIOptions>();
 // Cli
 void (async () => {
   // Setup Generator
-  const generator = new Generator(reporter, input, output);
+  const generator = new Generator(name, version, reporter, input, output);
 
   // Run
-  const exitCode = await generator.run(name, version);
+  const exitCode = await generator.run();
 
   // Return exit code
   process.exit(exitCode);
