@@ -1,10 +1,11 @@
 import { z } from 'zod';
 
-const Reference = z.object({
+export const Reference = z.object({
   $ref: z.string().optional(),
 });
 
 const BaseSchemaProperties = z.object({
+  $ref: z.string().optional(),
   title: z.string().optional(),
   multipleOf: z.number().optional(),
   maximum: z.number().optional(),
@@ -91,108 +92,52 @@ const ResponseHeader = z.object({
   schema: Reference.optional(),
 });
 
-const Response = z.object({
+export const Response = z.object({
   $ref: z.string().optional(),
   description: z.string(),
   headers: z.record(ResponseHeader).optional(),
-  content: z.record(z.object({
-    $ref: z.string().optional(),
-    name: z.string().optional(),
-    in: z.string().optional(),
-    description: z.string().optional(),
-    required: z.boolean().optional(),
-    deprecated: z.boolean().optional(),
-    allowEmptyValue: z.boolean().optional(),
-    style: z.string().optional(),
-    explode: z.boolean().optional(),
-    allowReserved: z.boolean().optional(),
-    schema: Reference.optional(),
-  })).optional(),
+  content: z.record(
+    z.object({
+      // TODO: Remove the unknown here in favor of the union type
+      // https://github.com/colinhacks/zod/issues/2203
+      schema: z.unknown().optional(),
+      // schema: z.union([
+      //   Reference,
+      //   SchemaProperties,
+      // ]).optional(),
+    }).optional(),
+  ).optional(),
+});
+
+export const RequestBody = z.object({
+  $ref: z.string().optional(),
+  description: z.string().optional(),
+  required: z.boolean().optional(),
+  content: z.object({
+    'application/json': z.object({
+      schema: Reference.optional(),
+    }).optional(),
+  }).optional(),
+});
+
+export const MethodSchema = z.object({
+  summary: z.string().optional(),
+  description: z.string().optional(),
+  operationId: z.string().optional(),
+  parameters: z.array(Parameter).optional(),
+  requestBody: RequestBody.optional(),
+  responses: z.record(Response).optional(),
 });
 
 export const PathItem = z.object({
   $ref: z.string().optional(),
   summary: z.string().optional(),
   description: z.string().optional(),
-  get: z.object({
-    summary: z.string().optional(),
-    description: z.string().optional(),
-    operationId: z.string().optional(),
-    parameters: z.array(Parameter).optional(),
-    responses: z.record(Response).optional(),
-  }).optional(),
-  post: z.object({
-    summary: z.string().optional(),
-    description: z.string().optional(),
-    operationId: z.string().optional(),
-    parameters: z.array(Parameter).optional(),
-    requestBody: z.object({
-      $ref: z.string().optional(),
-      description: z.string().optional(),
-      required: z.boolean().optional(),
-      content: z.record(z.object({
-        'application/json': z.object({
-          schema: Reference.optional(),
-        }).optional(),
-        // Add other media types as needed
-      })).optional(),
-    }).optional(),
-    responses: z.record(Response).optional(),
-  }).optional(),
-  put: z.object({
-    summary: z.string().optional(),
-    description: z.string().optional(),
-    operationId: z.string().optional(),
-    parameters: z.array(Parameter).optional(),
-    requestBody: z.object({
-      $ref: z.string().optional(),
-      description: z.string().optional(),
-      required: z.boolean().optional(),
-      content: z.record(z.object({
-        'application/json': z.object({
-          schema: Reference.optional(),
-        }).optional(),
-        // Add other media types as needed
-      })).optional(),
-    }).optional(),
-    responses: z.record(Response).optional(),
-  }).optional(),
-  patch: z.object({
-    summary: z.string().optional(),
-    description: z.string().optional(),
-    operationId: z.string().optional(),
-    parameters: z.array(Parameter).optional(),
-    requestBody: z.object({
-      $ref: z.string().optional(),
-      description: z.string().optional(),
-      required: z.boolean().optional(),
-      content: z.record(z.object({
-        'application/json': z.object({
-          schema: Reference.optional(),
-        }).optional(),
-        // Add other media types as needed
-      })).optional(),
-    }).optional(),
-    responses: z.record(Response).optional(),
-  }).optional(),
-  delete: z.object({
-    summary: z.string().optional(),
-    description: z.string().optional(),
-    operationId: z.string().optional(),
-    parameters: z.array(Parameter).optional(),
-    requestBody: z.object({
-      $ref: z.string().optional(),
-      description: z.string().optional(),
-      required: z.boolean().optional(),
-      content: z.record(z.object({
-        'application/json': z.object({
-          schema: Reference.optional(),
-        }).optional(),
-        // Add other media types as needed
-      })).optional(),
-    }).optional(),
-    responses: z.record(Response).optional(),
-  }).optional(),
+  get: MethodSchema.optional(),
+  post: MethodSchema.optional(),
+  put: MethodSchema.optional(),
+  patch: MethodSchema.optional(),
+  delete: MethodSchema.optional(),
 });
 
 const Info = z.object({

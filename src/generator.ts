@@ -2,8 +2,9 @@ import { readFileSync, writeFileSync, } from 'fs';
 import { Reporter } from './utils/reporter';
 import { resolve } from 'path';
 import { load } from 'js-yaml';
-import { OpenApiSpec, PathItem, SchemaProperties } from './openapi';
+import { MethodSchema, OpenApiSpec, Reference, SchemaProperties } from './openapi';
 import ts from 'typescript';
+import jp from 'jsonpath';
 import { z } from 'zod';
 
 const IsTypeImport = z.boolean();
@@ -117,7 +118,7 @@ export class Generator {
 
   createParameter(
     name: string,
-    type: string,
+    type: string | ts.TypeNode,
     defaultValue?: ts.Identifier,
     isOptional = false,
   ) {
@@ -128,7 +129,9 @@ export class Generator {
       isOptional
         ? ts.factory.createToken(ts.SyntaxKind.QuestionToken)
         : undefined,
-      this.createType(type),
+      typeof type === 'string'
+        ? this.createType(type)
+        : type,
       defaultValue,
     );
   }
@@ -209,10 +212,20 @@ export class Generator {
     return rootExpression;
   }
 
+  isReference(reference: unknown): reference is z.infer<typeof Reference> {
+    return Reference.safeParse(reference).success;
+  }
+
+  buildFromReference(reference: unknown): ts.Identifier {
+    const { $ref = '' } = Reference.parse(reference);
+
+    return ts.factory.createIdentifier($ref.split('/').pop() ?? 'never');
+  }
+
   // TODO: Extract methods to build each type of property
   // eslint-disable-next-line complexity
   buildProperty(property: unknown, required = false)
-    : ts.CallExpression {
+    : ts.CallExpression | ts.Identifier {
     const safeProperty = SchemaProperties.parse(property);
     switch (safeProperty.type) {
       case 'array':
@@ -266,6 +279,10 @@ export class Generator {
           ...(!required ? ['optional'] : []),
         ]);
       default:
+        if (this.isReference(property)) {
+          return this.buildFromReference(property);
+        }
+
         return this.buildZodAST([
           'unknown',
           ...(!required ? ['optional'] : []),
@@ -281,6 +298,65 @@ export class Generator {
     }
 
     throw safeCategorySchema.error;
+  }
+
+  getRequestBody(schema: unknown) {
+    const safeSchema = MethodSchema.safeParse(schema);
+
+    if (!safeSchema.success) {
+      return;
+    }
+
+    const requestBodySchema = safeSchema.data.requestBody?.content?.['application/json']?.schema;
+
+    if (requestBodySchema?.$ref) {
+      return requestBodySchema.$ref.split('/').pop();
+    }
+
+    return requestBodySchema;
+  }
+
+  getResponseBody(schemas: Record<string, ts.VariableStatement>, operationId: string, schema: unknown) {
+    try {
+      const safeSchema = MethodSchema.parse(schema);
+
+      const responseBodySchema = safeSchema.responses?.['200']?.content?.['application/json']?.schema;
+      const safeResponseBodySchema = SchemaProperties.parse(responseBodySchema);
+
+      if (safeResponseBodySchema.$ref) {
+        return safeResponseBodySchema.$ref.split('/').pop();
+      }
+
+      const identifier = `${operationId}Response`;
+      const newSchema = identifier.charAt(0).toUpperCase() + identifier.slice(1);
+
+      const variableStatement = (
+        ts.factory.createVariableStatement(
+          undefined,
+          ts.factory.createVariableDeclarationList(
+            [
+              ts.factory.createVariableDeclaration(
+                ts.factory.createIdentifier(newSchema),
+                undefined,
+                undefined,
+                this.buildSchema(safeResponseBodySchema)
+              ),
+            ],
+            ts.NodeFlags.Const
+          )
+        )
+      );
+
+      // TODO: Refactor this side effect
+      schemas = {
+        ...schemas,
+        [newSchema]: variableStatement,
+      };
+
+      return newSchema;
+    } catch (_) {
+      return;
+    }
   }
 
   buildAST(openapi: Zod.infer<typeof OpenApiSpec>) {
@@ -305,9 +381,22 @@ export class Generator {
       }
     );
 
-    const schemas = Object.entries(openapi.components?.schemas ?? {})
-      .map(([name, schema]) => {
-        return ts.factory.createVariableStatement(
+    const schemas: Record<string, ts.VariableStatement> = Object.entries(openapi.components?.schemas ?? {})
+      // Sort by dependencies
+      .sort(([aName, aSchema], [bName, bSchema]) => {
+        const aDependencies = jp.query(aSchema, '$..[\'$ref\']');
+        if (aDependencies.includes(`#/components/schemas/${bName}`)) {
+          return 1;
+        }
+        const bDependencies = jp.query(bSchema, '$..[\'$ref\']');
+        if (bDependencies.includes(`#/components/schemas/${aName}`)) {
+          return -1;
+        }
+
+        return 0;
+      })
+      .reduce((schemaRegistered, [name, schema]) => {
+        const variableStatement = ts.factory.createVariableStatement(
           undefined,
           ts.factory.createVariableDeclarationList(
             [
@@ -321,33 +410,80 @@ export class Generator {
             ts.NodeFlags.Const
           )
         );
-      });
 
-    const paths = Object.entries(openapi.paths ?? {})
-      .reduce((endpoints, [, endpoint]) => {
-        const methods = Object.entries(endpoint).map(([, schema]) => {
-          const safeSchema = z.union([
-            PathItem.shape.get,
-            PathItem.shape.delete,
-            PathItem.shape.patch,
-            PathItem.shape.post,
-            PathItem.shape.put,
-          ]).parse(schema);
+        return {
+          ...schemaRegistered,
+          [name]: variableStatement,
+        };
+      }, {});
 
-          if (!safeSchema?.operationId) {
+    const paths = Object.entries(openapi.paths)
+      .reduce<ts.MethodDeclaration[]>((endpoints, [, endpoint]) => {
+        const methods = Object.entries(endpoint).map(([, methodSchema]) => {
+          const safeMethodSchema = MethodSchema.parse(methodSchema);
+
+          if (!safeMethodSchema.operationId) {
             return [
               ...endpoints,
             ];
           }
 
+          const safeRequestBodySchemaName = z.string().safeParse(
+            this.getRequestBody(safeMethodSchema)
+          );
+          const safeResponseBodySchemaName = z.string().safeParse(
+            this.getResponseBody(schemas, safeMethodSchema.operationId, safeMethodSchema)
+          );
+
           return ts.factory.createMethodDeclaration(
             [ts.factory.createToken(ts.SyntaxKind.AsyncKeyword)],
             undefined,
-            ts.factory.createIdentifier(safeSchema.operationId),
+            ts.factory.createIdentifier(safeMethodSchema.operationId),
             undefined,
-            [],
-            [],
             undefined,
+            safeRequestBodySchemaName.success
+              ? [
+                this.createParameter(
+                  safeRequestBodySchemaName.data.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase(),
+                  ts.factory.createTypeReferenceNode(
+                    ts.factory.createQualifiedName(
+                      ts.factory.createIdentifier('z'),
+                      ts.factory.createIdentifier('infer')
+                    ),
+                    [
+                      ts.factory.createTypeQueryNode(
+                        ts.factory.createIdentifier(safeRequestBodySchemaName.data),
+                        undefined
+                      )
+                    ]
+                  ),
+                ),
+              ]
+              : [],
+            safeResponseBodySchemaName.success
+              ? ts.factory.createTypeReferenceNode(
+                ts.factory.createIdentifier('Promise'),
+                [
+                  ts.factory.createTypeReferenceNode(
+                    ts.factory.createIdentifier('AxiosResponse'),
+                    [
+                      ts.factory.createTypeReferenceNode(
+                        ts.factory.createQualifiedName(
+                          ts.factory.createIdentifier('z'),
+                          ts.factory.createIdentifier('infer')
+                        ),
+                        [
+                          ts.factory.createTypeQueryNode(
+                            ts.factory.createIdentifier(safeResponseBodySchemaName.data),
+                            undefined
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              )
+              : undefined,
             ts.factory.createBlock(
               [],
               true,
@@ -356,7 +492,7 @@ export class Generator {
         });
 
         return endpoints.concat(...methods);
-      }, [] as ts.MethodDeclaration[]);
+      }, []);
 
     const safeBaseUrl = z.string().safeParse(openapi.servers?.[0]?.url);
 
@@ -562,7 +698,7 @@ export class Generator {
         ' Components schemas',
         true,
       ),
-      ...schemas,
+      ...Object.values(schemas),
 
       ...defaultBaseUrl,
 

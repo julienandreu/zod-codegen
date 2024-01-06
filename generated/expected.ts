@@ -40,33 +40,16 @@ export class SwaggerPetstore {
     });
   }
 
-  async createPet(data: z.infer<typeof Pet>): Promise<AxiosResponse<unknown>> {
+  async addPet(data: z.infer<typeof Pet>): Promise<AxiosResponse<z.infer<typeof Pet>>> {
     const safeData = Pet.parse(data);
 
-    return this.#makeApiRequest('post', '/pet', safeData);
-  }
+    const response = await this.#makeApiRequest('post', '/pet', safeData);
 
-  async getPetById(petId: z.infer<typeof Pet.shape.id>): Promise<AxiosResponse<z.infer<typeof Pet>>> {
-    const safePetId = Pet.shape.id.parse(petId);
-
-    const response = await this.#makeApiRequest<z.infer<typeof Pet>>('get', `/pet/${safePetId}`);
-
-    const safeData = Pet.parse(response.data);
+    const safeResponseData = Pet.parse(response.data);
 
     return {
       ...response,
-      data: safeData,
+      data: safeResponseData,
     };
-  }
-
-  async updatePet(petId: z.infer<typeof Pet.shape.id>, data: z.infer<typeof Pet>): Promise<AxiosResponse> {
-    const safePetId = Pet.shape.id.parse(petId);
-    const safeData = Pet.parse(data);
-
-    return this.#makeApiRequest('put', `/pet/${safePetId}`, safeData);
-  }
-
-  async deletePet(petId: number): Promise<AxiosResponse> {
-    return this.#makeApiRequest('delete', `/pet/${petId}`);
   }
 }
