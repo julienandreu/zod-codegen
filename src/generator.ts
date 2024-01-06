@@ -279,11 +279,181 @@ export class Generator {
       .join('');
 
     const clientHelper = ts.factory.createClassDeclaration(
-      [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
+      [
+        ts.factory.createToken(ts.SyntaxKind.ExportKeyword)
+      ],
       ts.factory.createIdentifier(clientHelperName),
       undefined,
       undefined,
-      []
+      [
+        // Properties
+        // Private properties
+        ts.factory.createPropertyDeclaration(
+          [
+            ts.factory.createToken(ts.SyntaxKind.ReadonlyKeyword)
+          ],
+          ts.factory.createPrivateIdentifier('#baseUrl'),
+          undefined,
+          ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+          undefined,
+        ),
+        // Constructor
+        ts.factory.createConstructorDeclaration(
+          undefined,
+          [
+            ts.factory.createParameterDeclaration(
+              undefined,
+              undefined,
+              ts.factory.createIdentifier('baseUrl'),
+              undefined,
+              ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+              defaultBaseUrl.length > 0
+                ? ts.factory.createIdentifier('defaultBaseUrl')
+                : undefined,
+            )
+          ],
+          ts.factory.createBlock(
+            [
+              ts.factory.createExpressionStatement(
+                ts.factory.createBinaryExpression(
+                  ts.factory.createPropertyAccessExpression(
+                    ts.factory.createThis(),
+                    ts.factory.createPrivateIdentifier('#baseUrl'),
+                  ),
+                  ts.factory.createToken(ts.SyntaxKind.EqualsToken),
+                  ts.factory.createIdentifier('baseUrl'),
+                ),
+              ),
+            ],
+            true,
+          ),
+        ),
+        // Methods
+        // TODO: Refactor this, it's a mess right now :(
+        // #makeApiRequest(method, path, data)
+        ts.factory.createMethodDeclaration(
+          [
+            ts.factory.createToken(ts.SyntaxKind.AsyncKeyword)
+          ],
+          undefined,
+          ts.factory.createPrivateIdentifier('#makeApiRequest'),
+          undefined,
+          [
+            ts.factory.createTypeParameterDeclaration(
+              undefined,
+              ts.factory.createIdentifier('T'),
+              undefined,
+              undefined
+            )
+          ],
+          [
+            ts.factory.createParameterDeclaration(
+              undefined,
+              undefined,
+              ts.factory.createIdentifier('method'),
+              undefined,
+              ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+              undefined
+            ),
+            ts.factory.createParameterDeclaration(
+              undefined,
+              undefined,
+              ts.factory.createIdentifier('path'),
+              undefined,
+              ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+              undefined
+            ),
+            ts.factory.createParameterDeclaration(
+              undefined,
+              undefined,
+              ts.factory.createIdentifier('data'),
+              ts.factory.createToken(ts.SyntaxKind.QuestionToken),
+              ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
+              undefined
+            )
+          ],
+          ts.factory.createTypeReferenceNode(
+            ts.factory.createIdentifier('Promise'),
+            [
+              ts.factory.createTypeReferenceNode(
+                ts.factory.createIdentifier('AxiosResponse'),
+                [
+                  ts.factory.createTypeReferenceNode(
+                    ts.factory.createIdentifier('T'),
+                    undefined
+                  )]
+              )]
+          ),
+          ts.factory.createBlock(
+            [
+              ts.factory.createReturnStatement(ts.factory.createCallExpression(
+                ts.factory.createIdentifier('axios'),
+                [
+                  ts.factory.createTypeReferenceNode(
+                    ts.factory.createIdentifier('T'),
+                    undefined
+                  )
+                ],
+                [
+                  ts.factory.createObjectLiteralExpression(
+                    [
+                      ts.factory.createShorthandPropertyAssignment(
+                        ts.factory.createIdentifier('method'),
+                        undefined
+                      ),
+                      ts.factory.createPropertyAssignment(
+                        ts.factory.createIdentifier('url'),
+                        ts.factory.createTemplateExpression(
+                          ts.factory.createTemplateHead(
+                            '',
+                            ''
+                          ),
+                          [
+                            ts.factory.createTemplateSpan(
+                              ts.factory.createPropertyAccessExpression(
+                                ts.factory.createThis(),
+                                ts.factory.createPrivateIdentifier('#baseUrl')
+                              ),
+                              ts.factory.createTemplateMiddle(
+                                '',
+                                ''
+                              )
+                            ),
+                            ts.factory.createTemplateSpan(
+                              ts.factory.createIdentifier('path'),
+                              ts.factory.createTemplateTail(
+                                '',
+                                ''
+                              )
+                            )
+                          ]
+                        )
+                      ),
+                      ts.factory.createShorthandPropertyAssignment(
+                        ts.factory.createIdentifier('data'),
+                        undefined
+                      ),
+                      ts.factory.createPropertyAssignment(
+                        ts.factory.createIdentifier('headers'),
+                        ts.factory.createObjectLiteralExpression(
+                          [
+                            ts.factory.createPropertyAssignment(
+                              ts.factory.createStringLiteral('Content-Type'),
+                              ts.factory.createStringLiteral('application/json')
+                            )
+                          ],
+                          true
+                        )
+                      )
+                    ],
+                    true
+                  )]
+              ))
+            ],
+            true
+          ),
+        ),
+      ]
     );
 
     return [
