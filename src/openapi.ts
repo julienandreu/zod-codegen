@@ -26,7 +26,6 @@ const BaseSchemaProperties = z.object({
   oneOf: z.array(Reference).optional(),
   anyOf: z.array(Reference).optional(),
   not: Reference.optional(),
-  items: Reference.optional(),
   additionalProperties: z.unknown().optional(),
   description: z.string().optional(),
   format: z.string().optional(),
@@ -46,10 +45,12 @@ const BaseSchemaProperties = z.object({
 
 export const SchemaProperties: z.ZodType<
   z.infer<typeof BaseSchemaProperties> & {
-    properties?: z.infer<typeof SchemaProperties>;
+    properties?: Record<string, z.infer<typeof SchemaProperties>>;
+    items?: z.infer<typeof SchemaProperties>;
   }
 > = BaseSchemaProperties.extend({
   properties: z.lazy(() => z.record(SchemaProperties).optional()),
+  items: z.lazy(() => SchemaProperties.optional()),
 });
 
 const ServerVariable = z.object({

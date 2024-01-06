@@ -81,6 +81,67 @@ export class Generator {
     );
   }
 
+  createType(type: string) {
+    switch (type) {
+      case 'string':
+        return ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword);
+      case 'number':
+        return ts.factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword);
+      case 'boolean':
+        return ts.factory.createKeywordTypeNode(ts.SyntaxKind.BooleanKeyword);
+      case 'unknown':
+      default:
+        return ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword);
+    }
+  }
+
+  createProperty(
+    name: string,
+    type: string,
+    isReadonly = false
+  ) {
+    const createIdentifier = name.startsWith('#')
+      ? 'createPrivateIdentifier'
+      : 'createIdentifier';
+
+    return ts.factory.createPropertyDeclaration(
+      isReadonly
+        ? [ts.factory.createToken(ts.SyntaxKind.ReadonlyKeyword)]
+        : undefined,
+      ts.factory[createIdentifier](name),
+      undefined,
+      this.createType(type),
+      undefined,
+    );
+  }
+
+  createParameter(
+    name: string,
+    type: string,
+    defaultValue?: ts.Identifier,
+    isOptional = false,
+  ) {
+    return ts.factory.createParameterDeclaration(
+      undefined,
+      undefined,
+      ts.factory.createIdentifier(name),
+      isOptional
+        ? ts.factory.createToken(ts.SyntaxKind.QuestionToken)
+        : undefined,
+      this.createType(type),
+      defaultValue,
+    );
+  }
+
+  createGenericType(name: string) {
+    return ts.factory.createTypeParameterDeclaration(
+      undefined,
+      ts.factory.createIdentifier(name),
+      undefined,
+      undefined
+    );
+  }
+
   debugAST(...nodes: ts.Node[]) {
     const debugFile = ts.createSourceFile(
       this._target,
@@ -97,7 +158,7 @@ export class Generator {
   }
 
   static ZodAST = z.object({
-    type: z.enum(['string', 'number', 'boolean', 'object']),
+    type: z.enum(['string', 'number', 'boolean', 'object', 'array', 'unknown']),
     args: z.array(z.unknown()).optional(),
   });
 
@@ -110,7 +171,7 @@ export class Generator {
       ? ts.factory.createCallExpression(
         ts.factory.createPropertyAccessExpression(
           ts.factory.createIdentifier('z'),
-          ts.factory.createIdentifier(String(initial)),
+          ts.factory.createIdentifier(Generator.ZodAST.shape.type.parse(initial)),
         ),
         undefined,
         [],
@@ -150,9 +211,20 @@ export class Generator {
 
   // TODO: Extract methods to build each type of property
   // eslint-disable-next-line complexity
-  buildProperty(property: unknown, required = false) {
+  buildProperty(property: unknown, required = false)
+    : ts.CallExpression {
     const safeProperty = SchemaProperties.parse(property);
     switch (safeProperty.type) {
+      case 'array':
+        return this.buildZodAST([
+          {
+            type: 'array',
+            args: [
+              this.buildProperty(safeProperty.items, true),
+            ],
+          },
+          ...(!required ? ['optional'] : []),
+        ]);
       case 'object':
         return this.buildZodAST([
           {
@@ -188,9 +260,14 @@ export class Generator {
           'boolean',
           ...(!required ? ['optional'] : []),
         ]);
+      case 'unknown':
+        return this.buildZodAST([
+          'unknown',
+          ...(!required ? ['optional'] : []),
+        ]);
       default:
         return this.buildZodAST([
-          'boolean',
+          'unknown',
           ...(!required ? ['optional'] : []),
         ]);
     }
@@ -288,28 +365,19 @@ export class Generator {
       [
         // Properties
         // Private properties
-        ts.factory.createPropertyDeclaration(
-          [
-            ts.factory.createToken(ts.SyntaxKind.ReadonlyKeyword)
-          ],
-          ts.factory.createPrivateIdentifier('#baseUrl'),
-          undefined,
-          ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-          undefined,
-        ),
+        this.createProperty('#baseUrl', 'string', true),
+
+        // Methods
         // Constructor
         ts.factory.createConstructorDeclaration(
           undefined,
           [
-            ts.factory.createParameterDeclaration(
-              undefined,
-              undefined,
-              ts.factory.createIdentifier('baseUrl'),
-              undefined,
-              ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+            this.createParameter(
+              'baseUrl',
+              'string',
               defaultBaseUrl.length > 0
                 ? ts.factory.createIdentifier('defaultBaseUrl')
-                : undefined,
+                : undefined
             )
           ],
           ts.factory.createBlock(
@@ -328,7 +396,6 @@ export class Generator {
             true,
           ),
         ),
-        // Methods
         // TODO: Refactor this, it's a mess right now :(
         // #makeApiRequest(method, path, data)
         ts.factory.createMethodDeclaration(
@@ -339,38 +406,23 @@ export class Generator {
           ts.factory.createPrivateIdentifier('#makeApiRequest'),
           undefined,
           [
-            ts.factory.createTypeParameterDeclaration(
-              undefined,
-              ts.factory.createIdentifier('T'),
-              undefined,
-              undefined
-            )
+            this.createGenericType('T'),
           ],
           [
-            ts.factory.createParameterDeclaration(
-              undefined,
-              undefined,
-              ts.factory.createIdentifier('method'),
-              undefined,
-              ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-              undefined
+            this.createParameter(
+              'method',
+              'string',
             ),
-            ts.factory.createParameterDeclaration(
-              undefined,
-              undefined,
-              ts.factory.createIdentifier('path'),
-              undefined,
-              ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-              undefined
+            this.createParameter(
+              'path',
+              'string',
             ),
-            ts.factory.createParameterDeclaration(
+            this.createParameter(
+              'data',
+              'unknown',
               undefined,
-              undefined,
-              ts.factory.createIdentifier('data'),
-              ts.factory.createToken(ts.SyntaxKind.QuestionToken),
-              ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
-              undefined
-            )
+              true,
+            ),
           ],
           ts.factory.createTypeReferenceNode(
             ts.factory.createIdentifier('Promise'),
@@ -381,8 +433,10 @@ export class Generator {
                   ts.factory.createTypeReferenceNode(
                     ts.factory.createIdentifier('T'),
                     undefined
-                  )]
-              )]
+                  ),
+                ],
+              ),
+            ],
           ),
           ts.factory.createBlock(
             [
@@ -438,8 +492,8 @@ export class Generator {
                         ts.factory.createObjectLiteralExpression(
                           [
                             ts.factory.createPropertyAssignment(
-                              ts.factory.createStringLiteral('Content-Type'),
-                              ts.factory.createStringLiteral('application/json')
+                              ts.factory.createStringLiteral('Content-Type', true),
+                              ts.factory.createStringLiteral('application/json', true)
                             )
                           ],
                           true
