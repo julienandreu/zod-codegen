@@ -29,7 +29,10 @@
   "include": [
     "src/**/*.ts",
     "scripts/**/*.ts",
-    "generated/**/*.ts",
+    "generated/**/*.ts"
+  ],
+  "exclude": [
+    "generated/type.ts"
   ],
   "scripts": {
     "build": "tsc --project tsconfig.json",

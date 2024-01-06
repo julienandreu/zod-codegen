@@ -2,8 +2,18 @@ import { readFileSync, writeFileSync, } from 'fs';
 import { Reporter } from './utils/reporter';
 import { resolve } from 'path';
 import { load } from 'js-yaml';
-import { OpenApiSpec } from './openapi';
+import { OpenApiSpec, SchemaProperties } from './openapi';
 import ts from 'typescript';
+import { z } from 'zod';
+
+const IsTypeImport = z.boolean();
+
+const ImportedElement = z.record(IsTypeImport);
+
+const ImportOptions = z.object({
+  defaultImport: ImportedElement.optional(),
+  namedImports: ImportedElement.optional(),
+});
 
 export class Generator {
   private _target: string;
@@ -34,51 +44,231 @@ export class Generator {
     return OpenApiSpec.parse(source);
   }
 
-  buildAST() {
-    const importDeclaration = ts.factory.createImportDeclaration(
+  createImport(target: string, options: z.infer<typeof ImportOptions>): ts.ImportDeclaration {
+    const safeOptions = ImportOptions.parse(options);
+    const [
+      defaultImport,
+      isDefaultImportTypeImport = false,
+    ] = Object.entries(safeOptions.defaultImport ?? {})[0];
+    const { success: hasDefaultImport } = z.string().safeParse(defaultImport);
+
+    const safeNameImports = ImportedElement.safeParse(safeOptions.namedImports);
+    const namedImportList = safeNameImports.success
+      ? Object.entries(safeNameImports.data)
+      : [];
+
+    return ts.factory.createImportDeclaration(
       undefined,
       ts.factory.createImportClause(
-        false,
-        ts.factory.createIdentifier('axios'),
-        ts.factory.createNamedImports([
-          ts.factory.createImportSpecifier(
-            false,
-            undefined,
-            ts.factory.createIdentifier('AxiosRequestConfig')
-          ),
-          ts.factory.createImportSpecifier(
-            false,
-            undefined,
-            ts.factory.createIdentifier('AxiosResponse')
+        isDefaultImportTypeImport,
+        hasDefaultImport
+          ? ts.factory.createIdentifier(defaultImport)
+          : undefined,
+        namedImportList.length > 0
+          ? ts.factory.createNamedImports(
+            namedImportList.map(([name, isTypeImport = false]) => {
+              return ts.factory.createImportSpecifier(
+                isTypeImport,
+                undefined,
+                ts.factory.createIdentifier(name)
+              );
+            }),
           )
-        ])
+          : undefined,
       ),
-      ts.factory.createStringLiteral('axios'),
+      ts.factory.createStringLiteral(target, true),
       undefined
     );
+  }
 
-    const baseUrlVariableDeclaration = ts.factory.createVariableDeclaration(
-      ts.factory.createIdentifier('baseUrl'),
-      undefined,
-      undefined,
-      ts.factory.createStringLiteral('http://example.com')
+  debugAST(...nodes: ts.Node[]) {
+    const debugFile = ts.createSourceFile(
+      this._target,
+      '',
+      ts.ScriptTarget.Latest,
+      false,
+      ts.ScriptKind.TS
+    );
+    console.log(this._printer.printList(
+      ts.ListFormat.SourceFileStatements,
+      ts.factory.createNodeArray(nodes),
+      debugFile,
+    ));
+  }
+
+  static ZodAST = z.object({
+    type: z.enum(['string', 'number', 'boolean', 'object']),
+    args: z.array(z.unknown()).optional(),
+  });
+
+  buildZodAST(input: (string | z.infer<typeof Generator.ZodAST>)[]) {
+    const [initial, ...rest] = input;
+
+    const safeInitial = Generator.ZodAST.safeParse(initial);
+
+    const initialExpression = !safeInitial.success
+      ? ts.factory.createCallExpression(
+        ts.factory.createPropertyAccessExpression(
+          ts.factory.createIdentifier('z'),
+          ts.factory.createIdentifier(String(initial)),
+        ),
+        undefined,
+        [],
+      )
+      : ts.factory.createCallExpression(
+        ts.factory.createPropertyAccessExpression(
+          ts.factory.createIdentifier('z'),
+          ts.factory.createIdentifier(safeInitial.data.type),
+        ),
+        undefined,
+        (safeInitial.data.args ?? []) as ts.Expression[],
+      );
+
+    const rootExpression = rest.reduce((expression, exp) => {
+      const safeExp = Generator.ZodAST.safeParse(exp);
+      return !safeExp.success
+        ? ts.factory.createCallExpression(
+          ts.factory.createPropertyAccessExpression(
+            expression,
+            ts.factory.createIdentifier(String(exp)),
+          ),
+          undefined,
+          [],
+        )
+        : ts.factory.createCallExpression(
+          ts.factory.createPropertyAccessExpression(
+            expression,
+            ts.factory.createIdentifier(safeExp.data.type),
+          ),
+          undefined,
+          (safeExp.data.args ?? []) as ts.Expression[],
+        );
+    }, initialExpression);
+
+    return rootExpression;
+  }
+
+  // TODO: Extract methods to build each type of property
+  // eslint-disable-next-line complexity
+  buildProperty(property: unknown, required = false) {
+    const safeProperty = SchemaProperties.parse(property);
+    switch (safeProperty.type) {
+      case 'object':
+        return this.buildZodAST([
+          {
+            type: 'object',
+            args: [
+              ts.factory.createObjectLiteralExpression(
+                Object.entries(safeProperty.properties ?? {})
+                  .map(([name, property]): ts.ObjectLiteralElementLike => {
+                    return ts.factory.createPropertyAssignment(
+                      ts.factory.createIdentifier(name),
+                      this.buildProperty(property, safeProperty.required?.includes(name) ?? false),
+                    );
+                  }),
+                true,
+              )
+            ],
+          },
+          ...(!required ? ['optional'] : []),
+        ]);
+      case 'integer':
+        return this.buildZodAST([
+          'number',
+          'int',
+          ...(!required ? ['optional'] : []),
+        ]);
+      case 'string':
+        return this.buildZodAST([
+          'string',
+          ...(!required ? ['optional'] : []),
+        ]);
+      case 'boolean':
+        return this.buildZodAST([
+          'boolean',
+          ...(!required ? ['optional'] : []),
+        ]);
+      default:
+        return this.buildZodAST([
+          'boolean',
+          ...(!required ? ['optional'] : []),
+        ]);
+    }
+  }
+
+  buildSchema(schema: unknown) {
+    const safeCategorySchema = SchemaProperties.safeParse(schema);
+    if (safeCategorySchema.success) {
+      const safeCategory = safeCategorySchema.data;
+      return this.buildProperty(safeCategory, true);
+    }
+
+    throw safeCategorySchema.error;
+  }
+
+  buildAST(openapi: Zod.infer<typeof OpenApiSpec>) {
+    const importFromAxios = this.createImport(
+      'axios',
+      {
+        defaultImport: {
+          axios: false,
+        },
+        namedImports: {
+          AxiosResponse: true,
+        }
+      }
     );
 
-    const baseUrlVariableStatement = ts.factory.createVariableStatement(
+    const importFromZod = this.createImport(
+      'zod',
+      {
+        defaultImport: {
+          z: false,
+        }
+      }
+    );
+
+    const categoryVariableStatement = ts.factory.createVariableStatement(
       undefined,
       ts.factory.createVariableDeclarationList(
-        [baseUrlVariableDeclaration],
+        [
+          ts.factory.createVariableDeclaration(
+            ts.factory.createIdentifier('Category'),
+            undefined,
+            undefined,
+            this.buildSchema(openapi.components?.schemas?.Category)
+          ),
+        ],
+        ts.NodeFlags.Const
+      )
+    );
+
+    const petVariableStatement = ts.factory.createVariableStatement(
+      undefined,
+      ts.factory.createVariableDeclarationList(
+        [
+          ts.factory.createVariableDeclaration(
+            ts.factory.createIdentifier('Pet'),
+            undefined,
+            undefined,
+            this.buildSchema(openapi.components?.schemas?.Pet)
+          ),
+        ],
         ts.NodeFlags.Const
       )
     );
 
     return [
-      importDeclaration,
-      baseUrlVariableStatement,
+      importFromAxios,
+      importFromZod,
+      ts.factory.createIdentifier('\n'),
+      categoryVariableStatement,
+      ts.factory.createIdentifier('\n'),
+      petVariableStatement,
     ];
   }
 
-  buildCode(): string {
+  buildCode(openapi: Zod.infer<typeof OpenApiSpec>): string {
     const file = ts.createSourceFile(
       this._target,
       '',
@@ -87,9 +277,11 @@ export class Generator {
       ts.ScriptKind.TS
     );
 
+    const nodes = this.buildAST(openapi);
+
     return this._printer.printList(
       ts.ListFormat.SourceFileStatements,
-      ts.factory.createNodeArray(this.buildAST()),
+      ts.factory.createNodeArray(nodes),
       file,
     );
   }
@@ -116,7 +308,7 @@ export class Generator {
     try {
       const rawSource = this.readFile();
       const openapi = this.parseFile(rawSource);
-      const code = this.buildCode();
+      const code = this.buildCode(openapi);
 
       this.writeFile(openapi.info.title, openapi.info.version, JSON.stringify(openapi, null, 2), code);
 
