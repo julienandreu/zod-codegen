@@ -66,7 +66,7 @@ const Server = z.object({
   variables: z.record(ServerVariable).optional(),
 });
 
-const Parameter = z.object({
+export const Parameter = z.object({
   $ref: z.string().optional(),
   name: z.string(),
   in: z.string(),
@@ -77,7 +77,7 @@ const Parameter = z.object({
   style: z.string().optional(),
   explode: z.boolean().optional(),
   allowReserved: z.boolean().optional(),
-  schema: Reference.optional(),
+  schema: SchemaProperties.optional(),
 });
 
 const ResponseHeader = z.object({
