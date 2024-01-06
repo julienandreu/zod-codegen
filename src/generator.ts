@@ -228,43 +228,91 @@ export class Generator {
       }
     );
 
-    const categoryVariableStatement = ts.factory.createVariableStatement(
-      undefined,
-      ts.factory.createVariableDeclarationList(
-        [
-          ts.factory.createVariableDeclaration(
-            ts.factory.createIdentifier('Category'),
-            undefined,
-            undefined,
-            this.buildSchema(openapi.components?.schemas?.Category)
-          ),
-        ],
-        ts.NodeFlags.Const
-      )
-    );
+    const schemas = Object.entries(openapi.components?.schemas ?? {})
+      .map(([name, schema]) => {
+        return ts.factory.createVariableStatement(
+          undefined,
+          ts.factory.createVariableDeclarationList(
+            [
+              ts.factory.createVariableDeclaration(
+                ts.factory.createIdentifier(name),
+                undefined,
+                undefined,
+                this.buildSchema(schema)
+              ),
+            ],
+            ts.NodeFlags.Const
+          )
+        );
+      });
 
-    const petVariableStatement = ts.factory.createVariableStatement(
+    const safeBaseUrl = z.string().safeParse(openapi.servers?.[0]?.url);
+
+    const defaultBaseUrl = safeBaseUrl.success
+      ? [
+        ts.addSyntheticTrailingComment(
+          ts.factory.createIdentifier('\n'),
+          ts.SyntaxKind.SingleLineCommentTrivia,
+          ' Default base URL',
+          true,
+        ),
+        ts.factory.createVariableStatement(
+          undefined,
+          ts.factory.createVariableDeclarationList(
+            [
+              ts.factory.createVariableDeclaration(
+                ts.factory.createIdentifier('defaultBaseUrl'),
+                undefined,
+                undefined,
+                ts.factory.createStringLiteral(safeBaseUrl.data, true),
+              ),
+            ],
+            ts.NodeFlags.Const
+          )
+        ),
+      ]
+      : [];
+
+    const clientHelperName = openapi.info.title
+      .split(/[^a-zA-Z0-9]/g)
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join('');
+
+    const clientHelper = ts.factory.createClassDeclaration(
+      [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
+      ts.factory.createIdentifier(clientHelperName),
       undefined,
-      ts.factory.createVariableDeclarationList(
-        [
-          ts.factory.createVariableDeclaration(
-            ts.factory.createIdentifier('Pet'),
-            undefined,
-            undefined,
-            this.buildSchema(openapi.components?.schemas?.Pet)
-          ),
-        ],
-        ts.NodeFlags.Const
-      )
+      undefined,
+      []
     );
 
     return [
+      ts.addSyntheticTrailingComment(
+        ts.factory.createIdentifier('\n'),
+        ts.SyntaxKind.SingleLineCommentTrivia,
+        ' Imports',
+        true,
+      ),
       importFromAxios,
       importFromZod,
-      ts.factory.createIdentifier('\n'),
-      categoryVariableStatement,
-      ts.factory.createIdentifier('\n'),
-      petVariableStatement,
+
+      ts.addSyntheticTrailingComment(
+        ts.factory.createIdentifier('\n'),
+        ts.SyntaxKind.SingleLineCommentTrivia,
+        ' Components schemas',
+        true,
+      ),
+      ...schemas,
+
+      ...defaultBaseUrl,
+
+      ts.addSyntheticTrailingComment(
+        ts.factory.createIdentifier('\n'),
+        ts.SyntaxKind.SingleLineCommentTrivia,
+        ' Client class',
+        true,
+      ),
+      clientHelper,
     ];
   }
 
@@ -280,13 +328,13 @@ export class Generator {
     const nodes = this.buildAST(openapi);
 
     return this._printer.printList(
-      ts.ListFormat.SourceFileStatements,
+      ts.ListFormat.MultiLine,
       ts.factory.createNodeArray(nodes),
       file,
     );
   }
 
-  writeFile(title: string, version: string, source: string, code: string) {
+  writeFile(title: string, version: string, source: string) {
     writeFileSync(
       this._target,
       [
@@ -295,11 +343,7 @@ export class Generator {
         `// Latest edit: ${new Date().toUTCString()}`,
         `// Source file: ${this._input}`,
         `// API: ${title} v${version}`,
-        null,
-        code,
-        '/*',
         source,
-        '*/',
       ].join('\n')
     );
   }
@@ -310,7 +354,7 @@ export class Generator {
       const openapi = this.parseFile(rawSource);
       const code = this.buildCode(openapi);
 
-      this.writeFile(openapi.info.title, openapi.info.version, JSON.stringify(openapi, null, 2), code);
+      this.writeFile(openapi.info.title, openapi.info.version, code);
 
       return 0;
     } catch (error) {
