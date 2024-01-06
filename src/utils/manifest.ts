@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import {z} from 'zod';
 
 interface Manifest {
   name: string;
@@ -8,7 +8,7 @@ interface Manifest {
 
 /**
  * Type guard for the package.json object
- * 
+ *
  * @param input Unknown input
  * @returns true if the input is an event object
  */
@@ -23,7 +23,7 @@ export function isManifest(input: unknown): input is Manifest {
     .catchall(z.any())
     .required();
 
-  const { success } = manifest.safeParse(input);
+  const {success} = manifest.safeParse(input);
 
   return success;
 }

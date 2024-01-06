@@ -1,4 +1,4 @@
-import { format } from "util";
+import {format} from 'util';
 
 export class Reporter {
   constructor(private _stdout: NodeJS.WriteStream) {

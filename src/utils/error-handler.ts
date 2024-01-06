@@ -7,9 +7,7 @@ export const errorReceived = (process: NodeJS.Process, startTime: bigint) => ():
 
 export const handleErrors = (process: NodeJS.Process, startTime: bigint): void => {
   const catchErrors: string[] = ['unhandledRejection', 'uncaughtException'];
-  catchErrors.map(
-    (event): NodeJS.EventEmitter => {
-      return process.on(event, errorReceived(process, startTime));
-    },
-  );
+  catchErrors.map((event): NodeJS.EventEmitter => {
+    return process.on(event, errorReceived(process, startTime));
+  });
 };
