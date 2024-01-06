@@ -4,7 +4,7 @@ const Reference = z.object({
   $ref: z.string().optional(),
 });
 
-const SchemaProperties = z.object({
+const BaseSchemaProperties = z.object({
   title: z.string().optional(),
   multipleOf: z.number().optional(),
   maximum: z.number().optional(),
@@ -27,9 +27,6 @@ const SchemaProperties = z.object({
   anyOf: z.array(Reference).optional(),
   not: Reference.optional(),
   items: Reference.optional(),
-  properties: z.object({}).refine(data => Object.keys(data).length === 0, {
-    message: 'properties must be an empty object',
-  }).optional(),
   additionalProperties: z.unknown().optional(),
   description: z.string().optional(),
   format: z.string().optional(),
@@ -38,10 +35,21 @@ const SchemaProperties = z.object({
   discriminator: Reference.optional(),
   readOnly: z.boolean().optional(),
   writeOnly: z.boolean().optional(),
-  xml: Reference.optional(),
+  xml: z.object({
+    name: z.string().optional(),
+    wrapped: z.boolean().optional(),
+  }).optional(),
   externalDocs: Reference.optional(),
   example: z.unknown().optional(),
   deprecated: z.boolean().optional(),
+});
+
+export const SchemaProperties: z.ZodType<
+  z.infer<typeof BaseSchemaProperties> & {
+    properties?: z.infer<typeof SchemaProperties>;
+  }
+> = BaseSchemaProperties.extend({
+  properties: z.lazy(() => z.record(SchemaProperties).optional()),
 });
 
 const ServerVariable = z.object({

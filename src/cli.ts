@@ -59,12 +59,12 @@ program
 const { input, output } = program.opts<CLIOptions>();
 
 // Cli
-void (async () => {
+void (() => {
   // Setup Generator
   const generator = new Generator(name, version, reporter, input, output);
 
   // Run
-  const exitCode = await generator.run();
+  const exitCode = generator.run();
 
   // Return exit code
   process.exit(exitCode);

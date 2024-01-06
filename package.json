@@ -33,7 +33,7 @@
   "scripts": {
     "build": "rm -rf dist && tsc --project tsconfig.json && chmod +x ./dist/src/cli.js",
     "deploy": "npm run build && npm publish",
-    "dev": "npm run build && node ./dist/src/cli.js",
+    "dev": "npm run build && node ./dist/src/cli.js --input ./samples/swagger-petstore.yaml",
     "lint": "eslint src",
     "manifest:update": "ts-node scripts/update-manifest.ts",
     "test": "jest",
