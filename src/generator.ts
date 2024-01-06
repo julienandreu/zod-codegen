@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync, } from 'fs';
 import { Reporter } from './utils/reporter';
 import { resolve } from 'path';
 import { load } from 'js-yaml';
-import { OpenApiSpec, SchemaProperties } from './openapi';
+import { OpenApiSpec, PathItem, SchemaProperties } from './openapi';
 import ts from 'typescript';
 import { z } from 'zod';
 
@@ -323,6 +323,41 @@ export class Generator {
         );
       });
 
+    const paths = Object.entries(openapi.paths ?? {})
+      .reduce((endpoints, [, endpoint]) => {
+        const methods = Object.entries(endpoint).map(([, schema]) => {
+          const safeSchema = z.union([
+            PathItem.shape.get,
+            PathItem.shape.delete,
+            PathItem.shape.patch,
+            PathItem.shape.post,
+            PathItem.shape.put,
+          ]).parse(schema);
+
+          if (!safeSchema?.operationId) {
+            return [
+              ...endpoints,
+            ];
+          }
+
+          return ts.factory.createMethodDeclaration(
+            [ts.factory.createToken(ts.SyntaxKind.AsyncKeyword)],
+            undefined,
+            ts.factory.createIdentifier(safeSchema.operationId),
+            undefined,
+            [],
+            [],
+            undefined,
+            ts.factory.createBlock(
+              [],
+              true,
+            ),
+          );
+        });
+
+        return endpoints.concat(...methods);
+      }, [] as ts.MethodDeclaration[]);
+
     const safeBaseUrl = z.string().safeParse(openapi.servers?.[0]?.url);
 
     const defaultBaseUrl = safeBaseUrl.success
@@ -507,6 +542,7 @@ export class Generator {
             true
           ),
         ),
+        ...paths,
       ]
     );
 
