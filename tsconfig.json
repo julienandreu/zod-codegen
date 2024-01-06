@@ -31,9 +31,6 @@
     "scripts/**/*.ts",
     "generated/**/*.ts"
   ],
-  "exclude": [
-    "generated/type.ts"
-  ],
   "scripts": {
     "build": "tsc --project tsconfig.json",
     "dev": "npm run build && npm run start",

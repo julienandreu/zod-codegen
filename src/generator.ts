@@ -348,10 +348,7 @@ export class Generator {
       );
 
       // TODO: Refactor this side effect
-      schemas = {
-        ...schemas,
-        [newSchema]: variableStatement,
-      };
+      schemas[newSchema] = variableStatement;
 
       return newSchema;
     } catch (_) {
@@ -397,7 +394,7 @@ export class Generator {
       })
       .reduce((schemaRegistered, [name, schema]) => {
         const variableStatement = ts.factory.createVariableStatement(
-          undefined,
+          [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
           ts.factory.createVariableDeclarationList(
             [
               ts.factory.createVariableDeclaration(
@@ -418,8 +415,8 @@ export class Generator {
       }, {});
 
     const paths = Object.entries(openapi.paths)
-      .reduce<ts.MethodDeclaration[]>((endpoints, [, endpoint]) => {
-        const methods = Object.entries(endpoint).map(([, methodSchema]) => {
+      .reduce<ts.MethodDeclaration[]>((endpoints, [path, endpoint]) => {
+        const methods = Object.entries(endpoint).map(([method, methodSchema]) => {
           const safeMethodSchema = MethodSchema.parse(methodSchema);
 
           if (!safeMethodSchema.operationId) {
@@ -485,7 +482,104 @@ export class Generator {
               )
               : undefined,
             ts.factory.createBlock(
-              [],
+              [
+                // START OF THE METHOD
+
+                ...
+                safeRequestBodySchemaName.success
+                  ? [
+                    ts.factory.createVariableStatement(
+                      undefined,
+                      ts.factory.createVariableDeclarationList(
+                        [ts.factory.createVariableDeclaration(
+                          ts.factory.createIdentifier('safeData'),
+                          undefined,
+                          undefined,
+                          ts.factory.createCallExpression(
+                            ts.factory.createPropertyAccessExpression(
+                              ts.factory.createIdentifier(safeRequestBodySchemaName.data),
+                              ts.factory.createIdentifier('parse')
+                            ),
+                            undefined,
+                            [ts.factory.createIdentifier(
+                              safeRequestBodySchemaName.data.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase()
+                            )]
+                          )
+                        )],
+                        ts.NodeFlags.Const
+                      )
+                    )
+                  ]
+                  : [],
+                ts.factory.createVariableStatement(
+                  undefined,
+                  ts.factory.createVariableDeclarationList(
+                    [ts.factory.createVariableDeclaration(
+                      ts.factory.createIdentifier('response'),
+                      undefined,
+                      undefined,
+                      ts.factory.createAwaitExpression(ts.factory.createCallExpression(
+                        ts.factory.createPropertyAccessExpression(
+                          ts.factory.createThis(),
+                          ts.factory.createPrivateIdentifier('#makeApiRequest')
+                        ),
+                        undefined,
+                        [
+                          ts.factory.createStringLiteral(method, true),
+                          ts.factory.createStringLiteral(path, true),
+                          ...safeRequestBodySchemaName.success
+                            ? [ts.factory.createIdentifier('safeData')]
+                            : [],
+                        ]
+                      ))
+                    )],
+                    ts.NodeFlags.Const
+                  )
+                ),
+                ...safeResponseBodySchemaName.success
+                  ? [
+                    ts.factory.createVariableStatement(
+                      undefined,
+                      ts.factory.createVariableDeclarationList(
+                        [ts.factory.createVariableDeclaration(
+                          ts.factory.createIdentifier('safeResponseData'),
+                          undefined,
+                          undefined,
+                          ts.factory.createCallExpression(
+                            ts.factory.createPropertyAccessExpression(
+                              ts.factory.createIdentifier(safeResponseBodySchemaName.data),
+                              ts.factory.createIdentifier('parse')
+                            ),
+                            undefined,
+                            [ts.factory.createPropertyAccessExpression(
+                              ts.factory.createIdentifier('response'),
+                              ts.factory.createIdentifier('data')
+                            )]
+                          )
+                        )],
+                        ts.NodeFlags.Const
+                      )
+                    ),
+                    ts.factory.createReturnStatement(ts.factory.createObjectLiteralExpression(
+                      [
+                        ts.factory.createSpreadAssignment(ts.factory.createIdentifier('response')),
+                        ts.factory.createPropertyAssignment(
+                          ts.factory.createIdentifier('data'),
+                          ts.factory.createIdentifier('safeResponseData')
+                        )
+                      ],
+                      true
+                    )),
+                  ]
+                  : [
+                    ts.factory.createReturnStatement(
+                      ts.factory.createIdentifier('response'),
+                    ),
+                  ],
+
+
+                // END OF THE METHOD
+              ],
               true,
             ),
           );

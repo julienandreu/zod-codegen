@@ -43,7 +43,7 @@ export class SwaggerPetstore {
   async addPet(data: z.infer<typeof Pet>): Promise<AxiosResponse<z.infer<typeof Pet>>> {
     const safeData = Pet.parse(data);
 
-    const response = await this.#makeApiRequest('post', '/pet', safeData);
+    const response = await this.#makeApiRequest<z.infer<typeof Pet>>('post', '/pet', safeData);
 
     const safeResponseData = Pet.parse(response.data);
 
