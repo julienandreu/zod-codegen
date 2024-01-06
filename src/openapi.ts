@@ -110,7 +110,7 @@ const Response = z.object({
   })).optional(),
 });
 
-const PathItem = z.object({
+export const PathItem = z.object({
   $ref: z.string().optional(),
   summary: z.string().optional(),
   description: z.string().optional(),
