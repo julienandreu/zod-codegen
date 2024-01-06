@@ -1,12 +1,12 @@
-import { readFileSync, writeFileSync, } from 'fs';
-import { Reporter } from './utils/reporter';
-import { resolve } from 'path';
-import { load } from 'js-yaml';
-import { MethodSchema, OpenApiSpec, Parameter, Reference, SchemaProperties } from './openapi';
+import {readFileSync, writeFileSync} from 'fs';
+import {Reporter} from './utils/reporter';
+import {resolve} from 'path';
+import {load} from 'js-yaml';
+import {MethodSchema, OpenApiSpec, Parameter, Reference, SchemaProperties} from './openapi';
 import ts from 'typescript';
 import jp from 'jsonpath';
-import { z } from 'zod';
-import { parse } from 'path-to-regexp';
+import {z} from 'zod';
+import {parse} from 'path-to-regexp';
 
 const IsTypeImport = z.boolean();
 
@@ -29,7 +29,7 @@ export class Generator {
     private _output: string,
   ) {
     this._target = resolve(this._output, 'type.ts');
-    this._printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed });
+    this._printer = ts.createPrinter({newLine: ts.NewLineKind.LineFeed});
   }
 
   readFile(): unknown {
@@ -48,38 +48,27 @@ export class Generator {
 
   createImport(target: string, options: z.infer<typeof ImportOptions>): ts.ImportDeclaration {
     const safeOptions = ImportOptions.parse(options);
-    const [
-      defaultImport,
-      isDefaultImportTypeImport = false,
-    ] = Object.entries(safeOptions.defaultImport ?? {})[0] ?? [];
-    const { success: hasDefaultImport } = z.string().safeParse(defaultImport);
+    const [defaultImport, isDefaultImportTypeImport = false] = Object.entries(safeOptions.defaultImport ?? {})[0] ?? [];
+    const {success: hasDefaultImport} = z.string().safeParse(defaultImport);
 
     const safeNameImports = ImportedElement.safeParse(safeOptions.namedImports);
-    const namedImportList = safeNameImports.success
-      ? Object.entries(safeNameImports.data)
-      : [];
+    const namedImportList = safeNameImports.success ? Object.entries(safeNameImports.data) : [];
 
     return ts.factory.createImportDeclaration(
       undefined,
       ts.factory.createImportClause(
         isDefaultImportTypeImport,
-        hasDefaultImport
-          ? ts.factory.createIdentifier(defaultImport)
-          : undefined,
+        hasDefaultImport ? ts.factory.createIdentifier(defaultImport) : undefined,
         namedImportList.length > 0
           ? ts.factory.createNamedImports(
-            namedImportList.map(([name, isTypeImport = false]) => {
-              return ts.factory.createImportSpecifier(
-                isTypeImport,
-                undefined,
-                ts.factory.createIdentifier(name)
-              );
-            }),
-          )
+              namedImportList.map(([name, isTypeImport = false]) => {
+                return ts.factory.createImportSpecifier(isTypeImport, undefined, ts.factory.createIdentifier(name));
+              }),
+            )
           : undefined,
       ),
       ts.factory.createStringLiteral(target, true),
-      undefined
+      undefined,
     );
   }
 
@@ -97,19 +86,11 @@ export class Generator {
     }
   }
 
-  createProperty(
-    name: string,
-    type: string,
-    isReadonly = false
-  ) {
-    const createIdentifier = name.startsWith('#')
-      ? 'createPrivateIdentifier'
-      : 'createIdentifier';
+  createProperty(name: string, type: string, isReadonly = false) {
+    const createIdentifier = name.startsWith('#') ? 'createPrivateIdentifier' : 'createIdentifier';
 
     return ts.factory.createPropertyDeclaration(
-      isReadonly
-        ? [ts.factory.createToken(ts.SyntaxKind.ReadonlyKeyword)]
-        : undefined,
+      isReadonly ? [ts.factory.createToken(ts.SyntaxKind.ReadonlyKeyword)] : undefined,
       ts.factory[createIdentifier](name),
       undefined,
       this.createType(type),
@@ -117,22 +98,13 @@ export class Generator {
     );
   }
 
-  createParameter(
-    name: string,
-    type?: string | ts.TypeNode,
-    defaultValue?: ts.Expression,
-    isOptional = false,
-  ) {
+  createParameter(name: string, type?: string | ts.TypeNode, defaultValue?: ts.Expression, isOptional = false) {
     return ts.factory.createParameterDeclaration(
       undefined,
       undefined,
       ts.factory.createIdentifier(`\n${name}`),
-      isOptional
-        ? ts.factory.createToken(ts.SyntaxKind.QuestionToken)
-        : undefined,
-      typeof type === 'string'
-        ? this.createType(type)
-        : type,
+      isOptional ? ts.factory.createToken(ts.SyntaxKind.QuestionToken) : undefined,
+      typeof type === 'string' ? this.createType(type) : type,
       defaultValue,
     );
   }
@@ -142,23 +114,15 @@ export class Generator {
       undefined,
       ts.factory.createIdentifier(name),
       undefined,
-      undefined
+      undefined,
     );
   }
 
   debugAST(...nodes: ts.Node[]) {
-    const debugFile = ts.createSourceFile(
-      this._target,
-      '',
-      ts.ScriptTarget.Latest,
-      false,
-      ts.ScriptKind.TS
+    const debugFile = ts.createSourceFile(this._target, '', ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
+    console.log(
+      this._printer.printList(ts.ListFormat.SourceFileStatements, ts.factory.createNodeArray(nodes), debugFile),
     );
-    console.log(this._printer.printList(
-      ts.ListFormat.SourceFileStatements,
-      ts.factory.createNodeArray(nodes),
-      debugFile,
-    ));
   }
 
   static ZodAST = z.object({
@@ -173,41 +137,35 @@ export class Generator {
 
     const initialExpression = !safeInitial.success
       ? ts.factory.createCallExpression(
-        ts.factory.createPropertyAccessExpression(
-          ts.factory.createIdentifier('z'),
-          ts.factory.createIdentifier(Generator.ZodAST.shape.type.parse(initial)),
-        ),
-        undefined,
-        [],
-      )
+          ts.factory.createPropertyAccessExpression(
+            ts.factory.createIdentifier('z'),
+            ts.factory.createIdentifier(Generator.ZodAST.shape.type.parse(initial)),
+          ),
+          undefined,
+          [],
+        )
       : ts.factory.createCallExpression(
-        ts.factory.createPropertyAccessExpression(
-          ts.factory.createIdentifier('z'),
-          ts.factory.createIdentifier(safeInitial.data.type),
-        ),
-        undefined,
-        (safeInitial.data.args ?? []) as ts.Expression[],
-      );
+          ts.factory.createPropertyAccessExpression(
+            ts.factory.createIdentifier('z'),
+            ts.factory.createIdentifier(safeInitial.data.type),
+          ),
+          undefined,
+          (safeInitial.data.args ?? []) as ts.Expression[],
+        );
 
     const rootExpression = rest.reduce((expression, exp) => {
       const safeExp = Generator.ZodAST.safeParse(exp);
       return !safeExp.success
         ? ts.factory.createCallExpression(
-          ts.factory.createPropertyAccessExpression(
-            expression,
-            ts.factory.createIdentifier(String(exp)),
-          ),
-          undefined,
-          [],
-        )
+            ts.factory.createPropertyAccessExpression(expression, ts.factory.createIdentifier(String(exp))),
+            undefined,
+            [],
+          )
         : ts.factory.createCallExpression(
-          ts.factory.createPropertyAccessExpression(
-            expression,
-            ts.factory.createIdentifier(safeExp.data.type),
-          ),
-          undefined,
-          (safeExp.data.args ?? []) as ts.Expression[],
-        );
+            ts.factory.createPropertyAccessExpression(expression, ts.factory.createIdentifier(safeExp.data.type)),
+            undefined,
+            (safeExp.data.args ?? []) as ts.Expression[],
+          );
     }, initialExpression);
 
     return rootExpression;
@@ -218,24 +176,21 @@ export class Generator {
   }
 
   buildFromReference(reference: unknown): ts.Identifier {
-    const { $ref = '' } = Reference.parse(reference);
+    const {$ref = ''} = Reference.parse(reference);
 
     return ts.factory.createIdentifier($ref.split('/').pop() ?? 'never');
   }
 
   // TODO: Extract methods to build each type of property
   // eslint-disable-next-line complexity
-  buildProperty(property: unknown, required = false)
-    : ts.CallExpression | ts.Identifier {
+  buildProperty(property: unknown, required = false): ts.CallExpression | ts.Identifier {
     const safeProperty = SchemaProperties.parse(property);
     switch (safeProperty.type) {
       case 'array':
         return this.buildZodAST([
           {
             type: 'array',
-            args: [
-              this.buildProperty(safeProperty.items, true),
-            ],
+            args: [this.buildProperty(safeProperty.items, true)],
           },
           ...(!required ? ['optional'] : []),
         ]);
@@ -245,49 +200,32 @@ export class Generator {
             type: 'object',
             args: [
               ts.factory.createObjectLiteralExpression(
-                Object.entries(safeProperty.properties ?? {})
-                  .map(([name, property]): ts.ObjectLiteralElementLike => {
-                    return ts.factory.createPropertyAssignment(
-                      ts.factory.createIdentifier(name),
-                      this.buildProperty(property, safeProperty.required?.includes(name) ?? false),
-                    );
-                  }),
+                Object.entries(safeProperty.properties ?? {}).map(([name, property]): ts.ObjectLiteralElementLike => {
+                  return ts.factory.createPropertyAssignment(
+                    ts.factory.createIdentifier(name),
+                    this.buildProperty(property, safeProperty.required?.includes(name) ?? false),
+                  );
+                }),
                 true,
-              )
+              ),
             ],
           },
           ...(!required ? ['optional'] : []),
         ]);
       case 'integer':
-        return this.buildZodAST([
-          'number',
-          'int',
-          ...(!required ? ['optional'] : []),
-        ]);
+        return this.buildZodAST(['number', 'int', ...(!required ? ['optional'] : [])]);
       case 'string':
-        return this.buildZodAST([
-          'string',
-          ...(!required ? ['optional'] : []),
-        ]);
+        return this.buildZodAST(['string', ...(!required ? ['optional'] : [])]);
       case 'boolean':
-        return this.buildZodAST([
-          'boolean',
-          ...(!required ? ['optional'] : []),
-        ]);
+        return this.buildZodAST(['boolean', ...(!required ? ['optional'] : [])]);
       case 'unknown':
-        return this.buildZodAST([
-          'unknown',
-          ...(!required ? ['optional'] : []),
-        ]);
+        return this.buildZodAST(['unknown', ...(!required ? ['optional'] : [])]);
       default:
         if (this.isReference(property)) {
           return this.buildFromReference(property);
         }
 
-        return this.buildZodAST([
-          'unknown',
-          ...(!required ? ['optional'] : []),
-        ]);
+        return this.buildZodAST(['unknown', ...(!required ? ['optional'] : [])]);
     }
   }
 
@@ -347,21 +285,19 @@ export class Generator {
       const identifier = `${operationId}Response`;
       const newSchema = this.toPascalCase(identifier);
 
-      const variableStatement = (
-        ts.factory.createVariableStatement(
-          undefined,
-          ts.factory.createVariableDeclarationList(
-            [
-              ts.factory.createVariableDeclaration(
-                ts.factory.createIdentifier(newSchema),
-                undefined,
-                undefined,
-                this.buildSchema(safeResponseBodySchema)
-              ),
-            ],
-            ts.NodeFlags.Const
-          )
-        )
+      const variableStatement = ts.factory.createVariableStatement(
+        [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
+        ts.factory.createVariableDeclarationList(
+          [
+            ts.factory.createVariableDeclaration(
+              ts.factory.createIdentifier(newSchema),
+              undefined,
+              undefined,
+              this.buildSchema(safeResponseBodySchema),
+            ),
+          ],
+          ts.NodeFlags.Const,
+        ),
       );
 
       // TODO: Refactor this side effect
@@ -387,21 +323,19 @@ export class Generator {
     const identifier = `${safeParameter.in}Parameter${this.toPascalCase(safeParameter.name)}`;
     const newSchema = this.toPascalCase(identifier);
 
-    const variableStatement = (
-      ts.factory.createVariableStatement(
-        [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
-        ts.factory.createVariableDeclarationList(
-          [
-            ts.factory.createVariableDeclaration(
-              ts.factory.createIdentifier(newSchema),
-              undefined,
-              undefined,
-              this.buildSchema(safeParameter.schema, safeParameter.required ?? false)
-            ),
-          ],
-          ts.NodeFlags.Const
-        )
-      )
+    const variableStatement = ts.factory.createVariableStatement(
+      [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
+      ts.factory.createVariableDeclarationList(
+        [
+          ts.factory.createVariableDeclaration(
+            ts.factory.createIdentifier(newSchema),
+            undefined,
+            undefined,
+            this.buildSchema(safeParameter.schema, safeParameter.required ?? false),
+          ),
+        ],
+        ts.NodeFlags.Const,
+      ),
     );
 
     // TODO: Refactor this side effect
@@ -410,16 +344,8 @@ export class Generator {
     return this.createParameter(
       safeParameter.name,
       ts.factory.createTypeReferenceNode(
-        ts.factory.createQualifiedName(
-          ts.factory.createIdentifier('z'),
-          ts.factory.createIdentifier('infer')
-        ),
-        [
-          ts.factory.createTypeQueryNode(
-            ts.factory.createIdentifier(newSchema),
-            undefined
-          )
-        ]
+        ts.factory.createQualifiedName(ts.factory.createIdentifier('z'), ts.factory.createIdentifier('infer')),
+        [ts.factory.createTypeQueryNode(ts.factory.createIdentifier(newSchema), undefined)],
       ),
       undefined,
       !safeParameter.required,
@@ -428,41 +354,32 @@ export class Generator {
 
   hasNoPathParams(path: string) {
     const out = parse(path);
-    const { success } = z.array(z.string()).safeParse(out);
+    const {success} = z.array(z.string()).safeParse(out);
 
     return success;
   }
 
   buildAST(openapi: Zod.infer<typeof OpenApiSpec>) {
-    const importFromAxios = this.createImport(
-      'axios',
-      {
-        defaultImport: {
-          axios: false,
-        },
-        namedImports: {
-          AxiosResponse: true,
-        }
-      }
-    );
+    const importFromAxios = this.createImport('axios', {
+      defaultImport: {
+        axios: false,
+      },
+      namedImports: {
+        AxiosResponse: true,
+      },
+    });
 
-    const importFromZod = this.createImport(
-      'zod',
-      {
-        defaultImport: {
-          z: false,
-        }
-      }
-    );
+    const importFromZod = this.createImport('zod', {
+      defaultImport: {
+        z: false,
+      },
+    });
 
-    const importFromPathToRegexp = this.createImport(
-      'path-to-regexp',
-      {
-        namedImports: {
-          compile: false,
-        }
-      }
-    );
+    const importFromPathToRegexp = this.createImport('path-to-regexp', {
+      namedImports: {
+        compile: false,
+      },
+    });
 
     const schemas: Record<string, ts.VariableStatement> = Object.entries(openapi.components?.schemas ?? {})
       // Sort by dependencies
@@ -487,11 +404,11 @@ export class Generator {
                 ts.factory.createIdentifier(name),
                 undefined,
                 undefined,
-                this.buildSchema(schema)
+                this.buildSchema(schema),
               ),
             ],
-            ts.NodeFlags.Const
-          )
+            ts.NodeFlags.Const,
+          ),
         );
 
         return {
@@ -500,118 +417,115 @@ export class Generator {
         };
       }, {});
 
-    const paths = Object.entries(openapi.paths)
-      .reduce<ts.MethodDeclaration[]>((endpoints, [path, endpoint]) => {
-        // TODO: Refactor this mess
-        // eslint-disable-next-line complexity
-        const methods = Object.entries(endpoint).map(([method, methodSchema]) => {
-          const safeMethodSchema = MethodSchema.parse(methodSchema);
+    const paths = Object.entries(openapi.paths).reduce<ts.MethodDeclaration[]>((endpoints, [path, endpoint]) => {
+      // TODO: Refactor this mess
+      // eslint-disable-next-line complexity
+      const methods = Object.entries(endpoint).map(([method, methodSchema]) => {
+        const safeMethodSchema = MethodSchema.parse(methodSchema);
 
-          if (!safeMethodSchema.operationId) {
-            return [
-              ...endpoints,
-            ];
-          }
+        if (!safeMethodSchema.operationId) {
+          return [...endpoints];
+        }
 
-          const safeRequestBodySchemaName = z.string().safeParse(
-            this.getRequestBody(safeMethodSchema)
-          );
+        const safeRequestBodySchemaName = z.string().safeParse(this.getRequestBody(safeMethodSchema));
 
-          const safeResponseBodySchemaName = z.string().safeParse(
-            this.getResponseBody(schemas, safeMethodSchema.operationId, safeMethodSchema)
-          );
+        const safeResponseBodySchemaName = z
+          .string()
+          .safeParse(this.getResponseBody(schemas, safeMethodSchema.operationId, safeMethodSchema));
 
-          return ts.factory.createMethodDeclaration(
-            [ts.factory.createToken(ts.SyntaxKind.AsyncKeyword)],
-            undefined,
-            ts.factory.createIdentifier(safeMethodSchema.operationId),
-            undefined,
-            undefined,
-            [
-              ...(this.getParameters(safeMethodSchema, ['path'])?.map(
-                (parameter) => this.buildPathParameter(schemas, parameter)
-              ) ?? []),
-              ...(this.getParameters(safeMethodSchema, ['query'])?.map(
-                (parameter) => this.buildPathParameter(schemas, parameter)
-              ) ?? []),
-              ...(this.getParameters(safeMethodSchema, ['header'])?.map(
-                (parameter) => this.buildPathParameter(schemas, parameter)
-              ) ?? []),
-              ...(safeRequestBodySchemaName.success ? [
-                this.createParameter(
-                  this.toCamelCase(safeRequestBodySchemaName.data.replace(/([a-z])([A-Z])/g, '$1-$2')),
+        return ts.factory.createMethodDeclaration(
+          [ts.factory.createToken(ts.SyntaxKind.AsyncKeyword)],
+          undefined,
+          ts.factory.createIdentifier(safeMethodSchema.operationId),
+          undefined,
+          undefined,
+          [
+            ...(this.getParameters(safeMethodSchema, ['path'])?.map((parameter) =>
+              this.buildPathParameter(schemas, parameter),
+            ) ?? []),
+            ...(this.getParameters(safeMethodSchema, ['query'])?.map((parameter) =>
+              this.buildPathParameter(schemas, parameter),
+            ) ?? []),
+            ...(this.getParameters(safeMethodSchema, ['header'])?.map((parameter) =>
+              this.buildPathParameter(schemas, parameter),
+            ) ?? []),
+            ...(safeRequestBodySchemaName.success
+              ? [
+                  this.createParameter(
+                    this.toCamelCase(safeRequestBodySchemaName.data.replace(/([a-z])([A-Z])/g, '$1-$2')),
+                    ts.factory.createTypeReferenceNode(
+                      ts.factory.createQualifiedName(
+                        ts.factory.createIdentifier('z'),
+                        ts.factory.createIdentifier('infer'),
+                      ),
+                      [
+                        ts.factory.createTypeQueryNode(
+                          ts.factory.createIdentifier(safeRequestBodySchemaName.data),
+                          undefined,
+                        ),
+                      ],
+                    ),
+                  ),
+                ]
+              : []),
+          ].concat(this.createParameter('')),
+          safeResponseBodySchemaName.success
+            ? ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [
+                ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('AxiosResponse'), [
                   ts.factory.createTypeReferenceNode(
                     ts.factory.createQualifiedName(
                       ts.factory.createIdentifier('z'),
-                      ts.factory.createIdentifier('infer')
+                      ts.factory.createIdentifier('infer'),
                     ),
                     [
                       ts.factory.createTypeQueryNode(
-                        ts.factory.createIdentifier(safeRequestBodySchemaName.data),
-                        undefined
-                      )
-                    ]
-                  ),
-                ),
-              ] : []),
-            ].concat(this.createParameter('')),
-            safeResponseBodySchemaName.success
-              ? ts.factory.createTypeReferenceNode(
-                ts.factory.createIdentifier('Promise'),
-                [
-                  ts.factory.createTypeReferenceNode(
-                    ts.factory.createIdentifier('AxiosResponse'),
-                    [
-                      ts.factory.createTypeReferenceNode(
-                        ts.factory.createQualifiedName(
-                          ts.factory.createIdentifier('z'),
-                          ts.factory.createIdentifier('infer')
-                        ),
-                        [
-                          ts.factory.createTypeQueryNode(
-                            ts.factory.createIdentifier(safeResponseBodySchemaName.data),
-                            undefined
-                          ),
-                        ],
+                        ts.factory.createIdentifier(safeResponseBodySchemaName.data),
+                        undefined,
                       ),
                     ],
                   ),
-                ],
-              )
-              : undefined,
-            ts.factory.createBlock(
-              [
-                // START OF THE METHOD
+                ]),
+              ])
+            : undefined,
+          ts.factory.createBlock(
+            [
+              // START OF THE METHOD
 
-                ...
-                (safeRequestBodySchemaName.success ? [
-                  ts.factory.createVariableStatement(
-                    undefined,
-                    ts.factory.createVariableDeclarationList(
-                      [ts.factory.createVariableDeclaration(
-                        ts.factory.createIdentifier('safeData'),
-                        undefined,
-                        undefined,
-                        ts.factory.createCallExpression(
-                          ts.factory.createPropertyAccessExpression(
-                            ts.factory.createIdentifier(safeRequestBodySchemaName.data),
-                            ts.factory.createIdentifier('parse')
+              ...(safeRequestBodySchemaName.success
+                ? [
+                    ts.factory.createVariableStatement(
+                      undefined,
+                      ts.factory.createVariableDeclarationList(
+                        [
+                          ts.factory.createVariableDeclaration(
+                            ts.factory.createIdentifier('safeData'),
+                            undefined,
+                            undefined,
+                            ts.factory.createCallExpression(
+                              ts.factory.createPropertyAccessExpression(
+                                ts.factory.createIdentifier(safeRequestBodySchemaName.data),
+                                ts.factory.createIdentifier('parse'),
+                              ),
+                              undefined,
+                              [
+                                ts.factory.createIdentifier(
+                                  this.toCamelCase(safeRequestBodySchemaName.data.replace(/([a-z])([A-Z])/g, '$1-$2')),
+                                ),
+                              ],
+                            ),
                           ),
-                          undefined,
-                          [ts.factory.createIdentifier(
-                            this.toCamelCase(safeRequestBodySchemaName.data.replace(/([a-z])([A-Z])/g, '$1-$2'))
-                          )]
-                        )
-                      )],
-                      ts.NodeFlags.Const
-                    )
-                  )
-                ] : []),
-                // TODO: Add safe parsing of all other params
-                ts.factory.createVariableStatement(
-                  undefined,
-                  ts.factory.createVariableDeclarationList(
-                    [ts.factory.createVariableDeclaration(
+                        ],
+                        ts.NodeFlags.Const,
+                      ),
+                    ),
+                  ]
+                : []),
+              // TODO: Add safe parsing of all other params
+              ts.factory.createVariableStatement(
+                undefined,
+                ts.factory.createVariableDeclarationList(
+                  [
+                    ts.factory.createVariableDeclaration(
                       ts.factory.createIdentifier('response'),
                       undefined,
                       undefined,
@@ -619,7 +533,7 @@ export class Generator {
                         ts.factory.createCallExpression(
                           ts.factory.createPropertyAccessExpression(
                             ts.factory.createThis(),
-                            ts.factory.createPrivateIdentifier('#makeApiRequest')
+                            ts.factory.createPrivateIdentifier('#makeApiRequest'),
                           ),
                           undefined,
                           [
@@ -627,25 +541,21 @@ export class Generator {
                             this.hasNoPathParams(path)
                               ? ts.factory.createStringLiteral(path, true)
                               : ts.factory.createCallExpression(
-                                ts.factory.createCallExpression(
-                                  ts.factory.createIdentifier('compile'),
+                                  ts.factory.createCallExpression(ts.factory.createIdentifier('compile'), undefined, [
+                                    ts.factory.createStringLiteral(path, true),
+                                  ]),
                                   undefined,
                                   [
-                                    ts.factory.createStringLiteral(path, true),
-                                  ]
+                                    ts.factory.createObjectLiteralExpression(
+                                      this.getParameters(safeMethodSchema, ['path'])?.map(({name}) => {
+                                        return ts.factory.createShorthandPropertyAssignment(
+                                          ts.factory.createIdentifier(name),
+                                        );
+                                      }) ?? [],
+                                      true,
+                                    ),
+                                  ],
                                 ),
-                                undefined,
-                                [
-                                  ts.factory.createObjectLiteralExpression(
-                                    this.getParameters(safeMethodSchema, ['path'])?.map(({ name }) => {
-                                      return ts.factory.createShorthandPropertyAssignment(
-                                        ts.factory.createIdentifier(name),
-                                      );
-                                    }) ?? [],
-                                    true,
-                                  )
-                                ]
-                              ),
 
                             // params
                             ...(() => {
@@ -663,7 +573,7 @@ export class Generator {
                                       undefined,
                                     );
                                   }),
-                                )
+                                ),
                               ];
                             })(),
                             // headers
@@ -682,92 +592,97 @@ export class Generator {
                                       undefined,
                                     );
                                   }),
-                                )
+                                ),
                               ];
                             })(),
                             // data
                             ...(safeRequestBodySchemaName.success ? [ts.factory.createIdentifier('safeData')] : []),
-                          ]
-                        ))
-                    )],
-                    ts.NodeFlags.Const
-                  )
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                  ts.NodeFlags.Const,
                 ),
-                ...(safeResponseBodySchemaName.success ? [
-                  ts.factory.createVariableStatement(
-                    undefined,
-                    ts.factory.createVariableDeclarationList(
-                      [ts.factory.createVariableDeclaration(
-                        ts.factory.createIdentifier('safeResponseData'),
-                        undefined,
-                        undefined,
-                        ts.factory.createCallExpression(
-                          ts.factory.createPropertyAccessExpression(
-                            ts.factory.createIdentifier(safeResponseBodySchemaName.data),
-                            ts.factory.createIdentifier('parse')
+              ),
+              ...(safeResponseBodySchemaName.success
+                ? [
+                    ts.factory.createVariableStatement(
+                      undefined,
+                      ts.factory.createVariableDeclarationList(
+                        [
+                          ts.factory.createVariableDeclaration(
+                            ts.factory.createIdentifier('safeResponseData'),
+                            undefined,
+                            undefined,
+                            ts.factory.createCallExpression(
+                              ts.factory.createPropertyAccessExpression(
+                                ts.factory.createIdentifier(safeResponseBodySchemaName.data),
+                                ts.factory.createIdentifier('parse'),
+                              ),
+                              undefined,
+                              [
+                                ts.factory.createPropertyAccessExpression(
+                                  ts.factory.createIdentifier('response'),
+                                  ts.factory.createIdentifier('data'),
+                                ),
+                              ],
+                            ),
                           ),
-                          undefined,
-                          [ts.factory.createPropertyAccessExpression(
-                            ts.factory.createIdentifier('response'),
-                            ts.factory.createIdentifier('data')
-                          )]
-                        )
-                      )],
-                      ts.NodeFlags.Const
-                    )
-                  ),
-                  ts.factory.createReturnStatement(ts.factory.createObjectLiteralExpression(
-                    [
-                      ts.factory.createSpreadAssignment(ts.factory.createIdentifier('response')),
-                      ts.factory.createPropertyAssignment(
-                        ts.factory.createIdentifier('data'),
-                        ts.factory.createIdentifier('safeResponseData')
-                      )
-                    ],
-                    true
-                  )),
-                ] : [
-                  ts.factory.createReturnStatement(
-                    ts.factory.createIdentifier('response'),
-                  ),
-                ]),
+                        ],
+                        ts.NodeFlags.Const,
+                      ),
+                    ),
+                    ts.factory.createReturnStatement(
+                      ts.factory.createObjectLiteralExpression(
+                        [
+                          ts.factory.createSpreadAssignment(ts.factory.createIdentifier('response')),
+                          ts.factory.createPropertyAssignment(
+                            ts.factory.createIdentifier('data'),
+                            ts.factory.createIdentifier('safeResponseData'),
+                          ),
+                        ],
+                        true,
+                      ),
+                    ),
+                  ]
+                : [ts.factory.createReturnStatement(ts.factory.createIdentifier('response'))]),
 
+              // END OF THE METHOD
+            ],
+            true,
+          ),
+        );
+      });
 
-                // END OF THE METHOD
-              ],
-              true,
-            ),
-          );
-        });
-
-        return endpoints.concat(...methods);
-      }, []);
+      return endpoints.concat(...methods);
+    }, []);
 
     const safeBaseUrl = z.string().safeParse(openapi.servers?.[0]?.url);
 
     const defaultBaseUrl = safeBaseUrl.success
       ? [
-        ts.addSyntheticTrailingComment(
-          ts.factory.createIdentifier('\n'),
-          ts.SyntaxKind.SingleLineCommentTrivia,
-          ' Default base URL',
-          true,
-        ),
-        ts.factory.createVariableStatement(
-          undefined,
-          ts.factory.createVariableDeclarationList(
-            [
-              ts.factory.createVariableDeclaration(
-                ts.factory.createIdentifier('defaultBaseUrl'),
-                undefined,
-                undefined,
-                ts.factory.createStringLiteral(safeBaseUrl.data, true),
-              ),
-            ],
-            ts.NodeFlags.Const
-          )
-        ),
-      ]
+          ts.addSyntheticTrailingComment(
+            ts.factory.createIdentifier('\n'),
+            ts.SyntaxKind.SingleLineCommentTrivia,
+            ' Default base URL',
+            true,
+          ),
+          ts.factory.createVariableStatement(
+            undefined,
+            ts.factory.createVariableDeclarationList(
+              [
+                ts.factory.createVariableDeclaration(
+                  ts.factory.createIdentifier('defaultBaseUrl'),
+                  undefined,
+                  undefined,
+                  ts.factory.createStringLiteral(safeBaseUrl.data, true),
+                ),
+              ],
+              ts.NodeFlags.Const,
+            ),
+          ),
+        ]
       : [];
 
     const clientHelperName = openapi.info.title
@@ -776,9 +691,7 @@ export class Generator {
       .join('');
 
     const clientHelper = ts.factory.createClassDeclaration(
-      [
-        ts.factory.createToken(ts.SyntaxKind.ExportKeyword)
-      ],
+      [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
       ts.factory.createIdentifier(clientHelperName),
       undefined,
       undefined,
@@ -795,10 +708,8 @@ export class Generator {
             this.createParameter(
               'baseUrl',
               'string',
-              defaultBaseUrl.length > 0
-                ? ts.factory.createIdentifier('defaultBaseUrl')
-                : undefined
-            )
+              defaultBaseUrl.length > 0 ? ts.factory.createIdentifier('defaultBaseUrl') : undefined,
+            ),
           ].concat(this.createParameter('')),
           ts.factory.createBlock(
             [
@@ -819,155 +730,90 @@ export class Generator {
         // TODO: Refactor this, it's a mess right now :(
         // #makeApiRequest(method, path, data)
         ts.factory.createMethodDeclaration(
-          [
-            ts.factory.createToken(ts.SyntaxKind.AsyncKeyword)
-          ],
+          [ts.factory.createToken(ts.SyntaxKind.AsyncKeyword)],
           undefined,
           ts.factory.createPrivateIdentifier('#makeApiRequest'),
           undefined,
+          [this.createGenericType('T')],
           [
-            this.createGenericType('T'),
-          ],
-          [
-            this.createParameter(
-              'method',
-              'string',
-            ),
-            this.createParameter(
-              'path',
-              'string',
-            ),
+            this.createParameter('method', 'string'),
+            this.createParameter('path', 'string'),
             this.createParameter(
               'headers',
-              ts.factory.createTypeReferenceNode(
-                ts.factory.createIdentifier('Record'),
-                [
-                  ts.factory.createTypeReferenceNode(
-                    ts.factory.createIdentifier('PropertyKey'),
-                    undefined,
-                  ),
-                  ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
-                ]
-              ),
-              ts.factory.createObjectLiteralExpression(
-                [],
-                false
-              ),
+              ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Record'), [
+                ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('PropertyKey'), undefined),
+                ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
+              ]),
+              ts.factory.createObjectLiteralExpression([], false),
             ),
             this.createParameter(
               'params',
-              ts.factory.createTypeReferenceNode(
-                ts.factory.createIdentifier('Record'),
-                [
-                  ts.factory.createTypeReferenceNode(
-                    ts.factory.createIdentifier('PropertyKey'),
-                    undefined,
-                  ),
-                  ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
-                ]
-              ),
-              ts.factory.createObjectLiteralExpression(
-                [],
-                false
-              ),
+              ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Record'), [
+                ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('PropertyKey'), undefined),
+                ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
+              ]),
+              ts.factory.createObjectLiteralExpression([], false),
             ),
-            this.createParameter(
-              'data',
-              'unknown',
-              undefined,
-              true,
-            ),
+            this.createParameter('data', 'unknown', undefined, true),
           ].concat(this.createParameter('')),
-          ts.factory.createTypeReferenceNode(
-            ts.factory.createIdentifier('Promise'),
-            [
-              ts.factory.createTypeReferenceNode(
-                ts.factory.createIdentifier('AxiosResponse'),
-                [
-                  ts.factory.createTypeReferenceNode(
-                    ts.factory.createIdentifier('T'),
-                    undefined
-                  ),
-                ],
-              ),
-            ],
-          ),
+          ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [
+            ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('AxiosResponse'), [
+              ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('T'), undefined),
+            ]),
+          ]),
           ts.factory.createBlock(
             [
-              ts.factory.createReturnStatement(ts.factory.createCallExpression(
-                ts.factory.createIdentifier('axios'),
-                [
-                  ts.factory.createTypeReferenceNode(
-                    ts.factory.createIdentifier('T'),
-                    undefined
-                  )
-                ],
-                [
-                  ts.factory.createObjectLiteralExpression(
-                    [
-                      ts.factory.createShorthandPropertyAssignment(
-                        ts.factory.createIdentifier('method'),
-                        undefined
-                      ),
-                      ts.factory.createPropertyAssignment(
-                        ts.factory.createIdentifier('url'),
-                        ts.factory.createTemplateExpression(
-                          ts.factory.createTemplateHead(
-                            '',
-                            ''
-                          ),
-                          [
+              ts.factory.createReturnStatement(
+                ts.factory.createCallExpression(
+                  ts.factory.createIdentifier('axios'),
+                  [ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('T'), undefined)],
+                  [
+                    ts.factory.createObjectLiteralExpression(
+                      [
+                        ts.factory.createShorthandPropertyAssignment(ts.factory.createIdentifier('method'), undefined),
+                        ts.factory.createPropertyAssignment(
+                          ts.factory.createIdentifier('url'),
+                          ts.factory.createTemplateExpression(ts.factory.createTemplateHead('', ''), [
                             ts.factory.createTemplateSpan(
                               ts.factory.createPropertyAccessExpression(
                                 ts.factory.createThis(),
-                                ts.factory.createPrivateIdentifier('#baseUrl')
+                                ts.factory.createPrivateIdentifier('#baseUrl'),
                               ),
-                              ts.factory.createTemplateMiddle(
-                                '',
-                                ''
-                              )
+                              ts.factory.createTemplateMiddle('', ''),
                             ),
                             ts.factory.createTemplateSpan(
                               ts.factory.createIdentifier('path'),
-                              ts.factory.createTemplateTail(
-                                '',
-                                ''
-                              )
-                            )
-                          ]
-                        )
-                      ),
-                      ts.factory.createShorthandPropertyAssignment(
-                        ts.factory.createIdentifier('params'),
-                        undefined
-                      ),
-                      ts.factory.createShorthandPropertyAssignment(
-                        ts.factory.createIdentifier('data'),
-                        undefined
-                      ),
-                      ts.factory.createPropertyAssignment(
-                        ts.factory.createIdentifier('headers'),
-                        ts.factory.createObjectLiteralExpression(
-                          [
-                            ts.factory.createPropertyAssignment(
-                              ts.factory.createStringLiteral('Content-Type', true),
-                              ts.factory.createStringLiteral('application/json', true)
+                              ts.factory.createTemplateTail('', ''),
                             ),
-                            ts.factory.createSpreadAssignment(ts.factory.createIdentifier('headers')),
-                          ],
-                          true
-                        )
-                      )
-                    ],
-                    true
-                  )]
-              ))
+                          ]),
+                        ),
+                        ts.factory.createShorthandPropertyAssignment(ts.factory.createIdentifier('params'), undefined),
+                        ts.factory.createShorthandPropertyAssignment(ts.factory.createIdentifier('data'), undefined),
+                        ts.factory.createPropertyAssignment(
+                          ts.factory.createIdentifier('headers'),
+                          ts.factory.createObjectLiteralExpression(
+                            [
+                              ts.factory.createPropertyAssignment(
+                                ts.factory.createStringLiteral('Content-Type', true),
+                                ts.factory.createStringLiteral('application/json', true),
+                              ),
+                              ts.factory.createSpreadAssignment(ts.factory.createIdentifier('headers')),
+                            ],
+                            true,
+                          ),
+                        ),
+                      ],
+                      true,
+                    ),
+                  ],
+                ),
+              ),
             ],
-            true
+            true,
           ),
         ),
         ...paths,
-      ]
+      ],
     );
 
     return [
@@ -1002,21 +848,11 @@ export class Generator {
   }
 
   buildCode(openapi: Zod.infer<typeof OpenApiSpec>): string {
-    const file = ts.createSourceFile(
-      this._target,
-      '',
-      ts.ScriptTarget.Latest,
-      false,
-      ts.ScriptKind.TS
-    );
+    const file = ts.createSourceFile(this._target, '', ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
 
     const nodes = this.buildAST(openapi);
 
-    return this._printer.printList(
-      ts.ListFormat.MultiLine,
-      ts.factory.createNodeArray(nodes),
-      file,
-    );
+    return this._printer.printList(ts.ListFormat.MultiLine, ts.factory.createNodeArray(nodes), file);
   }
 
   writeFile(title: string, version: string, source: string) {
@@ -1029,7 +865,7 @@ export class Generator {
         `// Source file: ${this._input}`,
         `// API: ${title} v${version}`,
         source,
-      ].join('\n')
+      ].join('\n'),
     );
   }
 

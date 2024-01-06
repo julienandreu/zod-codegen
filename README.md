@@ -1,2 +1,3 @@
 # zod-codegen
-Zod code generator 
+
+Zod code generator

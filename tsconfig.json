@@ -4,13 +4,7 @@
     "downlevelIteration": true,
     "esModuleInterop": true,
     "isolatedModules": true,
-    "lib": [
-      "es5",
-      "es6",
-      "es7",
-      "esnext",
-      "dom"
-    ],
+    "lib": ["es5", "es6", "es7", "esnext", "dom"],
     "module": "commonjs",
     "moduleResolution": "node",
     "noFallthroughCasesInSwitch": true,
@@ -26,11 +20,7 @@
     "strictPropertyInitialization": false,
     "target": "es2018"
   },
-  "include": [
-    "src/**/*.ts",
-    "scripts/**/*.ts",
-    "generated/**/*.ts"
-  ],
+  "include": ["src/**/*.ts", "scripts/**/*.ts", "generated/**/*.ts"],
   "scripts": {
     "build": "tsc --project tsconfig.json",
     "dev": "npm run build && npm run start",

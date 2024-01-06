@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import {z} from 'zod';
 
 export const Reference = z.object({
   $ref: z.string().optional(),
@@ -35,10 +35,12 @@ const BaseSchemaProperties = z.object({
   discriminator: Reference.optional(),
   readOnly: z.boolean().optional(),
   writeOnly: z.boolean().optional(),
-  xml: z.object({
-    name: z.string().optional(),
-    wrapped: z.boolean().optional(),
-  }).optional(),
+  xml: z
+    .object({
+      name: z.string().optional(),
+      wrapped: z.boolean().optional(),
+    })
+    .optional(),
   externalDocs: Reference.optional(),
   example: z.unknown().optional(),
   deprecated: z.boolean().optional(),
@@ -96,28 +98,36 @@ export const Response = z.object({
   $ref: z.string().optional(),
   description: z.string(),
   headers: z.record(ResponseHeader).optional(),
-  content: z.record(
-    z.object({
-      // TODO: Remove the unknown here in favor of the union type
-      // https://github.com/colinhacks/zod/issues/2203
-      schema: z.unknown().optional(),
-      // schema: z.union([
-      //   Reference,
-      //   SchemaProperties,
-      // ]).optional(),
-    }).optional(),
-  ).optional(),
+  content: z
+    .record(
+      z
+        .object({
+          // TODO: Remove the unknown here in favor of the union type
+          // https://github.com/colinhacks/zod/issues/2203
+          schema: z.unknown().optional(),
+          // schema: z.union([
+          //   Reference,
+          //   SchemaProperties,
+          // ]).optional(),
+        })
+        .optional(),
+    )
+    .optional(),
 });
 
 export const RequestBody = z.object({
   $ref: z.string().optional(),
   description: z.string().optional(),
   required: z.boolean().optional(),
-  content: z.object({
-    'application/json': z.object({
-      schema: Reference.optional(),
-    }).optional(),
-  }).optional(),
+  content: z
+    .object({
+      'application/json': z
+        .object({
+          schema: Reference.optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 export const MethodSchema = z.object({
@@ -145,15 +155,19 @@ const Info = z.object({
   version: z.string(),
   description: z.string().optional(),
   termsOfService: z.string().url().optional(),
-  contact: z.object({
-    name: z.string().optional(),
-    email: z.string().email().optional(),
-    url: z.string().url().optional(),
-  }).optional(),
-  license: z.object({
-    name: z.string(),
-    url: z.string().url().optional(),
-  }).optional(),
+  contact: z
+    .object({
+      name: z.string().optional(),
+      email: z.string().email().optional(),
+      url: z.string().url().optional(),
+    })
+    .optional(),
+  license: z
+    .object({
+      name: z.string(),
+      url: z.string().url().optional(),
+    })
+    .optional(),
 });
 
 const SecurityRequirement = z.record(z.array(z.string()));
@@ -170,34 +184,44 @@ const ExternalDocumentation = z.object({
 });
 
 export const OpenApiSpec = z.object({
-  openapi: z.string().refine(version => version.startsWith('3.'), {
+  openapi: z.string().refine((version) => version.startsWith('3.'), {
     message: 'OpenAPI version must start with "3."',
   }),
   info: Info,
   servers: z.array(Server).optional(),
   paths: z.record(PathItem),
-  components: z.object({
-    schemas: z.record(SchemaProperties).optional(),
-    responses: z.record(Response).optional(),
-    parameters: z.record(Parameter).optional(),
-    examples: z.record(Reference).optional(),
-    requestBodies: z.record(
-      z.object({
-        $ref: z.string().optional(),
-        description: z.string().optional(),
-        content: z.record(z.object({
-          'application/json': z.object({
-            schema: Reference.optional(),
-          }).optional(),
-          // Add other media types as needed
-        })).optional(),
-      })
-    ).optional(),
-    headers: z.record(ResponseHeader).optional(),
-    securitySchemes: z.record(Reference).optional(),
-    links: z.record(Reference).optional(),
-    callbacks: z.record(Reference).optional(),
-  }).optional(),
+  components: z
+    .object({
+      schemas: z.record(SchemaProperties).optional(),
+      responses: z.record(Response).optional(),
+      parameters: z.record(Parameter).optional(),
+      examples: z.record(Reference).optional(),
+      requestBodies: z
+        .record(
+          z.object({
+            $ref: z.string().optional(),
+            description: z.string().optional(),
+            content: z
+              .record(
+                z.object({
+                  'application/json': z
+                    .object({
+                      schema: Reference.optional(),
+                    })
+                    .optional(),
+                  // Add other media types as needed
+                }),
+              )
+              .optional(),
+          }),
+        )
+        .optional(),
+      headers: z.record(ResponseHeader).optional(),
+      securitySchemes: z.record(Reference).optional(),
+      links: z.record(Reference).optional(),
+      callbacks: z.record(Reference).optional(),
+    })
+    .optional(),
   security: z.array(SecurityRequirement).optional(),
   tags: z.array(Tag).optional(),
   externalDocs: ExternalDocumentation.optional(),

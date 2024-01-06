@@ -1,12 +1,14 @@
-import axios, { type AxiosResponse } from 'axios';
-import { z } from 'zod';
+import axios, {type AxiosResponse} from 'axios';
+import {z} from 'zod';
 
 const Category = z.object({
   id: z.number().int().optional(),
   name: z.string().optional(),
-  sub: z.object({
-    prop1: z.string().optional(),
-  }).optional(),
+  sub: z
+    .object({
+      prop1: z.string().optional(),
+    })
+    .optional(),
 });
 
 const Pet = z.object({
@@ -25,11 +27,7 @@ export class SwaggerPetstore {
     this.#baseUrl = baseUrl;
   }
 
-  async #makeApiRequest<T>(
-    method: string,
-    path: string,
-    data?: unknown
-  ): Promise<AxiosResponse<T>> {
+  async #makeApiRequest<T>(method: string, path: string, data?: unknown): Promise<AxiosResponse<T>> {
     return axios<T>({
       method,
       url: `${this.#baseUrl}${path}`,
