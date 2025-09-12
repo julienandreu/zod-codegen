@@ -38,7 +38,7 @@
   "scripts": {
     "build": "rm -rf dist && tsc --project tsconfig.json && chmod +x ./dist/src/cli.js",
     "deploy": "npm run build && npm publish",
-    "dev": "npm run build && node ./dist/src/cli.js --input ./samples/swagger-petstore.yaml && npm run format && npm run lint",
+    "dev": "npm run build && node ./dist/src/cli.js --input ./samples/saris-openapi.json && npm run format && npm run lint",
     "lint": "eslint src generated --fix",
     "format": "prettier src generated --write --log-level error",
     "manifest:update": "ts-node scripts/update-manifest.ts",

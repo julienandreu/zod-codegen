@@ -20,7 +20,7 @@
     "strictPropertyInitialization": false,
     "target": "es2018"
   },
-  "include": ["src/**/*.ts", "scripts/**/*.ts", ],
+  "include": ["src/**/*.ts", "scripts/**/*.ts", "generated/**/*.ts" ],
   "scripts": {
     "build": "tsc --project tsconfig.json",
     "dev": "npm run build && npm run start",

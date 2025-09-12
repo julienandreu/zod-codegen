@@ -1,0 +1,50 @@
+openapi: 3.0.0
+info:
+  title: Test Logical Operators
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    TestAnyOf:
+      anyOf:
+        - type: string
+        - type: number
+        - type: boolean
+    
+    TestOneOf:
+      oneOf:
+        - type: string
+        - type: number
+    
+    TestAllOf:
+      allOf:
+        - type: object
+          properties:
+            name:
+              type: string
+        - type: object
+          properties:
+            age:
+              type: number
+    
+    TestNot:
+      not:
+        type: string
+    
+    TestComplex:
+      type: object
+      properties:
+        unionField:
+          anyOf:
+            - type: string
+            - type: number
+        intersectionField:
+          allOf:
+            - type: object
+              properties:
+                id:
+                  type: string
+            - type: object
+              properties:
+                timestamp:
+                  type: number
