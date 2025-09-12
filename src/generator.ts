@@ -102,7 +102,7 @@ export class Generator {
     return ts.factory.createParameterDeclaration(
       undefined,
       undefined,
-      ts.factory.createIdentifier(`\n${name}`),
+      ts.factory.createIdentifier(this.sanitizeIdentifier(name)),
       isOptional ? ts.factory.createToken(ts.SyntaxKind.QuestionToken) : undefined,
       typeof type === 'string' ? this.createType(type) : type,
       defaultValue,
@@ -171,20 +171,210 @@ export class Generator {
     return rootExpression;
   }
 
+  private handleLogicalOperator(
+    operator: 'anyOf' | 'oneOf' | 'allOf' | 'not',
+    schemas: unknown[],
+    required: boolean,
+  ): ts.CallExpression {
+    const logicalExpression = this.buildLogicalOperator(operator, schemas);
+    return required
+      ? logicalExpression
+      : ts.factory.createCallExpression(
+          ts.factory.createPropertyAccessExpression(logicalExpression, ts.factory.createIdentifier('optional')),
+          undefined,
+          [],
+        );
+  }
+
+  buildLogicalOperator(operator: 'anyOf' | 'oneOf' | 'allOf' | 'not', schemas: unknown[]): ts.CallExpression {
+    switch (operator) {
+      case 'anyOf':
+      case 'oneOf': {
+        // Both anyOf and oneOf map to z.union in Zod
+        const unionSchemas = schemas.map((schema) => this.buildSchemaFromLogicalOperator(schema));
+        return ts.factory.createCallExpression(
+          ts.factory.createPropertyAccessExpression(
+            ts.factory.createIdentifier('z'),
+            ts.factory.createIdentifier('union'),
+          ),
+          undefined,
+          [ts.factory.createArrayLiteralExpression(unionSchemas, false)],
+        );
+      }
+      case 'allOf': {
+        // allOf maps to z.intersection in Zod
+        if (schemas.length === 0) {
+          throw new Error('allOf requires at least one schema');
+        }
+
+        const firstSchema = this.buildSchemaFromLogicalOperator(schemas[0]);
+        return schemas.slice(1).reduce<ts.Expression>((acc, schema) => {
+          const schemaExpression = this.buildSchemaFromLogicalOperator(schema);
+          return ts.factory.createCallExpression(
+            ts.factory.createPropertyAccessExpression(
+              ts.factory.createIdentifier('z'),
+              ts.factory.createIdentifier('intersection'),
+            ),
+            undefined,
+            [acc, schemaExpression],
+          );
+        }, firstSchema) as ts.CallExpression;
+      }
+      case 'not': {
+        // not maps to z.any().refine with negation logic
+        const notSchema = this.buildSchemaFromLogicalOperator(schemas[0]);
+        return ts.factory.createCallExpression(
+          ts.factory.createPropertyAccessExpression(
+            ts.factory.createPropertyAccessExpression(
+              ts.factory.createIdentifier('z'),
+              ts.factory.createIdentifier('any'),
+            ),
+            ts.factory.createIdentifier('refine'),
+          ),
+          undefined,
+          [
+            ts.factory.createArrowFunction(
+              undefined,
+              undefined,
+              [ts.factory.createParameterDeclaration(undefined, undefined, 'val', undefined, undefined, undefined)],
+              undefined,
+              ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+              ts.factory.createPrefixUnaryExpression(
+                ts.SyntaxKind.ExclamationToken,
+                ts.factory.createCallExpression(
+                  ts.factory.createPropertyAccessExpression(notSchema, ts.factory.createIdentifier('safeParse')),
+                  undefined,
+                  [ts.factory.createIdentifier('val')],
+                ),
+              ),
+            ),
+            ts.factory.createObjectLiteralExpression([
+              ts.factory.createPropertyAssignment(
+                ts.factory.createIdentifier('message'),
+                ts.factory.createStringLiteral('Value must not match the excluded schema'),
+              ),
+            ]),
+          ],
+        );
+      }
+      default:
+        throw new Error(`Unsupported logical operator: ${String(operator)}`);
+    }
+  }
+
+  private buildSchemaFromLogicalOperator(schema: unknown): ts.CallExpression | ts.Identifier {
+    // Check if it's a reference
+    if (this.isReference(schema)) {
+      return this.buildFromReference(schema);
+    }
+
+    // Try to parse as SchemaProperties first
+    const safeSchema = SchemaProperties.safeParse(schema);
+    if (safeSchema.success) {
+      return this.buildProperty(safeSchema.data, true);
+    }
+
+    // If that fails, try to build as a basic type
+    return this.buildBasicTypeFromSchema(schema);
+  }
+
+  private buildBasicTypeFromSchema(schema: unknown): ts.CallExpression | ts.Identifier {
+    if (typeof schema === 'object' && schema !== null && 'type' in schema) {
+      const schemaObj = schema as {type: string; properties?: Record<string, unknown>; items?: unknown};
+
+      switch (schemaObj.type) {
+        case 'string':
+          return this.buildZodAST(['string']);
+        case 'number':
+          return this.buildZodAST(['number']);
+        case 'integer':
+          return this.buildZodAST(['number', 'int']);
+        case 'boolean':
+          return this.buildZodAST(['boolean']);
+        case 'object':
+          return this.buildObjectTypeFromSchema(schemaObj);
+        case 'array':
+          return this.buildArrayTypeFromSchema(schemaObj);
+        default:
+          return this.buildZodAST(['unknown']);
+      }
+    }
+
+    // Fallback to unknown
+    return this.buildZodAST(['unknown']);
+  }
+
+  private buildObjectTypeFromSchema(schemaObj: {properties?: Record<string, unknown>}): ts.CallExpression {
+    if (schemaObj.properties) {
+      return this.buildZodAST([
+        {
+          type: 'object',
+          args: [
+            ts.factory.createObjectLiteralExpression(
+              Object.entries(schemaObj.properties).map(([name, property]): ts.ObjectLiteralElementLike => {
+                return ts.factory.createPropertyAssignment(
+                  ts.factory.createIdentifier(name),
+                  this.buildSchemaFromLogicalOperator(property),
+                );
+              }),
+              true,
+            ),
+          ],
+        },
+      ]);
+    }
+    return this.buildZodAST(['object']);
+  }
+
+  private buildArrayTypeFromSchema(schemaObj: {items?: unknown}): ts.CallExpression {
+    if (schemaObj.items) {
+      return this.buildZodAST([
+        {
+          type: 'array',
+          args: [this.buildSchemaFromLogicalOperator(schemaObj.items)],
+        },
+      ]);
+    }
+    return this.buildZodAST(['array']);
+  }
+
   isReference(reference: unknown): reference is z.infer<typeof Reference> {
-    return Reference.safeParse(reference).success;
+    if (typeof reference === 'object' && reference !== null && '$ref' in reference) {
+      const ref = reference as {$ref?: unknown};
+      return typeof ref.$ref === 'string' && ref.$ref.length > 0;
+    }
+    return false;
   }
 
   buildFromReference(reference: unknown): ts.Identifier {
     const {$ref = ''} = Reference.parse(reference);
+    const refName = $ref.split('/').pop() ?? 'never';
 
-    return ts.factory.createIdentifier($ref.split('/').pop() ?? 'never');
+    return ts.factory.createIdentifier(this.sanitizeIdentifier(refName));
   }
 
   // TODO: Extract methods to build each type of property
   // eslint-disable-next-line complexity
   buildProperty(property: unknown, required = false): ts.CallExpression | ts.Identifier {
     const safeProperty = SchemaProperties.parse(property);
+
+    // Handle logical operators first
+    if (safeProperty.anyOf && safeProperty.anyOf.length > 0) {
+      return this.handleLogicalOperator('anyOf', safeProperty.anyOf, required);
+    }
+
+    if (safeProperty.oneOf && safeProperty.oneOf.length > 0) {
+      return this.handleLogicalOperator('oneOf', safeProperty.oneOf, required);
+    }
+
+    if (safeProperty.allOf && safeProperty.allOf.length > 0) {
+      return this.handleLogicalOperator('allOf', safeProperty.allOf, required);
+    }
+
+    if (safeProperty.not) {
+      return this.handleLogicalOperator('not', [safeProperty.not], required);
+    }
+
     switch (safeProperty.type) {
       case 'array':
         return this.buildZodAST([
@@ -214,6 +404,8 @@ export class Generator {
         ]);
       case 'integer':
         return this.buildZodAST(['number', 'int', ...(!required ? ['optional'] : [])]);
+      case 'number':
+        return this.buildZodAST(['number', ...(!required ? ['optional'] : [])]);
       case 'string':
         return this.buildZodAST(['string', ...(!required ? ['optional'] : [])]);
       case 'boolean':
@@ -233,6 +425,24 @@ export class Generator {
     const safeCategorySchema = SchemaProperties.safeParse(schema);
     if (safeCategorySchema.success) {
       const safeCategory = safeCategorySchema.data;
+
+      // Handle logical operators at the schema level
+      if (safeCategory.anyOf && safeCategory.anyOf.length > 0) {
+        return this.handleLogicalOperator('anyOf', safeCategory.anyOf, required);
+      }
+
+      if (safeCategory.oneOf && safeCategory.oneOf.length > 0) {
+        return this.handleLogicalOperator('oneOf', safeCategory.oneOf, required);
+      }
+
+      if (safeCategory.allOf && safeCategory.allOf.length > 0) {
+        return this.handleLogicalOperator('allOf', safeCategory.allOf, required);
+      }
+
+      if (safeCategory.not) {
+        return this.handleLogicalOperator('not', [safeCategory.not], required);
+      }
+
       return this.buildProperty(safeCategory, required);
     }
 
@@ -317,11 +527,29 @@ export class Generator {
     return word.charAt(0).toUpperCase() + word.slice(1);
   }
 
+  sanitizeIdentifier(name: string): string {
+    // Replace hyphens and other invalid characters with underscores
+    // Ensure it starts with a letter or underscore
+    let sanitized = name.replace(/[^a-zA-Z0-9_]/g, '_');
+
+    // Ensure it doesn't start with a number
+    if (/^[0-9]/.test(sanitized)) {
+      sanitized = '_' + sanitized;
+    }
+
+    // Ensure it's not empty
+    if (sanitized.length === 0) {
+      sanitized = '_';
+    }
+
+    return sanitized;
+  }
+
   buildPathParameter(schemas: Record<string, ts.VariableStatement>, parameter: unknown) {
     const safeParameter = Parameter.parse(parameter);
 
     const identifier = `${safeParameter.in}Parameter${this.toPascalCase(safeParameter.name)}`;
-    const newSchema = this.toPascalCase(identifier);
+    const newSchema = this.sanitizeIdentifier(this.toPascalCase(identifier));
 
     const variableStatement = ts.factory.createVariableStatement(
       [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
@@ -342,7 +570,7 @@ export class Generator {
     schemas[newSchema] = variableStatement;
 
     return this.createParameter(
-      safeParameter.name,
+      this.sanitizeIdentifier(safeParameter.name),
       ts.factory.createTypeReferenceNode(
         ts.factory.createQualifiedName(ts.factory.createIdentifier('z'), ts.factory.createIdentifier('infer')),
         [ts.factory.createTypeQueryNode(ts.factory.createIdentifier(newSchema), undefined)],
@@ -357,6 +585,48 @@ export class Generator {
     const {success} = z.array(z.string()).safeParse(out);
 
     return success;
+  }
+
+  // Topological sort for schema dependencies
+  private topologicalSort(schemas: Record<string, unknown>): string[] {
+    const visited = new Set<string>();
+    const visiting = new Set<string>();
+    const result: string[] = [];
+
+    const visit = (name: string) => {
+      if (visiting.has(name)) {
+        // Circular dependency detected, add it anyway
+        return;
+      }
+      if (visited.has(name)) {
+        return;
+      }
+
+      visiting.add(name);
+      const schema = schemas[name];
+      const dependencies = jp
+        .query(schema, '$..[\'$ref\']')
+        .filter((ref: string) => ref.startsWith('#/components/schemas/'))
+        .map((ref: string) => ref.replace('#/components/schemas/', ''));
+
+      for (const dep of dependencies) {
+        if (schemas[dep]) {
+          visit(dep);
+        }
+      }
+
+      visiting.delete(name);
+      visited.add(name);
+      result.push(name);
+    };
+
+    for (const name of Object.keys(schemas)) {
+      if (!visited.has(name)) {
+        visit(name);
+      }
+    }
+
+    return result;
   }
 
   buildAST(openapi: Zod.infer<typeof OpenApiSpec>) {
@@ -381,41 +651,33 @@ export class Generator {
       },
     });
 
-    const schemas: Record<string, ts.VariableStatement> = Object.entries(openapi.components?.schemas ?? {})
-      // Sort by dependencies
-      .sort(([aName, aSchema], [bName, bSchema]) => {
-        const aDependencies = jp.query(aSchema, '$..[\'$ref\']');
-        if (aDependencies.includes(`#/components/schemas/${bName}`)) {
-          return 1;
-        }
-        const bDependencies = jp.query(bSchema, '$..[\'$ref\']');
-        if (bDependencies.includes(`#/components/schemas/${aName}`)) {
-          return -1;
-        }
+    const schemasEntries = Object.entries(openapi.components?.schemas ?? {});
+    const sortedSchemaNames = this.topologicalSort(Object.fromEntries(schemasEntries));
 
-        return 0;
-      })
-      .reduce((schemaRegistered, [name, schema]) => {
-        const variableStatement = ts.factory.createVariableStatement(
-          [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
-          ts.factory.createVariableDeclarationList(
-            [
-              ts.factory.createVariableDeclaration(
-                ts.factory.createIdentifier(name),
-                undefined,
-                undefined,
-                this.buildSchema(schema),
-              ),
-            ],
-            ts.NodeFlags.Const,
-          ),
-        );
+    const schemas: Record<string, ts.VariableStatement> = sortedSchemaNames.reduce((schemaRegistered, name) => {
+      const schema = openapi.components?.schemas?.[name];
+      if (!schema) return schemaRegistered;
 
-        return {
-          ...schemaRegistered,
-          [name]: variableStatement,
-        };
-      }, {});
+      const variableStatement = ts.factory.createVariableStatement(
+        [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
+        ts.factory.createVariableDeclarationList(
+          [
+            ts.factory.createVariableDeclaration(
+              ts.factory.createIdentifier(this.sanitizeIdentifier(name)),
+              undefined,
+              undefined,
+              this.buildSchema(schema),
+            ),
+          ],
+          ts.NodeFlags.Const,
+        ),
+      );
+
+      return {
+        ...schemaRegistered,
+        [name]: variableStatement,
+      };
+    }, {});
 
     const paths = Object.entries(openapi.paths).reduce<ts.MethodDeclaration[]>((endpoints, [path, endpoint]) => {
       // TODO: Refactor this mess
@@ -440,19 +702,16 @@ export class Generator {
           undefined,
           undefined,
           [
+            // Required parameters first
             ...(this.getParameters(safeMethodSchema, ['path'])?.map((parameter) =>
-              this.buildPathParameter(schemas, parameter),
-            ) ?? []),
-            ...(this.getParameters(safeMethodSchema, ['query'])?.map((parameter) =>
-              this.buildPathParameter(schemas, parameter),
-            ) ?? []),
-            ...(this.getParameters(safeMethodSchema, ['header'])?.map((parameter) =>
               this.buildPathParameter(schemas, parameter),
             ) ?? []),
             ...(safeRequestBodySchemaName.success
               ? [
                   this.createParameter(
-                    this.toCamelCase(safeRequestBodySchemaName.data.replace(/([a-z])([A-Z])/g, '$1-$2')),
+                    this.sanitizeIdentifier(
+                      this.toCamelCase(safeRequestBodySchemaName.data.replace(/([a-z])([A-Z])/g, '$1-$2')),
+                    ),
                     ts.factory.createTypeReferenceNode(
                       ts.factory.createQualifiedName(
                         ts.factory.createIdentifier('z'),
@@ -468,7 +727,15 @@ export class Generator {
                   ),
                 ]
               : []),
-          ].concat(this.createParameter('')),
+            // Optional parameters last
+            ...(this.getParameters(safeMethodSchema, ['query'])?.map((parameter) =>
+              this.buildPathParameter(schemas, parameter),
+            ) ?? []),
+            ...(this.getParameters(safeMethodSchema, ['header'])?.map((parameter) =>
+              this.buildPathParameter(schemas, parameter),
+            ) ?? []),
+            this.createParameter('_', 'unknown', undefined, true),
+          ],
           safeResponseBodySchemaName.success
             ? ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [
                 ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('AxiosResponse'), [
@@ -509,7 +776,11 @@ export class Generator {
                               undefined,
                               [
                                 ts.factory.createIdentifier(
-                                  this.toCamelCase(safeRequestBodySchemaName.data.replace(/([a-z])([A-Z])/g, '$1-$2')),
+                                  this.sanitizeIdentifier(
+                                    this.toCamelCase(
+                                      safeRequestBodySchemaName.data.replace(/([a-z])([A-Z])/g, '$1-$2'),
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
@@ -542,14 +813,19 @@ export class Generator {
                               ? ts.factory.createStringLiteral(path, true)
                               : ts.factory.createCallExpression(
                                   ts.factory.createCallExpression(ts.factory.createIdentifier('compile'), undefined, [
-                                    ts.factory.createStringLiteral(path, true),
+                                    ts.factory.createStringLiteral(path.replace(/\{([^}]+)\}/g, ':$1'), true),
                                   ]),
                                   undefined,
                                   [
                                     ts.factory.createObjectLiteralExpression(
                                       this.getParameters(safeMethodSchema, ['path'])?.map(({name}) => {
-                                        return ts.factory.createShorthandPropertyAssignment(
+                                        return ts.factory.createPropertyAssignment(
                                           ts.factory.createIdentifier(name),
+                                          ts.factory.createCallExpression(
+                                            ts.factory.createIdentifier('String'),
+                                            undefined,
+                                            [ts.factory.createIdentifier(name)],
+                                          ),
                                         );
                                       }) ?? [],
                                       true,
@@ -568,11 +844,16 @@ export class Generator {
                               return [
                                 ts.factory.createObjectLiteralExpression(
                                   queryStringParams.map((param) => {
-                                    return ts.factory.createShorthandPropertyAssignment(
+                                    return ts.factory.createPropertyAssignment(
                                       ts.factory.createIdentifier(param.name),
-                                      undefined,
+                                      ts.factory.createCallExpression(
+                                        ts.factory.createIdentifier('String'),
+                                        undefined,
+                                        [ts.factory.createIdentifier(param.name)],
+                                      ),
                                     );
                                   }),
+                                  true,
                                 ),
                               ];
                             })(),
@@ -710,7 +991,8 @@ export class Generator {
               'string',
               defaultBaseUrl.length > 0 ? ts.factory.createIdentifier('defaultBaseUrl') : undefined,
             ),
-          ].concat(this.createParameter('')),
+            this.createParameter('_', 'unknown', undefined, true),
+          ],
           ts.factory.createBlock(
             [
               ts.factory.createExpressionStatement(
@@ -755,7 +1037,8 @@ export class Generator {
               ts.factory.createObjectLiteralExpression([], false),
             ),
             this.createParameter('data', 'unknown', undefined, true),
-          ].concat(this.createParameter('')),
+            this.createParameter('_', 'unknown', undefined, true),
+          ],
           ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [
             ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('AxiosResponse'), [
               ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('T'), undefined),
@@ -864,6 +1147,8 @@ export class Generator {
         `// Latest edit: ${new Date().toUTCString()}`,
         `// Source file: ${this._input}`,
         `// API: ${title} v${version}`,
+        '/* eslint-disable */',
+        '// @ts-nocheck',
         source,
       ].join('\n'),
     );

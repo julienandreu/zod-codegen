@@ -1,6 +1,6 @@
-import {SwaggerPetstoreOpenAPI30} from './type';
+import {SarisAPIMetro} from './type';
 
-const client = new SwaggerPetstoreOpenAPI30();
+const client = new SarisAPIMetro('https://api.saris.io', undefined);
 
 export async function test() {
   const {data: createdPet} = await client.addPet({
