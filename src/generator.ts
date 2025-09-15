@@ -1,8 +1,8 @@
-import type { Reporter } from './utils/reporter.js';
-import type { OpenApiSpecType } from './types/openapi.js';
-import { OpenApiFileParserService, SyncFileReaderService } from './services/file-reader.service.js';
-import { TypeScriptCodeGeneratorService } from './services/code-generator.service.js';
-import { SyncFileWriterService } from './services/file-writer.service.js';
+import type {Reporter} from './utils/reporter.js';
+import type {OpenApiSpecType} from './types/openapi.js';
+import {OpenApiFileParserService, SyncFileReaderService} from './services/file-reader.service.js';
+import {TypeScriptCodeGeneratorService} from './services/code-generator.service.js';
+import {SyncFileWriterService} from './services/file-writer.service.js';
 
 export class Generator {
   private readonly fileReader = new SyncFileReaderService();

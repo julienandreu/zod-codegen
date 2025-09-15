@@ -1,19 +1,19 @@
 import jp from 'jsonpath';
 import * as ts from 'typescript';
-import { z } from 'zod';
-import type { CodeGenerator, SchemaBuilder } from '../interfaces/code-generator.js';
-import type { MethodSchemaType, OpenApiSpecType, ReferenceType } from '../types/openapi.js';
-import { MethodSchema, Reference, SchemaProperties } from '../types/openapi.js';
-import { TypeScriptImportBuilderService } from './import-builder.service.js';
-import { TypeScriptTypeBuilderService } from './type-builder.service.js';
+import {z} from 'zod';
+import type {CodeGenerator, SchemaBuilder} from '../interfaces/code-generator.js';
+import type {MethodSchemaType, OpenApiSpecType, ReferenceType} from '../types/openapi.js';
+import {MethodSchema, Reference, SchemaProperties} from '../types/openapi.js';
+import {TypeScriptImportBuilderService} from './import-builder.service.js';
+import {TypeScriptTypeBuilderService} from './type-builder.service.js';
 
 export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuilder {
   private readonly typeBuilder = new TypeScriptTypeBuilderService();
   private readonly importBuilder = new TypeScriptImportBuilderService();
-  private readonly printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed });
+  private readonly printer = ts.createPrinter({newLine: ts.NewLineKind.LineFeed});
 
   private readonly ZodAST = z.object({
-    type: z.enum(['string', 'number', 'boolean', 'object', 'array', 'unknown']),
+    type: z.enum(['string', 'number', 'boolean', 'object', 'array', 'unknown', 'record']),
     args: z.array(z.unknown()).optional(),
   });
 
@@ -426,38 +426,38 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
     const initialExpression = !safeInitial.success
       ? ts.factory.createCallExpression(
-        ts.factory.createPropertyAccessExpression(
-          ts.factory.createIdentifier('z'),
-          ts.factory.createIdentifier(this.ZodAST.shape.type.parse(initial)),
-        ),
-        undefined,
-        [],
-      )
+          ts.factory.createPropertyAccessExpression(
+            ts.factory.createIdentifier('z'),
+            ts.factory.createIdentifier(this.ZodAST.shape.type.parse(initial)),
+          ),
+          undefined,
+          [],
+        )
       : ts.factory.createCallExpression(
-        ts.factory.createPropertyAccessExpression(
-          ts.factory.createIdentifier('z'),
-          ts.factory.createIdentifier(safeInitial.data.type),
-        ),
-        undefined,
-        (safeInitial.data.args ?? []) as ts.Expression[],
-      );
+          ts.factory.createPropertyAccessExpression(
+            ts.factory.createIdentifier('z'),
+            ts.factory.createIdentifier(safeInitial.data.type),
+          ),
+          undefined,
+          (safeInitial.data.args ?? []) as ts.Expression[],
+        );
 
     return rest.reduce((expression, exp: unknown) => {
       const safeExp = this.ZodAST.safeParse(exp);
       return !safeExp.success
         ? ts.factory.createCallExpression(
-          ts.factory.createPropertyAccessExpression(
-            expression,
-            ts.factory.createIdentifier(typeof exp === 'string' ? exp : String(exp)),
-          ),
-          undefined,
-          [],
-        )
+            ts.factory.createPropertyAccessExpression(
+              expression,
+              ts.factory.createIdentifier(typeof exp === 'string' ? exp : String(exp)),
+            ),
+            undefined,
+            [],
+          )
         : ts.factory.createCallExpression(
-          ts.factory.createPropertyAccessExpression(expression, ts.factory.createIdentifier(safeExp.data.type)),
-          undefined,
-          (safeExp.data.args ?? []) as ts.Expression[],
-        );
+            ts.factory.createPropertyAccessExpression(expression, ts.factory.createIdentifier(safeExp.data.type)),
+            undefined,
+            (safeExp.data.args ?? []) as ts.Expression[],
+          );
     }, initialExpression);
   }
 
@@ -501,19 +501,21 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
           },
           ...(!required ? ['optional'] : []),
         ]);
-      case 'object':
-        {
-          const {
-            properties = {},
-            required: propRequired = []
-          } = prop as { properties?: Record<string, unknown>; required?: string[] };
+      case 'object': {
+        const {properties = {}, required: propRequired = []} = prop as {
+          properties?: Record<string, unknown>;
+          required?: string[];
+        };
 
+        const propertiesEntries = Object.entries(properties);
+
+        if (propertiesEntries.length > 0) {
           return this.buildZodAST([
             {
               type: 'object',
               args: [
                 ts.factory.createObjectLiteralExpression(
-                  Object.entries(properties).map(([name, propValue]): ts.ObjectLiteralElementLike => {
+                  propertiesEntries.map(([name, propValue]): ts.ObjectLiteralElementLike => {
                     return ts.factory.createPropertyAssignment(
                       ts.factory.createIdentifier(name),
                       this.buildProperty(propValue, propRequired.includes(name)),
@@ -526,6 +528,14 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
             ...(!required ? ['optional'] : []),
           ]);
         }
+
+        return this.buildZodAST([
+          {
+            type: 'record',
+            args: [this.buildZodAST(['string']), this.buildZodAST(['unknown'])],
+          },
+        ]);
+      }
       case 'integer':
         methodsToApply.push('int');
         return this.buildZodAST(['number', ...methodsToApply, ...(!required ? ['optional'] : [])]);
@@ -550,10 +560,10 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     return required
       ? logicalExpression
       : ts.factory.createCallExpression(
-        ts.factory.createPropertyAccessExpression(logicalExpression, ts.factory.createIdentifier('optional')),
-        undefined,
-        [],
-      );
+          ts.factory.createPropertyAccessExpression(logicalExpression, ts.factory.createIdentifier('optional')),
+          undefined,
+          [],
+        );
   }
 
   private buildLogicalOperator(operator: 'anyOf' | 'oneOf' | 'allOf' | 'not', schemas: unknown[]): ts.CallExpression {
@@ -644,7 +654,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
   private buildBasicTypeFromSchema(schema: unknown): ts.CallExpression | ts.Identifier {
     if (typeof schema === 'object' && schema !== null && 'type' in schema) {
-      const schemaObj = schema as { type: string; properties?: Record<string, unknown>; items?: unknown };
+      const schemaObj = schema as {type: string; properties?: Record<string, unknown>; items?: unknown};
 
       switch (schemaObj.type) {
         case 'string':
@@ -667,14 +677,16 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     return this.buildZodAST(['unknown']);
   }
 
-  private buildObjectTypeFromSchema(schemaObj: { properties?: Record<string, unknown> }): ts.CallExpression {
-    if (schemaObj.properties) {
+  private buildObjectTypeFromSchema(schemaObj: {properties?: Record<string, unknown>}): ts.CallExpression {
+    const properties = Object.entries(schemaObj.properties ?? {});
+
+    if (properties.length > 0) {
       return this.buildZodAST([
         {
           type: 'object',
           args: [
             ts.factory.createObjectLiteralExpression(
-              Object.entries(schemaObj.properties).map(([name, property]): ts.ObjectLiteralElementLike => {
+              properties.map(([name, property]): ts.ObjectLiteralElementLike => {
                 return ts.factory.createPropertyAssignment(
                   ts.factory.createIdentifier(name),
                   this.buildSchemaFromLogicalOperator(property),
@@ -686,10 +698,16 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
         },
       ]);
     }
-    return this.buildZodAST(['object']);
+
+    return this.buildZodAST([
+      {
+        type: 'record',
+        args: [this.buildZodAST(['string']), this.buildZodAST(['unknown'])],
+      },
+    ]);
   }
 
-  private buildArrayTypeFromSchema(schemaObj: { items?: unknown }): ts.CallExpression {
+  private buildArrayTypeFromSchema(schemaObj: {items?: unknown}): ts.CallExpression {
     if (schemaObj.items) {
       return this.buildZodAST([
         {
@@ -703,14 +721,14 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
   private isReference(reference: unknown): reference is ReferenceType {
     if (typeof reference === 'object' && reference !== null && '$ref' in reference) {
-      const ref = reference as { $ref?: unknown };
+      const ref = reference as {$ref?: unknown};
       return typeof ref.$ref === 'string' && ref.$ref.length > 0;
     }
     return false;
   }
 
   private buildFromReference(reference: ReferenceType): ts.Identifier {
-    const { $ref = '' } = Reference.parse(reference);
+    const {$ref = ''} = Reference.parse(reference);
     const refName = $ref.split('/').pop() ?? 'never';
     return ts.factory.createIdentifier(this.typeBuilder.sanitizeIdentifier(refName));
   }

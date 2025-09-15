@@ -1,4 +1,4 @@
-import { HttpClient, HttpError, HttpRequestConfig, HttpResponse } from '../types/http.js';
+import {HttpClient, HttpError, HttpRequestConfig, HttpResponse} from '../types/http.js';
 
 declare const globalThis: typeof global & {
   fetch?: typeof fetch;
@@ -33,7 +33,7 @@ export class FetchHttpClient implements HttpClient {
     }
 
     throw new Error(
-      'Fetch API is not available. Please ensure you\'re running in a compatible environment or polyfill fetch.',
+      "Fetch API is not available. Please ensure you're running in a compatible environment or polyfill fetch.",
     );
   }
 
@@ -47,8 +47,8 @@ export class FetchHttpClient implements HttpClient {
     const controller = new AbortController();
     const timeoutId = config.timeout
       ? setTimeout(() => {
-        controller.abort();
-      }, config.timeout)
+          controller.abort();
+        }, config.timeout)
       : undefined;
 
     try {
@@ -103,13 +103,12 @@ export class FetchHttpClient implements HttpClient {
     const url = new URL(path, this.baseUrl || 'http://localhost');
 
     if (params) {
-      Object.entries(params)
-        .forEach(([key, value]) => {
-          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-          if (value !== undefined && value !== null) {
-            url.searchParams.set(key, String(value));
-          }
-        });
+      Object.entries(params).forEach(([key, value]) => {
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        if (value !== undefined && value !== null) {
+          url.searchParams.set(key, String(value));
+        }
+      });
     }
 
     return url.toString();
