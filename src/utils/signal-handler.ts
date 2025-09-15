@@ -1,7 +1,7 @@
-import {getExecutionTime} from './execution-time';
+import {getExecutionTime} from './execution-time.js';
 
 export const signalReceived = (process: NodeJS.Process, startTime: bigint, event: NodeJS.Signals) => (): void => {
-  console.log(`Done after ${getExecutionTime(startTime)}s`);
+  console.log(`Done after ${String(getExecutionTime(startTime))}s`);
   process.kill(process.pid, event);
   process.exit(1);
 };

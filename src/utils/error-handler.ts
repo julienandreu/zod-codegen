@@ -1,7 +1,7 @@
-import {getExecutionTime} from './execution-time';
+import {getExecutionTime} from './execution-time.js';
 
 export const errorReceived = (process: NodeJS.Process, startTime: bigint) => (): void => {
-  console.log(`Done after ${getExecutionTime(startTime)}s`);
+  console.log(`Done after ${String(getExecutionTime(startTime))}s`);
   process.exit(1);
 };
 

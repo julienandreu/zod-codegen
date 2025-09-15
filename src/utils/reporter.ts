@@ -1,15 +1,16 @@
-import {format} from 'util';
+import {format} from 'node:util';
 
 export class Reporter {
-  constructor(private _stdout: NodeJS.WriteStream) {
+  constructor(private readonly _stdout: NodeJS.WriteStream) {
     this.log = this.log.bind(this);
+    this.error = this.error.bind(this);
   }
 
-  log(...args: unknown[]) {
+  log(...args: readonly unknown[]): void {
     this._stdout.write(format(...args) + '\n');
   }
 
-  error(...args: unknown[]) {
+  error(...args: readonly unknown[]): void {
     this._stdout.write(format(...args) + '\n');
   }
 }

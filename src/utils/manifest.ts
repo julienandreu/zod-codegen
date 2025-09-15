@@ -1,29 +1,17 @@
 import {z} from 'zod';
 
 interface Manifest {
-  name: string;
-  version: string;
-  description: string;
+  readonly name: string;
+  readonly version: string;
+  readonly description: string;
 }
 
-/**
- * Type guard for the package.json object
- *
- * @param input Unknown input
- * @returns true if the input is an event object
- */
+const ManifestSchema = z.object({
+  name: z.string().min(1),
+  version: z.string().min(1),
+  description: z.string().min(1),
+});
+
 export function isManifest(input: unknown): input is Manifest {
-  const manifest = z
-    .object({
-      name: z.string(),
-      version: z.string(),
-      description: z.string(),
-    })
-    .strict()
-    .catchall(z.any())
-    .required();
-
-  const {success} = manifest.safeParse(input);
-
-  return success;
+  return ManifestSchema.safeParse(input).success;
 }

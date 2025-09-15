@@ -1,29 +1,57 @@
 {
   "compilerOptions": {
-    "allowSyntheticDefaultImports": true,
+    "allowJs": false,
+    "alwaysStrict": true,
+    "baseUrl": ".",
+    "checkJs": false,
     "downlevelIteration": true,
     "esModuleInterop": true,
+    "exactOptionalPropertyTypes": false,
+    "forceConsistentCasingInFileNames": true,
+    "incremental": true,
     "isolatedModules": true,
-    "lib": ["es5", "es6", "es7", "esnext", "dom"],
-    "module": "commonjs",
-    "moduleResolution": "node",
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": false,
     "noFallthroughCasesInSwitch": true,
     "noImplicitAny": true,
+    "noImplicitOverride": true,
     "noImplicitReturns": true,
+    "noImplicitThis": true,
+    "noPropertyAccessFromIndexSignature": false,
+    "noUncheckedIndexedAccess": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "outDir": "dist",
     "removeComments": false,
     "resolveJsonModule": true,
+    "rootDir": ".",
     "skipLibCheck": true,
+    "sourceMap": false,
     "strict": true,
-    "strictPropertyInitialization": false,
-    "target": "es2018"
+    "strictBindCallApply": true,
+    "strictFunctionTypes": true,
+    "strictNullChecks": true,
+    "strictPropertyInitialization": true,
+    "target": "ES2022",
+    "typeRoots": [
+      "./node_modules/@types"
+    ],
+    "useUnknownInCatchVariables": true,
+    "verbatimModuleSyntax": false
   },
-  "include": ["src/**/*.ts", "scripts/**/*.ts", ],
-  "scripts": {
-    "build": "tsc --project tsconfig.json",
-    "dev": "npm run build && npm run start",
-    "start": "chmod +x dist/cli.js && dist/cli.js"
-  }
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build",
+    "generated"
+  ],
+  "include": [
+    "src/**/*.ts",
+    "scripts/**/*.ts"
+  ]
 }

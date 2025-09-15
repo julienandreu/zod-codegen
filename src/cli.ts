@@ -1,64 +1,67 @@
 #!/usr/bin/env node
-import {program} from 'commander';
-import {Generator} from './generator';
-import manifestData from './assets/manifest.json';
-import loudRejection from 'loud-rejection';
-import {handleErrors} from './utils/error-handler';
-import {handleSignals} from './utils/signal-handler';
-import debug from 'debug';
-import {isManifest} from './utils/manifest';
-import {Reporter} from './utils/reporter';
+import yargs from 'yargs';
+import { hideBin } from 'yargs/helpers';
+import { Generator } from './generator.js';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 
-interface CLIOptions {
-  input: string;
-  output: string;
-}
+import loudRejection from 'loud-rejection';
+import { handleErrors } from './utils/error-handler.js';
+import { handleSignals } from './utils/signal-handler.js';
+import debug from 'debug';
+import { isManifest } from './utils/manifest.js';
+import { Reporter } from './utils/reporter.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const manifestData: unknown = JSON.parse(readFileSync(join(__dirname, 'assets', 'manifest.json'), 'utf-8'));
 
 if (!isManifest(manifestData)) {
   process.exit(1);
 }
 
-// Get manifest data
-const {name, description, version} = manifestData;
-
-// Set output stream
+const { name, description, version } = manifestData;
 const reporter = new Reporter(process.stdout);
-
-// Get HRTime
 const startTime = process.hrtime.bigint();
 
-// Define debug namespace
-debug(`${name}:${process.pid}`);
+debug(`${name}:${String(process.pid)}`);
 
-// Loud rejection
 loudRejection();
-
-// Handle signals
 handleSignals(process, startTime);
-
-// Handle errors
 handleErrors(process, startTime);
 
-// Define program params
-program
-  .name(name)
-  .description(description)
+const argv = yargs(hideBin(process.argv))
+  .scriptName(name)
+  .usage(`${description}\n\nUsage: $0 [options]`)
   .version(version)
-  .requiredOption('-i, --input <path|url>', 'Path or URL to OpenAPI file')
-  .option('-o, --output [directory]', 'Directory to output the generated files', 'generated')
-  .parse();
+  .option('input', {
+    alias: 'i',
+    type: 'string',
+    description: 'Path or URL to OpenAPI file',
+    demandOption: true,
+  })
+  .option('output', {
+    alias: 'o',
+    type: 'string',
+    description: 'Directory to output the generated files',
+    default: 'generated',
+  })
+  .help()
+  .parseSync();
 
-// Parse params
-const {input, output} = program.opts<CLIOptions>();
+const { input, output } = argv;
 
-// Cli
-void (() => {
-  // Setup Generator
-  const generator = new Generator(name, version, reporter, input, output);
-
-  // Run
-  const exitCode = generator.run();
-
-  // Return exit code
-  process.exit(exitCode);
+void (async () => {
+  try {
+    const generator = new Generator(name, version, reporter, input, output);
+    const exitCode = await generator.run();
+    process.exit(exitCode);
+  } catch (error) {
+    if (error instanceof Error) {
+      reporter.error(`Fatal error: ${error.message}`);
+    } else {
+      reporter.error('An unknown fatal error occurred');
+    }
+    process.exit(1);
+  }
 })();
