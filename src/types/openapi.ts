@@ -7,19 +7,19 @@ export const Reference = z.object({
 const BaseSchemaProperties = z.object({
   $ref: z.string().optional(),
   title: z.string().optional(),
-  multipleOf: z.number().optional(),
+  multipleOf: z.number().positive().optional(),
   maximum: z.number().optional(),
   exclusiveMaximum: z.boolean().optional(),
   minimum: z.number().optional(),
   exclusiveMinimum: z.boolean().optional(),
-  maxLength: z.number().optional(),
-  minLength: z.number().optional(),
+  maxLength: z.number().int().nonnegative().optional(),
+  minLength: z.number().int().nonnegative().optional(),
   pattern: z.string().optional(),
-  maxItems: z.number().optional(),
-  minItems: z.number().optional(),
+  maxItems: z.number().int().nonnegative().optional(),
+  minItems: z.number().int().nonnegative().optional(),
   uniqueItems: z.boolean().optional(),
-  maxProperties: z.number().optional(),
-  minProperties: z.number().optional(),
+  maxProperties: z.number().int().nonnegative().optional(),
+  minProperties: z.number().int().nonnegative().optional(),
   required: z.array(z.string()).optional(),
   enum: z.array(z.unknown()).optional(),
   type: z.string().optional(),
@@ -46,15 +46,13 @@ const BaseSchemaProperties = z.object({
   deprecated: z.boolean().optional(),
 });
 
-export const SchemaProperties: z.ZodType<
-  z.infer<typeof BaseSchemaProperties> & {
-    properties?: Record<string, z.infer<typeof SchemaProperties>>;
-    items?: z.infer<typeof SchemaProperties>;
-  }
-> = BaseSchemaProperties.extend({
-  properties: z.lazy(() => z.record(SchemaProperties).optional()),
-  items: z.lazy(() => SchemaProperties.optional()),
-});
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const SchemaProperties: z.ZodLazy<z.ZodObject<any>> = z.lazy(() =>
+  BaseSchemaProperties.extend({
+    properties: z.record(z.string(), SchemaProperties).optional(),
+    items: SchemaProperties.optional(),
+  }),
+);
 
 const ServerVariable = z.object({
   default: z.string(),
@@ -65,13 +63,13 @@ const ServerVariable = z.object({
 const Server = z.object({
   url: z.string().url(),
   description: z.string().optional(),
-  variables: z.record(ServerVariable).optional(),
+  variables: z.record(z.string(), ServerVariable).optional(),
 });
 
 export const Parameter = z.object({
   $ref: z.string().optional(),
   name: z.string(),
-  in: z.string(),
+  in: z.enum(['query', 'header', 'path', 'cookie']),
   description: z.string().optional(),
   required: z.boolean().optional(),
   deprecated: z.boolean().optional(),
@@ -94,40 +92,22 @@ const ResponseHeader = z.object({
   schema: Reference.optional(),
 });
 
+const MediaType = z.object({
+  schema: z.unknown().optional(),
+});
+
 export const Response = z.object({
   $ref: z.string().optional(),
   description: z.string(),
-  headers: z.record(ResponseHeader).optional(),
-  content: z
-    .record(
-      z
-        .object({
-          // TODO: Remove the unknown here in favor of the union type
-          // https://github.com/colinhacks/zod/issues/2203
-          schema: z.unknown().optional(),
-          // schema: z.union([
-          //   Reference,
-          //   SchemaProperties,
-          // ]).optional(),
-        })
-        .optional(),
-    )
-    .optional(),
+  headers: z.record(z.string(), ResponseHeader).optional(),
+  content: z.record(z.string(), MediaType).optional(),
 });
 
 export const RequestBody = z.object({
   $ref: z.string().optional(),
   description: z.string().optional(),
   required: z.boolean().optional(),
-  content: z
-    .object({
-      'application/json': z
-        .object({
-          schema: Reference.optional(),
-        })
-        .optional(),
-    })
-    .optional(),
+  content: z.record(z.string(), MediaType).optional(),
 });
 
 export const MethodSchema = z.object({
@@ -136,7 +116,9 @@ export const MethodSchema = z.object({
   operationId: z.string().optional(),
   parameters: z.array(Parameter).optional(),
   requestBody: RequestBody.optional(),
-  responses: z.record(Response).optional(),
+  responses: z.record(z.string(), Response).optional(),
+  tags: z.array(z.string()).optional(),
+  deprecated: z.boolean().optional(),
 });
 
 export const PathItem = z.object({
@@ -148,11 +130,15 @@ export const PathItem = z.object({
   put: MethodSchema.optional(),
   patch: MethodSchema.optional(),
   delete: MethodSchema.optional(),
+  head: MethodSchema.optional(),
+  options: MethodSchema.optional(),
+  trace: MethodSchema.optional(),
+  parameters: z.array(Parameter).optional(),
 });
 
 const Info = z.object({
-  title: z.string(),
-  version: z.string(),
+  title: z.string().min(1),
+  version: z.string().min(1),
   description: z.string().optional(),
   termsOfService: z.string().url().optional(),
   contact: z
@@ -164,16 +150,16 @@ const Info = z.object({
     .optional(),
   license: z
     .object({
-      name: z.string(),
+      name: z.string().min(1),
       url: z.string().url().optional(),
     })
     .optional(),
 });
 
-const SecurityRequirement = z.record(z.array(z.string()));
+const SecurityRequirement = z.record(z.string(), z.array(z.string()));
 
 const Tag = z.object({
-  name: z.string(),
+  name: z.string().min(1),
   description: z.string().optional(),
   externalDocs: Reference.optional(),
 });
@@ -183,46 +169,34 @@ const ExternalDocumentation = z.object({
   url: z.string().url(),
 });
 
+const Components = z.object({
+  schemas: z.record(z.string(), SchemaProperties).optional(),
+  responses: z.record(z.string(), Response).optional(),
+  parameters: z.record(z.string(), Parameter).optional(),
+  examples: z.record(z.string(), Reference).optional(),
+  requestBodies: z.record(z.string(), RequestBody).optional(),
+  headers: z.record(z.string(), ResponseHeader).optional(),
+  securitySchemes: z.record(z.string(), Reference).optional(),
+  links: z.record(z.string(), Reference).optional(),
+  callbacks: z.record(z.string(), Reference).optional(),
+});
+
 export const OpenApiSpec = z.object({
-  openapi: z.string().refine((version) => version.startsWith('3.'), {
-    message: 'OpenAPI version must start with "3."',
-  }),
+  openapi: z.string().regex(/^3\.\d+\.\d+$/, 'OpenAPI version must be in format 3.x.x'),
   info: Info,
   servers: z.array(Server).optional(),
-  paths: z.record(PathItem),
-  components: z
-    .object({
-      schemas: z.record(SchemaProperties).optional(),
-      responses: z.record(Response).optional(),
-      parameters: z.record(Parameter).optional(),
-      examples: z.record(Reference).optional(),
-      requestBodies: z
-        .record(
-          z.object({
-            $ref: z.string().optional(),
-            description: z.string().optional(),
-            content: z
-              .record(
-                z.object({
-                  'application/json': z
-                    .object({
-                      schema: Reference.optional(),
-                    })
-                    .optional(),
-                  // Add other media types as needed
-                }),
-              )
-              .optional(),
-          }),
-        )
-        .optional(),
-      headers: z.record(ResponseHeader).optional(),
-      securitySchemes: z.record(Reference).optional(),
-      links: z.record(Reference).optional(),
-      callbacks: z.record(Reference).optional(),
-    })
-    .optional(),
+  paths: z.record(z.string(), PathItem),
+  components: Components.optional(),
   security: z.array(SecurityRequirement).optional(),
   tags: z.array(Tag).optional(),
   externalDocs: ExternalDocumentation.optional(),
 });
+
+export type OpenApiSpecType = z.infer<typeof OpenApiSpec>;
+export type SchemaPropertiesType = z.infer<typeof SchemaProperties>;
+export type ParameterType = z.infer<typeof Parameter>;
+export type ResponseType = z.infer<typeof Response>;
+export type RequestBodyType = z.infer<typeof RequestBody>;
+export type MethodSchemaType = z.infer<typeof MethodSchema>;
+export type PathItemType = z.infer<typeof PathItem>;
+export type ReferenceType = z.infer<typeof Reference>;
