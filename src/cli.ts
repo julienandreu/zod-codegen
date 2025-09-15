@@ -1,17 +1,18 @@
 #!/usr/bin/env node
+
 import yargs from 'yargs';
-import { hideBin } from 'yargs/helpers';
-import { Generator } from './generator.js';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import {hideBin} from 'yargs/helpers';
+import {Generator} from './generator.js';
+import {readFileSync} from 'node:fs';
+import {fileURLToPath} from 'node:url';
+import {dirname, join} from 'node:path';
 
 import loudRejection from 'loud-rejection';
-import { handleErrors } from './utils/error-handler.js';
-import { handleSignals } from './utils/signal-handler.js';
+import {handleErrors} from './utils/error-handler.js';
+import {handleSignals} from './utils/signal-handler.js';
 import debug from 'debug';
-import { isManifest } from './utils/manifest.js';
-import { Reporter } from './utils/reporter.js';
+import {isManifest} from './utils/manifest.js';
+import {Reporter} from './utils/reporter.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const manifestData: unknown = JSON.parse(readFileSync(join(__dirname, 'assets', 'manifest.json'), 'utf-8'));
@@ -20,7 +21,7 @@ if (!isManifest(manifestData)) {
   process.exit(1);
 }
 
-const { name, description, version } = manifestData;
+const {name, description, version} = manifestData;
 const reporter = new Reporter(process.stdout);
 const startTime = process.hrtime.bigint();
 
@@ -49,7 +50,7 @@ const argv = yargs(hideBin(process.argv))
   .help()
   .parseSync();
 
-const { input, output } = argv;
+const {input, output} = argv;
 
 void (async () => {
   try {

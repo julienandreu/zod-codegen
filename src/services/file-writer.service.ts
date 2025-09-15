@@ -1,5 +1,5 @@
-import {writeFileSync} from 'node:fs';
-import {resolve} from 'node:path';
+import {existsSync, mkdirSync, writeFileSync} from 'node:fs';
+import {dirname, resolve} from 'node:path';
 import type {FileWriter} from '../interfaces/code-generator.js';
 
 export class SyncFileWriterService implements FileWriter {
@@ -20,6 +20,12 @@ export class SyncFileWriterService implements FileWriter {
       '',
       content,
     ].join('\n');
+
+    const dirPath = dirname(filePath);
+
+    if (!existsSync(dirPath)) {
+      mkdirSync(dirPath, {recursive: true});
+    }
 
     writeFileSync(filePath, generatedContent);
   }
