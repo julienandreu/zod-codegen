@@ -1,3 +1,25 @@
+## <small>1.0.1 (2025-09-16)</small>
+
+- Merge pull request #10 from julienandreu/dependabot/npm_and_yarn/eslint-config-prettier-10.1.8 ([d9b786c](https://github.com/julienandreu/zod-codegen/commit/d9b786c)), closes [#10](https://github.com/julienandreu/zod-codegen/issues/10)
+- Merge pull request #11 from julienandreu/dependabot/npm_and_yarn/types/node-24.5.0 ([aef6e88](https://github.com/julienandreu/zod-codegen/commit/aef6e88)), closes [#11](https://github.com/julienandreu/zod-codegen/issues/11)
+- Merge pull request #3 from julienandreu/dependabot/github_actions/actions/setup-node-5 ([62282bc](https://github.com/julienandreu/zod-codegen/commit/62282bc)), closes [#3](https://github.com/julienandreu/zod-codegen/issues/3)
+- Merge pull request #4 from julienandreu/dependabot/github_actions/actions/checkout-5 ([979b29e](https://github.com/julienandreu/zod-codegen/commit/979b29e)), closes [#4](https://github.com/julienandreu/zod-codegen/issues/4)
+- Merge pull request #5 from julienandreu/dependabot/github_actions/codecov/codecov-action-5 ([dddb7b0](https://github.com/julienandreu/zod-codegen/commit/dddb7b0)), closes [#5](https://github.com/julienandreu/zod-codegen/issues/5)
+- Merge pull request #6 from julienandreu/dependabot/npm_and_yarn/dev-dependencies-77ad94e918 ([596b00f](https://github.com/julienandreu/zod-codegen/commit/596b00f)), closes [#6](https://github.com/julienandreu/zod-codegen/issues/6)
+- Merge pull request #7 from julienandreu/dependabot/npm_and_yarn/zod-4.1.8 ([39eecb4](https://github.com/julienandreu/zod-codegen/commit/39eecb4)), closes [#7](https://github.com/julienandreu/zod-codegen/issues/7)
+- Merge pull request #8 from julienandreu/dependabot/npm_and_yarn/apidevtools/swagger-parser-12.0.0 ([3507359](https://github.com/julienandreu/zod-codegen/commit/3507359)), closes [#8](https://github.com/julienandreu/zod-codegen/issues/8)
+- Merge pull request #9 from julienandreu/dependabot/npm_and_yarn/undici-7.16.0 ([84d7c4a](https://github.com/julienandreu/zod-codegen/commit/84d7c4a)), closes [#9](https://github.com/julienandreu/zod-codegen/issues/9)
+- fix: use z.url() and z.email() instead of substring types ([4ea5902](https://github.com/julienandreu/zod-codegen/commit/4ea5902))
+- chore(deps-dev): bump @types/node from 22.18.3 to 24.5.0 ([33e823c](https://github.com/julienandreu/zod-codegen/commit/33e823c))
+- chore(deps-dev): bump eslint-config-prettier from 9.1.0 to 10.1.8 ([79dc367](https://github.com/julienandreu/zod-codegen/commit/79dc367))
+- chore(deps-dev): bump typescript-eslint in the dev-dependencies group ([907712a](https://github.com/julienandreu/zod-codegen/commit/907712a))
+- chore(deps): bump @apidevtools/swagger-parser from 10.1.0 to 12.0.0 ([9abfbbe](https://github.com/julienandreu/zod-codegen/commit/9abfbbe))
+- chore(deps): bump undici from 6.21.3 to 7.16.0 ([43c579b](https://github.com/julienandreu/zod-codegen/commit/43c579b))
+- chore(deps): bump zod from 3.25.76 to 4.1.8 ([5b7e047](https://github.com/julienandreu/zod-codegen/commit/5b7e047))
+- ci(deps): bump actions/checkout from 4 to 5 ([3f141f7](https://github.com/julienandreu/zod-codegen/commit/3f141f7))
+- ci(deps): bump actions/setup-node from 4 to 5 ([cc4a331](https://github.com/julienandreu/zod-codegen/commit/cc4a331))
+- ci(deps): bump codecov/codecov-action from 4 to 5 ([c0a4ea5](https://github.com/julienandreu/zod-codegen/commit/c0a4ea5))
+
 ## 1.0.0 (2025-09-16)
 
 - chore: fix husky deprecation warnings and improve ci/cd ([fe24d72](https://github.com/julienandreu/zod-codegen/commit/fe24d72))
