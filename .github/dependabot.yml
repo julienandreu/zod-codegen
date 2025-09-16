@@ -1,0 +1,76 @@
+version: 2
+updates:
+  - package-ecosystem: 'npm'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '09:00'
+    open-pull-requests-limit: 10
+    reviewers:
+      - 'julienandreu'
+    assignees:
+      - 'julienandreu'
+    commit-message:
+      prefix: 'chore'
+      prefix-development: 'chore'
+      include: 'scope'
+    labels:
+      - 'dependencies'
+      - 'automated'
+    versioning-strategy: increase
+    groups:
+      dev-dependencies:
+        patterns:
+          - '@types/*'
+          - '@eslint/*'
+          - '@commitlint/*'
+          - '@semantic-release/*'
+          - '@vitest/*'
+          - 'eslint*'
+          - 'prettier'
+          - 'typescript*'
+          - 'husky'
+          - 'lint-staged'
+          - 'vitest'
+          - 'ts-node'
+        update-types:
+          - 'minor'
+          - 'patch'
+      production-dependencies:
+        patterns:
+          - '*'
+        exclude-patterns:
+          - '@types/*'
+          - '@eslint/*'
+          - '@commitlint/*'
+          - '@semantic-release/*'
+          - '@vitest/*'
+          - 'eslint*'
+          - 'prettier'
+          - 'typescript*'
+          - 'husky'
+          - 'lint-staged'
+          - 'vitest'
+          - 'ts-node'
+        update-types:
+          - 'minor'
+          - 'patch'
+
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '09:00'
+    open-pull-requests-limit: 5
+    reviewers:
+      - 'julienandreu'
+    assignees:
+      - 'julienandreu'
+    commit-message:
+      prefix: 'ci'
+      include: 'scope'
+    labels:
+      - 'ci'
+      - 'automated'
