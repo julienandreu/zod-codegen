@@ -61,7 +61,7 @@ const ServerVariable = z.object({
 });
 
 const Server = z.object({
-  url: z.string().url(),
+  url: z.url(),
   description: z.string().optional(),
   variables: z.record(z.string(), ServerVariable).optional(),
 });
@@ -140,18 +140,18 @@ const Info = z.object({
   title: z.string().min(1),
   version: z.string().min(1),
   description: z.string().optional(),
-  termsOfService: z.string().url().optional(),
+  termsOfService: z.url().optional(),
   contact: z
     .object({
       name: z.string().optional(),
-      email: z.string().email().optional(),
-      url: z.string().url().optional(),
+      email: z.email().optional(),
+      url: z.url().optional(),
     })
     .optional(),
   license: z
     .object({
       name: z.string().min(1),
-      url: z.string().url().optional(),
+      url: z.url().optional(),
     })
     .optional(),
 });
@@ -166,7 +166,7 @@ const Tag = z.object({
 
 const ExternalDocumentation = z.object({
   description: z.string().optional(),
-  url: z.string().url(),
+  url: z.url(),
 });
 
 const Components = z.object({
