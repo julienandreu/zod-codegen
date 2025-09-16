@@ -1,6 +1,8 @@
 {
   "author": "Julien Andreu <julienandreu@me.com>",
-  "bin": "dist/src/cli.js",
+  "bin": {
+    "zod-codegen": "dist/src/cli.js"
+  },
   "bugs": {
     "url": "https://github.com/julienandreu/zod-codegen/issues"
   },
@@ -68,9 +70,12 @@
       "require": "./dist/src/generator-v2.js"
     }
   },
-  "repository": "git@github.com:julienandreu/zod-codegen.git",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/julienandreu/zod-codegen.git"
+  },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "scripts": {
     "build": "rm -rf dist && tsc --project tsconfig.json && cp -r src/assets dist/src/ && chmod +x ./dist/src/cli.js",
