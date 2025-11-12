@@ -16,10 +16,7 @@ export class TypeScriptImportBuilderService implements ImportBuilder {
   buildImports(): ts.ImportDeclaration[] {
     return [
       this.createImport('zod', {
-        defaultImport: {z: false},
-      }),
-      this.createImport('path-to-regexp', {
-        namedImports: {compile: false},
+        namedImports: {z: false},
       }),
     ];
   }
@@ -46,16 +43,16 @@ export class TypeScriptImportBuilderService implements ImportBuilder {
     const hasAnyImports = hasDefaultImport || namedImports;
 
     // For side effects imports, we can pass undefined as the import clause
-    // For imports with bindings, we need to create the clause differently
+    // For imports with bindings, we need to create the clause using the factory
     return ts.factory.createImportDeclaration(
       undefined,
       hasAnyImports
-        ? ({
-            kind: ts.SyntaxKind.ImportClause,
-            isTypeOnly: false,
-            name: hasDefaultImport && defaultImport ? ts.factory.createIdentifier(defaultImport) : undefined,
-            namedBindings: namedImports,
-          } as ts.ImportClause)
+        ? // eslint-disable-next-line @typescript-eslint/no-deprecated
+          ts.factory.createImportClause(
+            false,
+            hasDefaultImport && defaultImport ? ts.factory.createIdentifier(defaultImport) : undefined,
+            namedImports ?? undefined,
+          )
         : undefined,
       ts.factory.createStringLiteral(target, true),
       undefined,

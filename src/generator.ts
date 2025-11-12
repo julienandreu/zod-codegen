@@ -24,7 +24,7 @@ export class Generator {
 
   async run(): Promise<number> {
     try {
-      const rawSource = this.readFile();
+      const rawSource = await this.readFile();
       const openApiSpec = this.parseFile(rawSource);
       const generatedCode = this.generateCode(openApiSpec);
 
@@ -43,8 +43,8 @@ export class Generator {
     }
   }
 
-  private readFile(): string {
-    return this.fileReader.readFile(this.inputPath);
+  private async readFile(): Promise<string> {
+    return await this.fileReader.readFile(this.inputPath);
   }
 
   private parseFile(source: string): OpenApiSpecType {

@@ -28,20 +28,20 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     if (safeCategorySchema.success) {
       const safeCategory = safeCategorySchema.data;
 
-      if (safeCategory.anyOf && Array.isArray(safeCategory.anyOf) && safeCategory.anyOf.length > 0) {
-        return this.handleLogicalOperator('anyOf', safeCategory.anyOf, required);
+      if (safeCategory['anyOf'] && Array.isArray(safeCategory['anyOf']) && safeCategory['anyOf'].length > 0) {
+        return this.handleLogicalOperator('anyOf', safeCategory['anyOf'], required);
       }
 
-      if (safeCategory.oneOf && Array.isArray(safeCategory.oneOf) && safeCategory.oneOf.length > 0) {
-        return this.handleLogicalOperator('oneOf', safeCategory.oneOf, required);
+      if (safeCategory['oneOf'] && Array.isArray(safeCategory['oneOf']) && safeCategory['oneOf'].length > 0) {
+        return this.handleLogicalOperator('oneOf', safeCategory['oneOf'], required);
       }
 
-      if (safeCategory.allOf && Array.isArray(safeCategory.allOf) && safeCategory.allOf.length > 0) {
-        return this.handleLogicalOperator('allOf', safeCategory.allOf, required);
+      if (safeCategory['allOf'] && Array.isArray(safeCategory['allOf']) && safeCategory['allOf'].length > 0) {
+        return this.handleLogicalOperator('allOf', safeCategory['allOf'], required);
       }
 
-      if (safeCategory.not) {
-        return this.handleLogicalOperator('not', [safeCategory.not], required);
+      if (safeCategory['not']) {
+        return this.handleLogicalOperator('not', [safeCategory['not']], required);
       }
 
       return this.buildProperty(safeCategory, required);
@@ -155,9 +155,9 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
         this.typeBuilder.createParameter('path', 'string'),
         this.typeBuilder.createParameter(
           'options',
-          'unknown',
+          '{params?: Record<string, string | number | boolean>; data?: unknown; contentType?: string}',
           ts.factory.createObjectLiteralExpression([], false),
-          true,
+          false,
         ),
       ],
       ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [
@@ -165,12 +165,13 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       ]),
       ts.factory.createBlock(
         [
+          // Build URL with query parameters
           ts.factory.createVariableStatement(
             undefined,
             ts.factory.createVariableDeclarationList(
               [
                 ts.factory.createVariableDeclaration(
-                  ts.factory.createIdentifier('url'),
+                  ts.factory.createIdentifier('baseUrl'),
                   undefined,
                   undefined,
                   ts.factory.createTemplateExpression(ts.factory.createTemplateHead('', ''), [
@@ -196,6 +197,379 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
             ts.factory.createVariableDeclarationList(
               [
                 ts.factory.createVariableDeclaration(
+                  ts.factory.createIdentifier('url'),
+                  undefined,
+                  undefined,
+                  ts.factory.createConditionalExpression(
+                    ts.factory.createBinaryExpression(
+                      ts.factory.createPropertyAccessExpression(
+                        ts.factory.createIdentifier('options'),
+                        ts.factory.createIdentifier('params'),
+                      ),
+                      ts.factory.createToken(ts.SyntaxKind.AmpersandAmpersandToken),
+                      ts.factory.createBinaryExpression(
+                        ts.factory.createPropertyAccessExpression(
+                          ts.factory.createCallExpression(
+                            ts.factory.createPropertyAccessExpression(
+                              ts.factory.createIdentifier('Object'),
+                              ts.factory.createIdentifier('keys'),
+                            ),
+                            undefined,
+                            [
+                              ts.factory.createPropertyAccessExpression(
+                                ts.factory.createIdentifier('options'),
+                                ts.factory.createIdentifier('params'),
+                              ),
+                            ],
+                          ),
+                          ts.factory.createIdentifier('length'),
+                        ),
+                        ts.factory.createToken(ts.SyntaxKind.GreaterThanToken),
+                        ts.factory.createNumericLiteral('0'),
+                      ),
+                    ),
+                    undefined,
+                    (() => {
+                      const urlObj = ts.factory.createNewExpression(ts.factory.createIdentifier('URL'), undefined, [
+                        ts.factory.createIdentifier('baseUrl'),
+                      ]);
+                      const forEachCall = ts.factory.createCallExpression(
+                        ts.factory.createPropertyAccessExpression(
+                          ts.factory.createCallExpression(
+                            ts.factory.createPropertyAccessExpression(
+                              ts.factory.createIdentifier('Object'),
+                              ts.factory.createIdentifier('entries'),
+                            ),
+                            undefined,
+                            [
+                              ts.factory.createPropertyAccessExpression(
+                                ts.factory.createIdentifier('options'),
+                                ts.factory.createIdentifier('params'),
+                              ),
+                            ],
+                          ),
+                          ts.factory.createIdentifier('forEach'),
+                        ),
+                        undefined,
+                        [
+                          ts.factory.createArrowFunction(
+                            undefined,
+                            undefined,
+                            [
+                              ts.factory.createParameterDeclaration(
+                                undefined,
+                                undefined,
+                                ts.factory.createArrayBindingPattern([
+                                  ts.factory.createBindingElement(
+                                    undefined,
+                                    undefined,
+                                    ts.factory.createIdentifier('key'),
+                                    undefined,
+                                  ),
+                                  ts.factory.createBindingElement(
+                                    undefined,
+                                    undefined,
+                                    ts.factory.createIdentifier('value'),
+                                    undefined,
+                                  ),
+                                ]),
+                                undefined,
+                                undefined,
+                              ),
+                            ],
+                            undefined,
+                            ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+                            ts.factory.createBlock(
+                              [
+                                ts.factory.createExpressionStatement(
+                                  ts.factory.createCallExpression(
+                                    ts.factory.createPropertyAccessExpression(
+                                      ts.factory.createPropertyAccessExpression(
+                                        urlObj,
+                                        ts.factory.createIdentifier('searchParams'),
+                                      ),
+                                      ts.factory.createIdentifier('set'),
+                                    ),
+                                    undefined,
+                                    [
+                                      ts.factory.createIdentifier('key'),
+                                      ts.factory.createCallExpression(
+                                        ts.factory.createIdentifier('String'),
+                                        undefined,
+                                        [ts.factory.createIdentifier('value')],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                              false,
+                            ),
+                          ),
+                        ],
+                      );
+                      // Use IIFE to execute forEach and return URL string
+                      return ts.factory.createCallExpression(
+                        ts.factory.createParenthesizedExpression(
+                          ts.factory.createArrowFunction(
+                            undefined,
+                            undefined,
+                            [],
+                            undefined,
+                            ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+                            ts.factory.createBlock(
+                              [
+                                ts.factory.createExpressionStatement(forEachCall),
+                                ts.factory.createReturnStatement(
+                                  ts.factory.createCallExpression(
+                                    ts.factory.createPropertyAccessExpression(
+                                      urlObj,
+                                      ts.factory.createIdentifier('toString'),
+                                    ),
+                                    undefined,
+                                    [],
+                                  ),
+                                ),
+                              ],
+                              false,
+                            ),
+                          ),
+                        ),
+                        undefined,
+                        [],
+                      );
+                    })(),
+                    undefined,
+                    ts.factory.createCallExpression(
+                      ts.factory.createPropertyAccessExpression(
+                        ts.factory.createNewExpression(ts.factory.createIdentifier('URL'), undefined, [
+                          ts.factory.createIdentifier('baseUrl'),
+                        ]),
+                        ts.factory.createIdentifier('toString'),
+                      ),
+                      undefined,
+                      [],
+                    ),
+                  ),
+                ),
+              ],
+              ts.NodeFlags.Const,
+            ),
+          ),
+          // Build headers with dynamic Content-Type
+          ts.factory.createVariableStatement(
+            undefined,
+            ts.factory.createVariableDeclarationList(
+              [
+                ts.factory.createVariableDeclaration(
+                  ts.factory.createIdentifier('headers'),
+                  undefined,
+                  undefined,
+                  ts.factory.createObjectLiteralExpression(
+                    [
+                      ts.factory.createPropertyAssignment(
+                        ts.factory.createStringLiteral('Content-Type', true),
+                        ts.factory.createConditionalExpression(
+                          ts.factory.createBinaryExpression(
+                            ts.factory.createPropertyAccessExpression(
+                              ts.factory.createIdentifier('options'),
+                              ts.factory.createIdentifier('contentType'),
+                            ),
+                            ts.factory.createToken(ts.SyntaxKind.EqualsEqualsEqualsToken),
+                            ts.factory.createStringLiteral('application/x-www-form-urlencoded', true),
+                          ),
+                          undefined,
+                          ts.factory.createStringLiteral('application/x-www-form-urlencoded', true),
+                          undefined,
+                          ts.factory.createStringLiteral('application/json', true),
+                        ),
+                      ),
+                    ],
+                    true,
+                  ),
+                ),
+              ],
+              ts.NodeFlags.Const,
+            ),
+          ),
+          // Build body with form-urlencoded support
+          ts.factory.createVariableStatement(
+            undefined,
+            ts.factory.createVariableDeclarationList(
+              [
+                ts.factory.createVariableDeclaration(
+                  ts.factory.createIdentifier('body'),
+                  undefined,
+                  undefined,
+                  ts.factory.createConditionalExpression(
+                    ts.factory.createBinaryExpression(
+                      ts.factory.createPropertyAccessExpression(
+                        ts.factory.createIdentifier('options'),
+                        ts.factory.createIdentifier('data'),
+                      ),
+                      ts.factory.createToken(ts.SyntaxKind.ExclamationEqualsEqualsToken),
+                      ts.factory.createIdentifier('undefined'),
+                    ),
+                    undefined,
+                    ts.factory.createConditionalExpression(
+                      ts.factory.createBinaryExpression(
+                        ts.factory.createPropertyAccessExpression(
+                          ts.factory.createIdentifier('options'),
+                          ts.factory.createIdentifier('contentType'),
+                        ),
+                        ts.factory.createToken(ts.SyntaxKind.EqualsEqualsEqualsToken),
+                        ts.factory.createStringLiteral('application/x-www-form-urlencoded', true),
+                      ),
+                      undefined,
+                      // Form-urlencoded: convert object to URLSearchParams
+                      ts.factory.createCallExpression(
+                        ts.factory.createParenthesizedExpression(
+                          ts.factory.createArrowFunction(
+                            undefined,
+                            undefined,
+                            [],
+                            undefined,
+                            ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+                            ts.factory.createBlock(
+                              [
+                                ts.factory.createVariableStatement(
+                                  undefined,
+                                  ts.factory.createVariableDeclarationList(
+                                    [
+                                      ts.factory.createVariableDeclaration(
+                                        ts.factory.createIdentifier('params'),
+                                        undefined,
+                                        undefined,
+                                        ts.factory.createNewExpression(
+                                          ts.factory.createIdentifier('URLSearchParams'),
+                                          undefined,
+                                          [],
+                                        ),
+                                      ),
+                                    ],
+                                    ts.NodeFlags.Const,
+                                  ),
+                                ),
+                                ts.factory.createExpressionStatement(
+                                  ts.factory.createCallExpression(
+                                    ts.factory.createPropertyAccessExpression(
+                                      ts.factory.createCallExpression(
+                                        ts.factory.createPropertyAccessExpression(
+                                          ts.factory.createIdentifier('Object'),
+                                          ts.factory.createIdentifier('entries'),
+                                        ),
+                                        undefined,
+                                        [
+                                          ts.factory.createPropertyAccessExpression(
+                                            ts.factory.createIdentifier('options'),
+                                            ts.factory.createIdentifier('data'),
+                                          ),
+                                        ],
+                                      ),
+                                      ts.factory.createIdentifier('forEach'),
+                                    ),
+                                    undefined,
+                                    [
+                                      ts.factory.createArrowFunction(
+                                        undefined,
+                                        undefined,
+                                        [
+                                          ts.factory.createParameterDeclaration(
+                                            undefined,
+                                            undefined,
+                                            ts.factory.createArrayBindingPattern([
+                                              ts.factory.createBindingElement(
+                                                undefined,
+                                                undefined,
+                                                ts.factory.createIdentifier('key'),
+                                                undefined,
+                                              ),
+                                              ts.factory.createBindingElement(
+                                                undefined,
+                                                undefined,
+                                                ts.factory.createIdentifier('value'),
+                                                undefined,
+                                              ),
+                                            ]),
+                                            undefined,
+                                            undefined,
+                                          ),
+                                        ],
+                                        undefined,
+                                        ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+                                        ts.factory.createBlock(
+                                          [
+                                            ts.factory.createExpressionStatement(
+                                              ts.factory.createCallExpression(
+                                                ts.factory.createPropertyAccessExpression(
+                                                  ts.factory.createIdentifier('params'),
+                                                  ts.factory.createIdentifier('set'),
+                                                ),
+                                                undefined,
+                                                [
+                                                  ts.factory.createIdentifier('key'),
+                                                  ts.factory.createCallExpression(
+                                                    ts.factory.createIdentifier('String'),
+                                                    undefined,
+                                                    [ts.factory.createIdentifier('value')],
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                          false,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                ts.factory.createReturnStatement(
+                                  ts.factory.createCallExpression(
+                                    ts.factory.createPropertyAccessExpression(
+                                      ts.factory.createIdentifier('params'),
+                                      ts.factory.createIdentifier('toString'),
+                                    ),
+                                    undefined,
+                                    [],
+                                  ),
+                                ),
+                              ],
+                              false,
+                            ),
+                          ),
+                        ),
+                        undefined,
+                        [],
+                      ),
+                      undefined,
+                      // JSON: stringify the data
+                      ts.factory.createCallExpression(
+                        ts.factory.createPropertyAccessExpression(
+                          ts.factory.createIdentifier('JSON'),
+                          ts.factory.createIdentifier('stringify'),
+                        ),
+                        undefined,
+                        [
+                          ts.factory.createPropertyAccessExpression(
+                            ts.factory.createIdentifier('options'),
+                            ts.factory.createIdentifier('data'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    undefined,
+                    ts.factory.createNull(),
+                  ),
+                ),
+              ],
+              ts.NodeFlags.Const,
+            ),
+          ),
+          // Make fetch request
+          ts.factory.createVariableStatement(
+            undefined,
+            ts.factory.createVariableDeclarationList(
+              [
+                ts.factory.createVariableDeclaration(
                   ts.factory.createIdentifier('response'),
                   undefined,
                   undefined,
@@ -210,15 +584,11 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
                           ),
                           ts.factory.createPropertyAssignment(
                             ts.factory.createIdentifier('headers'),
-                            ts.factory.createObjectLiteralExpression(
-                              [
-                                ts.factory.createPropertyAssignment(
-                                  ts.factory.createStringLiteral('Content-Type', true),
-                                  ts.factory.createStringLiteral('application/json', true),
-                                ),
-                              ],
-                              true,
-                            ),
+                            ts.factory.createIdentifier('headers'),
+                          ),
+                          ts.factory.createPropertyAssignment(
+                            ts.factory.createIdentifier('body'),
+                            ts.factory.createIdentifier('body'),
                           ),
                         ],
                         true,
@@ -230,6 +600,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
               ts.NodeFlags.Const,
             ),
           ),
+          // Check response status
           ts.factory.createIfStatement(
             ts.factory.createPrefixUnaryExpression(
               ts.SyntaxKind.ExclamationToken,
@@ -260,6 +631,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
             ),
             undefined,
           ),
+          // Return parsed JSON
           ts.factory.createReturnStatement(
             ts.factory.createAwaitExpression(
               ts.factory.createCallExpression(
@@ -306,8 +678,84 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     schema: MethodSchemaType,
     schemas: Record<string, ts.VariableStatement>,
   ): ts.MethodDeclaration {
-    const parameters = this.buildMethodParameters(schema, schemas);
+    const {parameters, pathParams, queryParams, hasRequestBody, contentType} = this.buildMethodParameters(
+      schema,
+      schemas,
+    );
     const responseType = this.getResponseType(schema, schemas);
+    const responseSchema = this.getResponseSchema(schema, schemas);
+
+    const statements: ts.Statement[] = [];
+
+    // Build path with parameter substitution
+    const pathExpression = this.buildPathExpression(path, pathParams);
+
+    // Build query parameters object
+    const queryParamsExpression: ts.Expression | undefined =
+      queryParams.length > 0
+        ? ts.factory.createObjectLiteralExpression(
+            queryParams.map((param) => {
+              const paramName = this.typeBuilder.sanitizeIdentifier(param.name);
+              return ts.factory.createPropertyAssignment(
+                ts.factory.createStringLiteral(param.name, true),
+                ts.factory.createIdentifier(paramName),
+              );
+            }),
+            false,
+          )
+        : undefined;
+
+    // Build request body
+    const requestBodyExpression: ts.Expression | undefined = hasRequestBody
+      ? ts.factory.createIdentifier('body')
+      : undefined;
+
+    // Build options object for makeRequest
+    const optionsProps: ts.ObjectLiteralElementLike[] = [];
+    if (queryParamsExpression) {
+      optionsProps.push(
+        ts.factory.createPropertyAssignment(ts.factory.createIdentifier('params'), queryParamsExpression),
+      );
+    }
+    if (requestBodyExpression) {
+      optionsProps.push(
+        ts.factory.createPropertyAssignment(ts.factory.createIdentifier('data'), requestBodyExpression),
+      );
+    }
+    // Add content type if it's form-urlencoded
+    if (hasRequestBody && contentType === 'application/x-www-form-urlencoded') {
+      optionsProps.push(
+        ts.factory.createPropertyAssignment(
+          ts.factory.createIdentifier('contentType'),
+          ts.factory.createStringLiteral('application/x-www-form-urlencoded', true),
+        ),
+      );
+    }
+
+    const optionsExpression = ts.factory.createObjectLiteralExpression(optionsProps, false);
+
+    // Call makeRequest
+    const makeRequestCall = ts.factory.createCallExpression(
+      ts.factory.createPropertyAccessExpression(
+        ts.factory.createThis(),
+        ts.factory.createPrivateIdentifier('#makeRequest'),
+      ),
+      undefined,
+      [ts.factory.createStringLiteral(method.toUpperCase(), true), pathExpression, optionsExpression],
+    );
+
+    // Add Zod validation if we have a response schema
+    if (responseSchema) {
+      const validateCall = ts.factory.createCallExpression(
+        ts.factory.createPropertyAccessExpression(responseSchema, ts.factory.createIdentifier('parse')),
+        undefined,
+        [ts.factory.createAwaitExpression(makeRequestCall)],
+      );
+
+      statements.push(ts.factory.createReturnStatement(validateCall));
+    } else {
+      statements.push(ts.factory.createReturnStatement(ts.factory.createAwaitExpression(makeRequestCall)));
+    }
 
     return ts.factory.createMethodDeclaration(
       [ts.factory.createToken(ts.SyntaxKind.AsyncKeyword)],
@@ -317,68 +765,287 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       undefined,
       parameters,
       responseType,
-      ts.factory.createBlock(
-        [
-          ts.factory.createReturnStatement(
-            ts.factory.createAwaitExpression(
-              ts.factory.createCallExpression(
-                ts.factory.createPropertyAccessExpression(
-                  ts.factory.createThis(),
-                  ts.factory.createPrivateIdentifier('#makeRequest'),
-                ),
-                undefined,
-                [
-                  ts.factory.createStringLiteral(method.toUpperCase(), true),
-                  ts.factory.createStringLiteral(path, true),
-                ],
-              ),
-            ),
-          ),
-        ],
-        true,
-      ),
+      ts.factory.createBlock(statements, true),
     );
+  }
+
+  private buildPathExpression(path: string, pathParams: {name: string; type: string}[]): ts.Expression {
+    // Replace {param} with ${param} for template literal
+    const pathParamNames = new Set(pathParams.map((p) => p.name));
+    const pathParamRegex = /\{([^}]+)\}/g;
+    const matches: {index: number; length: number; name: string}[] = [];
+
+    // Find all path parameters
+    for (const match of path.matchAll(pathParamRegex)) {
+      const paramName = match[1];
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (paramName && pathParamNames.has(paramName) && match.index !== undefined) {
+        matches.push({
+          index: match.index,
+          length: match[0].length,
+          name: paramName,
+        });
+      }
+    }
+
+    if (matches.length === 0) {
+      // No path parameters, return as string literal
+      return ts.factory.createStringLiteral(path, true);
+    }
+
+    // Build template expression
+    const templateSpans: ts.TemplateSpan[] = [];
+    let lastIndex = 0;
+
+    for (const [index, m] of matches.entries()) {
+      const before = path.substring(lastIndex, m.index);
+      const sanitizedName = this.typeBuilder.sanitizeIdentifier(m.name);
+      const isLast = index === matches.length - 1;
+      const after = isLast ? path.substring(m.index + m.length) : '';
+
+      if (isLast) {
+        templateSpans.push(
+          ts.factory.createTemplateSpan(
+            ts.factory.createIdentifier(sanitizedName),
+            ts.factory.createTemplateTail(after, after),
+          ),
+        );
+      } else {
+        templateSpans.push(
+          ts.factory.createTemplateSpan(
+            ts.factory.createIdentifier(sanitizedName),
+            ts.factory.createTemplateMiddle(before, before),
+          ),
+        );
+      }
+
+      lastIndex = m.index + m.length;
+    }
+
+    const firstMatch = matches[0];
+    if (!firstMatch) {
+      return ts.factory.createStringLiteral(path, true);
+    }
+    const head = path.substring(0, firstMatch.index);
+    return ts.factory.createTemplateExpression(ts.factory.createTemplateHead(head, head), templateSpans);
   }
 
   private buildMethodParameters(
     schema: MethodSchemaType,
     schemas: Record<string, ts.VariableStatement>,
-  ): ts.ParameterDeclaration[] {
-    void schemas; // Mark as intentionally unused
+  ): {
+    parameters: ts.ParameterDeclaration[];
+    pathParams: {name: string; type: string}[];
+    queryParams: {name: string; type: string; required: boolean}[];
+    hasRequestBody: boolean;
+    contentType: string;
+  } {
     const parameters: ts.ParameterDeclaration[] = [];
+    const pathParams: {name: string; type: string}[] = [];
+    const queryParams: {name: string; type: string; required: boolean}[] = [];
 
+    // Extract path and query parameters
     if (schema.parameters) {
-      schema.parameters.forEach((param) => {
-        if (param.in === 'path' && param.required) {
-          parameters.push(
-            this.typeBuilder.createParameter(
-              this.typeBuilder.sanitizeIdentifier(param.name),
-              'string',
-              undefined,
-              false,
-            ),
-          );
+      for (const param of schema.parameters) {
+        const paramName = this.typeBuilder.sanitizeIdentifier(param.name);
+        const paramType = this.getParameterType(param.schema);
+
+        if (param.in === 'path') {
+          pathParams.push({name: param.name, type: paramType});
+          parameters.push(this.typeBuilder.createParameter(paramName, paramType, undefined, false));
+        } else if (param.in === 'query') {
+          // Improve type inference for query parameters
+          const queryParamType =
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+            typeof param.schema === 'object' && param.schema !== null
+              ? (() => {
+                  const paramSchema = param.schema as {type?: string; items?: unknown; enum?: unknown[]};
+                  // eslint-disable-next-line @typescript-eslint/dot-notation
+                  if (paramSchema['type'] === 'array' && paramSchema['items']) {
+                    // eslint-disable-next-line @typescript-eslint/dot-notation
+                    const itemSchema = paramSchema['items'] as {type?: string};
+                    // eslint-disable-next-line @typescript-eslint/dot-notation
+                    if (itemSchema['type'] === 'string') {
+                      return 'string[]' as const;
+                    }
+                    // eslint-disable-next-line @typescript-eslint/dot-notation
+                    if (itemSchema['type'] === 'number' || itemSchema['type'] === 'integer') {
+                      return 'number[]' as const;
+                    }
+                  }
+                  return paramType;
+                })()
+              : paramType;
+          queryParams.push({name: param.name, type: queryParamType, required: param.required ?? false});
+          parameters.push(this.typeBuilder.createParameter(paramName, queryParamType, undefined, !param.required));
         }
-      });
+      }
     }
 
-    parameters.push(this.typeBuilder.createParameter('_', 'unknown', undefined, true));
+    // Add request body parameter if present
+    // Check for both application/json and application/x-www-form-urlencoded
+    const jsonContent = schema.requestBody?.content?.['application/json'];
+    const formContent = schema.requestBody?.content?.['application/x-www-form-urlencoded'];
+    const hasRequestBody = !!(jsonContent ?? formContent);
 
-    return parameters;
+    if (hasRequestBody) {
+      const requestBodyContent = jsonContent ?? formContent;
+      const requestBodySchema = requestBodyContent?.schema;
+      const bodyType =
+        typeof requestBodySchema === 'object' && requestBodySchema !== null
+          ? (() => {
+              const schemaObj = requestBodySchema as Record<string, unknown>;
+              const ref = schemaObj['$ref'];
+
+              if (ref && typeof ref === 'string' && ref.startsWith('#/components/schemas/')) {
+                const refName = ref.split('/').pop() ?? 'unknown';
+                return this.typeBuilder.sanitizeIdentifier(refName);
+              }
+              // Fallback to getSchemaTypeName for non-ref schemas
+              return this.getSchemaTypeName(requestBodySchema, schemas);
+            })()
+          : 'unknown';
+
+      parameters.push(this.typeBuilder.createParameter('body', bodyType, undefined, !schema.requestBody?.required));
+    }
+
+    // Determine content type for request body
+    const contentType =
+      hasRequestBody && schema.requestBody?.content?.['application/x-www-form-urlencoded']
+        ? 'application/x-www-form-urlencoded'
+        : 'application/json';
+
+    return {parameters, pathParams, queryParams, hasRequestBody, contentType};
+  }
+
+  private getParameterType(schema: unknown): string {
+    if (!schema || typeof schema !== 'object') {
+      return 'string';
+    }
+
+    const schemaObj = schema as {
+      type?: string;
+      format?: string;
+      $ref?: string;
+      enum?: unknown[];
+      items?: unknown;
+    };
+
+    if (schemaObj.$ref) {
+      const refName = schemaObj.$ref.split('/').pop() ?? 'unknown';
+      return this.typeBuilder.sanitizeIdentifier(refName);
+    }
+
+    if (schemaObj.type === 'array' && schemaObj.items) {
+      const itemType = this.getParameterType(schemaObj.items);
+      return `${itemType}[]`;
+    }
+
+    switch (schemaObj.type) {
+      case 'integer':
+      case 'number':
+        return 'number';
+      case 'boolean':
+        return 'boolean';
+      case 'array':
+        return 'unknown[]';
+      case 'object':
+        return 'Record<string, unknown>';
+      case 'string':
+        // If it has enum values, we could generate a union type, but for simplicity, keep as string
+        // The Zod schema will handle the validation
+        return 'string';
+      default:
+        return 'string';
+    }
+  }
+
+  private getSchemaTypeName(schema: unknown, _schemas: Record<string, ts.VariableStatement>): string {
+    if (typeof schema !== 'object' || schema === null) {
+      return 'unknown';
+    }
+
+    const schemaObj = schema as {$ref?: string; type?: string; items?: unknown};
+
+    // Check for $ref using both dot notation and bracket notation
+    // eslint-disable-next-line @typescript-eslint/dot-notation
+    const ref = schemaObj['$ref'];
+    if (ref && typeof ref === 'string') {
+      const refName = ref.split('/').pop() ?? 'unknown';
+      return this.typeBuilder.sanitizeIdentifier(refName);
+    }
+
+    if (schemaObj.type === 'array' && schemaObj.items) {
+      const itemType = this.getSchemaTypeName(schemaObj.items, _schemas);
+      return `${itemType}[]`;
+    }
+
+    switch (schemaObj.type) {
+      case 'integer':
+      case 'number':
+        return 'number';
+      case 'boolean':
+        return 'boolean';
+      case 'string':
+        return 'string';
+      case 'object':
+        return 'Record<string, unknown>';
+      default:
+        return 'unknown';
+    }
+  }
+
+  private getResponseSchema(
+    schema: MethodSchemaType,
+    _schemas: Record<string, ts.VariableStatement>,
+  ): ts.Identifier | undefined {
+    // Try to find a 200 response first, then 201, then default
+    const response200 = schema.responses?.['200'];
+    const response201 = schema.responses?.['201'];
+    const responseDefault = schema.responses?.['default'];
+
+    const response = response200 ?? response201 ?? responseDefault;
+    if (!response?.content?.['application/json']?.schema) {
+      return undefined;
+    }
+
+    const responseSchema = response.content['application/json'].schema;
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (responseSchema !== null && typeof responseSchema === 'object' && '$ref' in responseSchema) {
+      // eslint-disable-next-line @typescript-eslint/dot-notation
+      const ref = (responseSchema as {$ref: string})['$ref'];
+      if (typeof ref === 'string') {
+        const refName = ref.split('/').pop() ?? 'unknown';
+        return ts.factory.createIdentifier(this.typeBuilder.sanitizeIdentifier(refName));
+      }
+    }
+
+    // For inline schemas, we'd need to generate a schema, but for now return undefined
+    // This could be enhanced to generate inline schemas
+    return undefined;
   }
 
   private getResponseType(
     schema: MethodSchemaType,
     schemas: Record<string, ts.VariableStatement>,
   ): ts.TypeNode | undefined {
-    void schemas; // Mark as intentionally unused
+    // Try to find a 200 response first, then 201, then default
     const response200 = schema.responses?.['200'];
-    if (!response200?.content?.['application/json']?.schema) {
-      return undefined;
+    const response201 = schema.responses?.['201'];
+    const responseDefault = schema.responses?.['default'];
+
+    const response = response200 ?? response201 ?? responseDefault;
+    if (!response?.content?.['application/json']?.schema) {
+      return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [
+        ts.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword),
+      ]);
     }
 
+    const responseSchema = response.content['application/json'].schema;
+    const typeName = this.getSchemaTypeName(responseSchema, schemas);
+
     return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [
-      ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
+      ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(typeName), undefined),
     ]);
   }
 
@@ -471,46 +1138,118 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     const prop = safeProperty.data;
 
     if (this.isReference(prop)) {
-      return this.buildFromReference(prop);
+      const refSchema = this.buildFromReference(prop);
+      return required
+        ? refSchema
+        : ts.factory.createCallExpression(
+            ts.factory.createPropertyAccessExpression(refSchema, ts.factory.createIdentifier('optional')),
+            undefined,
+            [],
+          );
     }
 
-    const methodsToApply: string[] = [];
-
-    if (prop.anyOf && Array.isArray(prop.anyOf) && prop.anyOf.length > 0) {
-      return this.handleLogicalOperator('anyOf', prop.anyOf, required);
+    if (prop['anyOf'] && Array.isArray(prop['anyOf']) && prop['anyOf'].length > 0) {
+      return this.handleLogicalOperator('anyOf', prop['anyOf'], required);
     }
 
-    if (prop.oneOf && Array.isArray(prop.oneOf) && prop.oneOf.length > 0) {
-      return this.handleLogicalOperator('oneOf', prop.oneOf, required);
+    if (prop['oneOf'] && Array.isArray(prop['oneOf']) && prop['oneOf'].length > 0) {
+      return this.handleLogicalOperator('oneOf', prop['oneOf'], required);
     }
 
-    if (prop.allOf && Array.isArray(prop.allOf) && prop.allOf.length > 0) {
-      return this.handleLogicalOperator('allOf', prop.allOf, required);
+    if (prop['allOf'] && Array.isArray(prop['allOf']) && prop['allOf'].length > 0) {
+      return this.handleLogicalOperator('allOf', prop['allOf'], required);
     }
 
-    if (prop.not) {
-      return this.handleLogicalOperator('not', [prop.not], required);
+    if (prop['not']) {
+      return this.handleLogicalOperator('not', [prop['not']], required);
     }
 
-    switch (prop.type) {
-      case 'array':
-        return this.buildZodAST([
+    // Handle enum
+    if (prop['enum'] && Array.isArray(prop['enum']) && prop['enum'].length > 0) {
+      const enumValues = prop['enum'].map((val) => {
+        if (typeof val === 'string') {
+          return ts.factory.createStringLiteral(val, true);
+        }
+        if (typeof val === 'number') {
+          // Handle negative numbers correctly
+          if (val < 0) {
+            return ts.factory.createPrefixUnaryExpression(
+              ts.SyntaxKind.MinusToken,
+              ts.factory.createNumericLiteral(String(Math.abs(val))),
+            );
+          }
+          return ts.factory.createNumericLiteral(String(val));
+        }
+        if (typeof val === 'boolean') {
+          return val ? ts.factory.createTrue() : ts.factory.createFalse();
+        }
+        return ts.factory.createStringLiteral(String(val), true);
+      });
+
+      const enumExpression = ts.factory.createCallExpression(
+        ts.factory.createPropertyAccessExpression(
+          ts.factory.createIdentifier('z'),
+          ts.factory.createIdentifier('enum'),
+        ),
+        undefined,
+        [ts.factory.createArrayLiteralExpression(enumValues, false)],
+      );
+
+      return required
+        ? enumExpression
+        : ts.factory.createCallExpression(
+            ts.factory.createPropertyAccessExpression(enumExpression, ts.factory.createIdentifier('optional')),
+            undefined,
+            [],
+          );
+    }
+
+    switch (prop['type']) {
+      case 'array': {
+        const itemsSchema = prop['items'] ? this.buildProperty(prop['items'], true) : this.buildZodAST(['unknown']);
+        let arraySchema = this.buildZodAST([
           {
             type: 'array',
-            args: prop.items ? [this.buildProperty(prop.items, true)] : [],
+            args: [itemsSchema],
           },
-          ...(!required ? ['optional'] : []),
         ]);
+
+        // Apply array constraints
+        if (typeof prop['minItems'] === 'number') {
+          arraySchema = ts.factory.createCallExpression(
+            ts.factory.createPropertyAccessExpression(arraySchema, ts.factory.createIdentifier('min')),
+            undefined,
+            [ts.factory.createNumericLiteral(String(prop['minItems']))],
+          );
+        }
+        if (typeof prop['maxItems'] === 'number') {
+          arraySchema = ts.factory.createCallExpression(
+            ts.factory.createPropertyAccessExpression(arraySchema, ts.factory.createIdentifier('max')),
+            undefined,
+            [ts.factory.createNumericLiteral(String(prop['maxItems']))],
+          );
+        }
+
+        return required
+          ? arraySchema
+          : ts.factory.createCallExpression(
+              ts.factory.createPropertyAccessExpression(arraySchema, ts.factory.createIdentifier('optional')),
+              undefined,
+              [],
+            );
+      }
       case 'object': {
-        const {properties = {}, required: propRequired = []} = prop as {
+        const propObj = prop satisfies {
           properties?: Record<string, unknown>;
           required?: string[];
         };
+        const properties = (propObj['properties'] ?? {}) as Record<string, unknown>;
+        const propRequired = (propObj['required'] ?? []) as string[];
 
         const propertiesEntries = Object.entries(properties);
 
         if (propertiesEntries.length > 0) {
-          return this.buildZodAST([
+          const objectSchema = this.buildZodAST([
             {
               type: 'object',
               args: [
@@ -525,8 +1264,94 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
                 ),
               ],
             },
-            ...(!required ? ['optional'] : []),
           ]);
+
+          // Apply object constraints
+          let constrainedSchema = objectSchema;
+          if (typeof prop['minProperties'] === 'number') {
+            constrainedSchema = ts.factory.createCallExpression(
+              ts.factory.createPropertyAccessExpression(constrainedSchema, ts.factory.createIdentifier('refine')),
+              undefined,
+              [
+                ts.factory.createArrowFunction(
+                  undefined,
+                  undefined,
+                  [ts.factory.createParameterDeclaration(undefined, undefined, 'obj', undefined, undefined, undefined)],
+                  undefined,
+                  ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+                  ts.factory.createBinaryExpression(
+                    ts.factory.createPropertyAccessExpression(
+                      ts.factory.createCallExpression(
+                        ts.factory.createPropertyAccessExpression(
+                          ts.factory.createIdentifier('Object'),
+                          ts.factory.createIdentifier('keys'),
+                        ),
+                        undefined,
+                        [ts.factory.createIdentifier('obj')],
+                      ),
+                      ts.factory.createIdentifier('length'),
+                    ),
+                    ts.factory.createToken(ts.SyntaxKind.GreaterThanEqualsToken),
+                    ts.factory.createNumericLiteral(String(prop['minProperties'])),
+                  ),
+                ),
+                ts.factory.createObjectLiteralExpression([
+                  ts.factory.createPropertyAssignment(
+                    ts.factory.createIdentifier('message'),
+                    ts.factory.createStringLiteral(
+                      `Object must have at least ${String(prop['minProperties'])} properties`,
+                    ),
+                  ),
+                ]),
+              ],
+            );
+          }
+          if (typeof prop['maxProperties'] === 'number') {
+            constrainedSchema = ts.factory.createCallExpression(
+              ts.factory.createPropertyAccessExpression(constrainedSchema, ts.factory.createIdentifier('refine')),
+              undefined,
+              [
+                ts.factory.createArrowFunction(
+                  undefined,
+                  undefined,
+                  [ts.factory.createParameterDeclaration(undefined, undefined, 'obj', undefined, undefined, undefined)],
+                  undefined,
+                  ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+                  ts.factory.createBinaryExpression(
+                    ts.factory.createPropertyAccessExpression(
+                      ts.factory.createCallExpression(
+                        ts.factory.createPropertyAccessExpression(
+                          ts.factory.createIdentifier('Object'),
+                          ts.factory.createIdentifier('keys'),
+                        ),
+                        undefined,
+                        [ts.factory.createIdentifier('obj')],
+                      ),
+                      ts.factory.createIdentifier('length'),
+                    ),
+                    ts.factory.createToken(ts.SyntaxKind.LessThanEqualsToken),
+                    ts.factory.createNumericLiteral(String(prop['maxProperties'])),
+                  ),
+                ),
+                ts.factory.createObjectLiteralExpression([
+                  ts.factory.createPropertyAssignment(
+                    ts.factory.createIdentifier('message'),
+                    ts.factory.createStringLiteral(
+                      `Object must have at most ${String(prop['maxProperties'])} properties`,
+                    ),
+                  ),
+                ]),
+              ],
+            );
+          }
+
+          return required
+            ? constrainedSchema
+            : ts.factory.createCallExpression(
+                ts.factory.createPropertyAccessExpression(constrainedSchema, ts.factory.createIdentifier('optional')),
+                undefined,
+                [],
+              );
         }
 
         return this.buildZodAST([
@@ -536,19 +1361,317 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
           },
         ]);
       }
-      case 'integer':
-        methodsToApply.push('int');
-        return this.buildZodAST(['number', ...methodsToApply, ...(!required ? ['optional'] : [])]);
-      case 'number':
-        return this.buildZodAST(['number', ...(!required ? ['optional'] : [])]);
-      case 'string':
-        return this.buildZodAST(['string', ...(!required ? ['optional'] : [])]);
-      case 'boolean':
-        return this.buildZodAST(['boolean', ...(!required ? ['optional'] : [])]);
+      case 'integer': {
+        let numberSchema = this.buildZodAST(['number', 'int']);
+
+        // Apply number constraints
+        if (prop['minimum'] !== undefined && typeof prop['minimum'] === 'number') {
+          const minValue =
+            prop['exclusiveMinimum'] && typeof prop['exclusiveMinimum'] === 'boolean'
+              ? prop['minimum'] + 1
+              : prop['minimum'];
+          numberSchema = ts.factory.createCallExpression(
+            ts.factory.createPropertyAccessExpression(
+              numberSchema,
+              ts.factory.createIdentifier(
+                prop['exclusiveMinimum'] && typeof prop['exclusiveMinimum'] === 'boolean' ? 'gt' : 'gte',
+              ),
+            ),
+            undefined,
+            [ts.factory.createNumericLiteral(String(minValue))],
+          );
+        }
+        if (prop['maximum'] !== undefined && typeof prop['maximum'] === 'number') {
+          const maxValue =
+            prop['exclusiveMaximum'] && typeof prop['exclusiveMaximum'] === 'boolean'
+              ? prop['maximum'] - 1
+              : prop['maximum'];
+          numberSchema = ts.factory.createCallExpression(
+            ts.factory.createPropertyAccessExpression(
+              numberSchema,
+              ts.factory.createIdentifier(prop['exclusiveMaximum'] ? 'lt' : 'lte'),
+            ),
+            undefined,
+            [ts.factory.createNumericLiteral(String(maxValue))],
+          );
+        }
+        if (typeof prop['multipleOf'] === 'number') {
+          const refineFunction = ts.factory.createArrowFunction(
+            undefined,
+            undefined,
+            [ts.factory.createParameterDeclaration(undefined, undefined, 'val', undefined, undefined, undefined)],
+            undefined,
+            ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+            ts.factory.createBinaryExpression(
+              ts.factory.createBinaryExpression(
+                ts.factory.createIdentifier('val'),
+                ts.factory.createToken(ts.SyntaxKind.PercentToken),
+                ts.factory.createNumericLiteral(String(prop['multipleOf'])),
+              ),
+              ts.factory.createToken(ts.SyntaxKind.EqualsEqualsEqualsToken),
+              ts.factory.createNumericLiteral('0'),
+            ),
+          );
+          const refineOptions = ts.factory.createObjectLiteralExpression([
+            ts.factory.createPropertyAssignment(
+              ts.factory.createIdentifier('message'),
+              ts.factory.createStringLiteral(`Number must be a multiple of ${String(prop['multipleOf'])}`),
+            ),
+          ]);
+          numberSchema = ts.factory.createCallExpression(
+            ts.factory.createPropertyAccessExpression(numberSchema, ts.factory.createIdentifier('refine')),
+            undefined,
+            [refineFunction, refineOptions],
+          );
+        }
+
+        return required
+          ? numberSchema
+          : ts.factory.createCallExpression(
+              ts.factory.createPropertyAccessExpression(numberSchema, ts.factory.createIdentifier('optional')),
+              undefined,
+              [],
+            );
+      }
+      case 'number': {
+        let numberSchema = this.buildZodAST(['number']);
+
+        // Apply number constraints
+        if (prop['minimum'] !== undefined && typeof prop['minimum'] === 'number') {
+          const minValue =
+            prop['exclusiveMinimum'] && typeof prop['exclusiveMinimum'] === 'boolean'
+              ? prop['minimum'] + 1
+              : prop['minimum'];
+          numberSchema = ts.factory.createCallExpression(
+            ts.factory.createPropertyAccessExpression(
+              numberSchema,
+              ts.factory.createIdentifier(
+                prop['exclusiveMinimum'] && typeof prop['exclusiveMinimum'] === 'boolean' ? 'gt' : 'gte',
+              ),
+            ),
+            undefined,
+            [ts.factory.createNumericLiteral(String(minValue))],
+          );
+        }
+        if (prop['maximum'] !== undefined && typeof prop['maximum'] === 'number') {
+          const maxValue =
+            prop['exclusiveMaximum'] && typeof prop['exclusiveMaximum'] === 'boolean'
+              ? prop['maximum'] - 1
+              : prop['maximum'];
+          numberSchema = ts.factory.createCallExpression(
+            ts.factory.createPropertyAccessExpression(
+              numberSchema,
+              ts.factory.createIdentifier(prop['exclusiveMaximum'] ? 'lt' : 'lte'),
+            ),
+            undefined,
+            [ts.factory.createNumericLiteral(String(maxValue))],
+          );
+        }
+        if (typeof prop['multipleOf'] === 'number') {
+          const refineFunction = ts.factory.createArrowFunction(
+            undefined,
+            undefined,
+            [ts.factory.createParameterDeclaration(undefined, undefined, 'val', undefined, undefined, undefined)],
+            undefined,
+            ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+            ts.factory.createBinaryExpression(
+              ts.factory.createBinaryExpression(
+                ts.factory.createIdentifier('val'),
+                ts.factory.createToken(ts.SyntaxKind.PercentToken),
+                ts.factory.createNumericLiteral(String(prop['multipleOf'])),
+              ),
+              ts.factory.createToken(ts.SyntaxKind.EqualsEqualsEqualsToken),
+              ts.factory.createNumericLiteral('0'),
+            ),
+          );
+          const refineOptions = ts.factory.createObjectLiteralExpression([
+            ts.factory.createPropertyAssignment(
+              ts.factory.createIdentifier('message'),
+              ts.factory.createStringLiteral(`Number must be a multiple of ${String(prop['multipleOf'])}`),
+            ),
+          ]);
+          numberSchema = ts.factory.createCallExpression(
+            ts.factory.createPropertyAccessExpression(numberSchema, ts.factory.createIdentifier('refine')),
+            undefined,
+            [refineFunction, refineOptions],
+          );
+        }
+
+        return required
+          ? numberSchema
+          : ts.factory.createCallExpression(
+              ts.factory.createPropertyAccessExpression(numberSchema, ts.factory.createIdentifier('optional')),
+              undefined,
+              [],
+            );
+      }
+      case 'string': {
+        let stringSchema = this.buildZodAST(['string']);
+
+        // Apply string format
+        if (prop['format']) {
+          switch (prop['format']) {
+            case 'email':
+              stringSchema = ts.factory.createCallExpression(
+                ts.factory.createPropertyAccessExpression(stringSchema, ts.factory.createIdentifier('email')),
+                undefined,
+                [],
+              );
+              break;
+            case 'uri':
+            case 'url':
+              stringSchema = ts.factory.createCallExpression(
+                ts.factory.createPropertyAccessExpression(stringSchema, ts.factory.createIdentifier('url')),
+                undefined,
+                [],
+              );
+              break;
+            case 'uuid':
+              stringSchema = ts.factory.createCallExpression(
+                ts.factory.createPropertyAccessExpression(stringSchema, ts.factory.createIdentifier('uuid')),
+                undefined,
+                [],
+              );
+              break;
+            case 'date-time':
+              stringSchema = ts.factory.createCallExpression(
+                ts.factory.createPropertyAccessExpression(stringSchema, ts.factory.createIdentifier('datetime')),
+                undefined,
+                [],
+              );
+              break;
+            case 'date':
+              stringSchema = ts.factory.createCallExpression(
+                ts.factory.createPropertyAccessExpression(stringSchema, ts.factory.createIdentifier('date')),
+                undefined,
+                [],
+              );
+              break;
+            case 'time':
+              stringSchema = ts.factory.createCallExpression(
+                ts.factory.createPropertyAccessExpression(stringSchema, ts.factory.createIdentifier('time')),
+                undefined,
+                [],
+              );
+              break;
+            // Add more formats as needed
+          }
+        }
+
+        // Apply string constraints
+        if (typeof prop['minLength'] === 'number') {
+          stringSchema = ts.factory.createCallExpression(
+            ts.factory.createPropertyAccessExpression(stringSchema, ts.factory.createIdentifier('min')),
+            undefined,
+            [ts.factory.createNumericLiteral(String(prop['minLength']))],
+          );
+        }
+        if (typeof prop['maxLength'] === 'number') {
+          stringSchema = ts.factory.createCallExpression(
+            ts.factory.createPropertyAccessExpression(stringSchema, ts.factory.createIdentifier('max')),
+            undefined,
+            [ts.factory.createNumericLiteral(String(prop['maxLength']))],
+          );
+        }
+        if (prop['pattern'] && typeof prop['pattern'] === 'string') {
+          stringSchema = ts.factory.createCallExpression(
+            ts.factory.createPropertyAccessExpression(stringSchema, ts.factory.createIdentifier('regex')),
+            undefined,
+            [
+              ts.factory.createNewExpression(ts.factory.createIdentifier('RegExp'), undefined, [
+                ts.factory.createStringLiteral(prop['pattern'], true),
+              ]),
+            ],
+          );
+        }
+
+        // Apply default value if not required
+        if (!required && prop['default'] !== undefined) {
+          const defaultValue = this.buildDefaultValue(prop['default']);
+          stringSchema = ts.factory.createCallExpression(
+            ts.factory.createPropertyAccessExpression(stringSchema, ts.factory.createIdentifier('default')),
+            undefined,
+            [defaultValue],
+          );
+        }
+
+        return required
+          ? stringSchema
+          : ts.factory.createCallExpression(
+              ts.factory.createPropertyAccessExpression(stringSchema, ts.factory.createIdentifier('optional')),
+              undefined,
+              [],
+            );
+      }
+      case 'boolean': {
+        let booleanSchema = this.buildZodAST(['boolean']);
+
+        // Apply default value if not required
+        if (!required && prop['default'] !== undefined) {
+          const defaultValue =
+            typeof prop['default'] === 'boolean'
+              ? prop['default']
+                ? ts.factory.createTrue()
+                : ts.factory.createFalse()
+              : ts.factory.createFalse();
+          booleanSchema = ts.factory.createCallExpression(
+            ts.factory.createPropertyAccessExpression(booleanSchema, ts.factory.createIdentifier('default')),
+            undefined,
+            [defaultValue],
+          );
+        }
+
+        return required
+          ? booleanSchema
+          : ts.factory.createCallExpression(
+              ts.factory.createPropertyAccessExpression(booleanSchema, ts.factory.createIdentifier('optional')),
+              undefined,
+              [],
+            );
+      }
       case 'unknown':
       default:
         return this.buildZodAST(['unknown', ...(!required ? ['optional'] : [])]);
     }
+  }
+
+  private buildDefaultValue(value: unknown): ts.Expression {
+    if (typeof value === 'string') {
+      return ts.factory.createStringLiteral(value, true);
+    }
+    if (typeof value === 'number') {
+      return ts.factory.createNumericLiteral(String(value));
+    }
+    if (typeof value === 'boolean') {
+      return value ? ts.factory.createTrue() : ts.factory.createFalse();
+    }
+    if (value === null) {
+      return ts.factory.createNull();
+    }
+    if (Array.isArray(value)) {
+      return ts.factory.createArrayLiteralExpression(
+        value.map((item) => this.buildDefaultValue(item)),
+        false,
+      );
+    }
+    if (typeof value === 'object') {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (value === null) {
+        return ts.factory.createNull();
+      }
+      return ts.factory.createObjectLiteralExpression(
+        Object.entries(value).map(([key, val]) =>
+          ts.factory.createPropertyAssignment(ts.factory.createIdentifier(key), this.buildDefaultValue(val)),
+        ),
+        true,
+      );
+    }
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      return ts.factory.createStringLiteral(String(value), true);
+    }
+    // For objects and arrays, we need to handle them differently
+    // This should not happen in practice, but we handle it for type safety
+    return ts.factory.createStringLiteral(JSON.stringify(value), true);
   }
 
   private handleLogicalOperator(
@@ -641,6 +1764,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
   private buildSchemaFromLogicalOperator(schema: unknown): ts.CallExpression | ts.Identifier {
     if (this.isReference(schema)) {
+      // In logical operators, references are always required (they're part of a union/intersection)
       return this.buildFromReference(schema);
     }
 
@@ -721,7 +1845,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
   private isReference(reference: unknown): reference is ReferenceType {
     if (typeof reference === 'object' && reference !== null && '$ref' in reference) {
-      const ref = reference as {$ref?: unknown};
+      const ref = reference satisfies {$ref?: unknown};
       return typeof ref.$ref === 'string' && ref.$ref.length > 0;
     }
     return false;
