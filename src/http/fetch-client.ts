@@ -1,4 +1,5 @@
-import {HttpClient, HttpError, HttpRequestConfig, HttpResponse} from '../types/http.js';
+import type {HttpClient, HttpRequestConfig, HttpResponse} from '../types/http.js';
+import {HttpError} from '../types/http.js';
 
 declare const globalThis: typeof global & {
   fetch?: typeof fetch;
@@ -167,13 +168,12 @@ export class FetchHttpClient implements HttpClient {
     }
 
     if (contentType.includes('text/')) {
-      return (await response.text()) as unknown as TResponse;
+      return (await response.text()) as TResponse;
     }
 
     try {
       const text = await response.text();
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-      return text ? JSON.parse(text) : ({} as TResponse);
+      return text ? (JSON.parse(text) as TResponse) : ({} as TResponse);
     } catch {
       return {} as TResponse;
     }

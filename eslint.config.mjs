@@ -8,6 +8,8 @@ export default defineConfig([
       '**/*.mjs',
       'dist/**/*',
       'node_modules/**/*',
+      '**/*.test*.ts',
+      '**/coverage/*',
     ],
   },
   eslint.configs.recommended,
@@ -20,12 +22,28 @@ export default defineConfig([
       },
     },
     rules: {
+      'no-var': 'error',
+      'prefer-const': [
+        'error',
+        {
+          destructuring: 'all',
+          ignoreReadBeforeAssign: false,
+        },
+      ],
       quotes: ['error', 'single', { avoidEscape: true }],
       'sort-imports': [
         'error',
         {
           ignoreCase: true,
           ignoreDeclarationSort: true,
+        },
+      ],
+      '@typescript-eslint/no-deprecated': 'warn',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
         },
       ],
     },

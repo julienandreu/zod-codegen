@@ -11,8 +11,23 @@ export class TypeScriptTypeBuilderService implements TypeBuilder {
       case 'boolean':
         return ts.factory.createKeywordTypeNode(ts.SyntaxKind.BooleanKeyword);
       case 'unknown':
-      default:
         return ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword);
+      default:
+        // Handle custom types (like Pet, Order, User, etc.) and array types
+        if (type.endsWith('[]')) {
+          const itemType = type.slice(0, -2);
+          return ts.factory.createArrayTypeNode(this.buildType(itemType));
+        }
+        // Handle Record types
+        if (type.startsWith('Record<')) {
+          // For now, return unknown for complex Record types
+          return ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword);
+        }
+        // Custom type name - create a type reference
+        return ts.factory.createTypeReferenceNode(
+          ts.factory.createIdentifier(this.sanitizeIdentifier(type)),
+          undefined,
+        );
     }
   }
 
@@ -54,17 +69,9 @@ export class TypeScriptTypeBuilderService implements TypeBuilder {
   }
 
   sanitizeIdentifier(name: string): string {
-    let sanitized = name.replace(/[^a-zA-Z0-9_]/g, '_');
-
-    if (/^[0-9]/.test(sanitized)) {
-      sanitized = '_' + sanitized;
-    }
-
-    if (sanitized.length === 0) {
-      sanitized = '_';
-    }
-
-    return sanitized;
+    const sanitized = name.replace(/[^a-zA-Z0-9_]/g, '_');
+    const withPrefix = /^[0-9]/.test(sanitized) ? '_' + sanitized : sanitized;
+    return withPrefix.length === 0 ? '_' : withPrefix;
   }
 
   toCamelCase(word: string): string {
