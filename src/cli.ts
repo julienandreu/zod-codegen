@@ -11,17 +11,42 @@ import loudRejection from 'loud-rejection';
 import {handleErrors} from './utils/error-handler.js';
 import {handleSignals} from './utils/signal-handler.js';
 import debug from 'debug';
-import {isManifest} from './utils/manifest.js';
 import {Reporter} from './utils/reporter.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const manifestData: unknown = JSON.parse(readFileSync(join(__dirname, 'assets', 'manifest.json'), 'utf-8'));
+// Read package.json from the project root
+// Handle multiple scenarios:
+// 1. Built locally: dist/src/cli.js -> go up 2 levels
+// 2. Source: src/cli.ts -> go up 1 level
+// 3. Installed via npm: node_modules/zod-codegen/dist/src/cli.js -> go up 2 levels
+// Try multiple paths to ensure we find package.json
+const possiblePaths = [
+  join(__dirname, '..', '..', 'package.json'), // dist/src/cli.js or node_modules/pkg/dist/src/cli.js
+  join(__dirname, '..', 'package.json'), // src/cli.ts
+];
 
-if (!isManifest(manifestData)) {
-  process.exit(1);
+let packageJsonPath: string | undefined;
+for (const path of possiblePaths) {
+  try {
+    readFileSync(path, 'utf-8');
+    packageJsonPath = path;
+    break;
+  } catch {
+    // Try next path
+  }
 }
 
-const {name, description, version} = manifestData;
+if (!packageJsonPath) {
+  throw new Error('Could not find package.json. Please ensure the package is properly installed.');
+}
+
+const packageData = JSON.parse(readFileSync(packageJsonPath, 'utf-8')) as {
+  name: string;
+  version: string;
+  description: string;
+};
+
+const {name, description, version} = packageData;
 const reporter = new Reporter(process.stdout);
 const startTime = process.hrtime.bigint();
 
