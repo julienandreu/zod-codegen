@@ -1,3 +1,10 @@
+## <small>1.0.2 (2025-11-12)</small>
+
+- Merge pull request #25 from julienandreu/refactor/modernize-typescript-strict-mode ([9614fbd](https://github.com/julienandreu/zod-codegen/commit/9614fbd)), closes [#25](https://github.com/julienandreu/zod-codegen/issues/25)
+- chore: update package-lock.json and pin Node.js to 24.11.1 in CI ([b165b43](https://github.com/julienandreu/zod-codegen/commit/b165b43))
+- ci: update workflows to use Node.js 24 only ([1b56ad8](https://github.com/julienandreu/zod-codegen/commit/1b56ad8))
+- refactor: modernize TypeScript to strict mode and fix all linting errors ([0dc2911](https://github.com/julienandreu/zod-codegen/commit/0dc2911))
+
 ## <small>1.0.1 (2025-09-16)</small>
 
 - Merge pull request #10 from julienandreu/dependabot/npm_and_yarn/eslint-config-prettier-10.1.8 ([d9b786c](https://github.com/julienandreu/zod-codegen/commit/d9b786c)), closes [#10](https://github.com/julienandreu/zod-codegen/issues/10)
