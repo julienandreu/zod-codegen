@@ -98,5 +98,5 @@
     "release": "semantic-release",
     "release:dry": "semantic-release --dry-run"
   },
-  "version": "1.0.2"
+  "version": "1.0.3"
 }

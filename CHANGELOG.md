@@ -1,3 +1,9 @@
+## <small>1.0.3 (2025-11-12)</small>
+
+- Merge pull request #26 from julienandreu/refactor/modernize-typescript-strict-mode ([fb7c1bf](https://github.com/julienandreu/zod-codegen/commit/fb7c1bf)), closes [#26](https://github.com/julienandreu/zod-codegen/issues/26)
+- fix: improve package.json path resolution for all installation scenarios ([c509691](https://github.com/julienandreu/zod-codegen/commit/c509691))
+- fix: read version dynamically from package.json instead of manifest ([dd32cb2](https://github.com/julienandreu/zod-codegen/commit/dd32cb2))
+
 ## <small>1.0.2 (2025-11-12)</small>
 
 - Merge pull request #25 from julienandreu/refactor/modernize-typescript-strict-mode ([9614fbd](https://github.com/julienandreu/zod-codegen/commit/9614fbd)), closes [#25](https://github.com/julienandreu/zod-codegen/issues/25)
