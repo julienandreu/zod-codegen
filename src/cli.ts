@@ -11,17 +11,23 @@ import loudRejection from 'loud-rejection';
 import {handleErrors} from './utils/error-handler.js';
 import {handleSignals} from './utils/signal-handler.js';
 import debug from 'debug';
-import {isManifest} from './utils/manifest.js';
 import {Reporter} from './utils/reporter.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const manifestData: unknown = JSON.parse(readFileSync(join(__dirname, 'assets', 'manifest.json'), 'utf-8'));
+// Read package.json from the project root
+// When built: dist/src/cli.js -> go up 2 levels to project root
+// When in source: src/cli.ts -> go up 1 level to project root
+// Try both paths to handle both cases
+const packageJsonPath = __dirname.includes('dist')
+  ? join(__dirname, '..', '..', 'package.json')
+  : join(__dirname, '..', 'package.json');
+const packageData = JSON.parse(readFileSync(packageJsonPath, 'utf-8')) as {
+  name: string;
+  version: string;
+  description: string;
+};
 
-if (!isManifest(manifestData)) {
-  process.exit(1);
-}
-
-const {name, description, version} = manifestData;
+const {name, description, version} = packageData;
 const reporter = new Reporter(process.stdout);
 const startTime = process.hrtime.bigint();
 
