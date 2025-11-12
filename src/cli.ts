@@ -15,12 +15,31 @@ import {Reporter} from './utils/reporter.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Read package.json from the project root
-// When built: dist/src/cli.js -> go up 2 levels to project root
-// When in source: src/cli.ts -> go up 1 level to project root
-// Try both paths to handle both cases
-const packageJsonPath = __dirname.includes('dist')
-  ? join(__dirname, '..', '..', 'package.json')
-  : join(__dirname, '..', 'package.json');
+// Handle multiple scenarios:
+// 1. Built locally: dist/src/cli.js -> go up 2 levels
+// 2. Source: src/cli.ts -> go up 1 level
+// 3. Installed via npm: node_modules/zod-codegen/dist/src/cli.js -> go up 2 levels
+// Try multiple paths to ensure we find package.json
+const possiblePaths = [
+  join(__dirname, '..', '..', 'package.json'), // dist/src/cli.js or node_modules/pkg/dist/src/cli.js
+  join(__dirname, '..', 'package.json'), // src/cli.ts
+];
+
+let packageJsonPath: string | undefined;
+for (const path of possiblePaths) {
+  try {
+    readFileSync(path, 'utf-8');
+    packageJsonPath = path;
+    break;
+  } catch {
+    // Try next path
+  }
+}
+
+if (!packageJsonPath) {
+  throw new Error('Could not find package.json. Please ensure the package is properly installed.');
+}
+
 const packageData = JSON.parse(readFileSync(packageJsonPath, 'utf-8')) as {
   name: string;
   version: string;
