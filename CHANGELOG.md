@@ -1,3 +1,9 @@
+## <small>1.1.1 (2025-11-13)</small>
+
+- Merge pull request #29 from julienandreu/feat/server-configuration-and-examples ([c598b5a](https://github.com/julienandreu/zod-codegen/commit/c598b5a)), closes [#29](https://github.com/julienandreu/zod-codegen/issues/29)
+- fix: clarify getBaseRequestOptions merging behavior ([13379fd](https://github.com/julienandreu/zod-codegen/commit/13379fd))
+- fix: use z.union with z.literal for numeric enums instead of z.enum ([5e0c7ea](https://github.com/julienandreu/zod-codegen/commit/5e0c7ea))
+
 ## 1.1.0 (2025-11-13)
 
 - Merge pull request #27 from julienandreu/docs/update-readme-reflect-changes ([3f6745e](https://github.com/julienandreu/zod-codegen/commit/3f6745e)), closes [#27](https://github.com/julienandreu/zod-codegen/issues/27)
