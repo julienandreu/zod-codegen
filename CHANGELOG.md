@@ -1,3 +1,10 @@
+## 1.1.0 (2025-11-13)
+
+- Merge pull request #27 from julienandreu/docs/update-readme-reflect-changes ([3f6745e](https://github.com/julienandreu/zod-codegen/commit/3f6745e)), closes [#27](https://github.com/julienandreu/zod-codegen/issues/27)
+- Merge pull request #28 from julienandreu/feat/server-configuration-and-examples ([49d523d](https://github.com/julienandreu/zod-codegen/commit/49d523d)), closes [#28](https://github.com/julienandreu/zod-codegen/issues/28)
+- feat: add server configuration support and comprehensive examples ([31538ff](https://github.com/julienandreu/zod-codegen/commit/31538ff))
+- docs: update README to reflect current implementation ([d52ed5f](https://github.com/julienandreu/zod-codegen/commit/d52ed5f))
+
 ## <small>1.0.3 (2025-11-12)</small>
 
 - Merge pull request #26 from julienandreu/refactor/modernize-typescript-strict-mode ([fb7c1bf](https://github.com/julienandreu/zod-codegen/commit/fb7c1bf)), closes [#26](https://github.com/julienandreu/zod-codegen/issues/26)
