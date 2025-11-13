@@ -72,6 +72,7 @@ const argv = yargs(hideBin(process.argv))
     description: 'Directory to output the generated files',
     default: 'generated',
   })
+  .strict()
   .help()
   .parseSync();
 
