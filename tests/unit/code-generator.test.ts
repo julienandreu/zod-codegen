@@ -185,6 +185,84 @@ describe('TypeScriptCodeGeneratorService', () => {
       expect(code).toContain('pending');
     });
 
+    it('should handle numeric enum types with z.union and z.literal', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            Status: {
+              type: 'integer',
+              enum: [-99, 0, 1, 2],
+            },
+            ExecutionMode: {
+              type: 'integer',
+              enum: [1, 2],
+            },
+          },
+        },
+      };
+
+      const code = generator.generate(spec);
+      // Numeric enums should use z.union([z.literal(...), ...])
+      expect(code).toContain('z.union');
+      expect(code).toContain('z.literal');
+      expect(code).toContain('-99');
+      expect(code).toContain('0');
+      expect(code).toContain('1');
+      expect(code).toContain('2');
+      // Should not use z.enum for numeric enums
+      expect(code).not.toContain('Status: z.enum');
+      expect(code).not.toContain('ExecutionMode: z.enum');
+    });
+
+    it('should merge baseOptions with request-specific options in #makeRequest', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {
+          '/test': {
+            get: {
+              operationId: 'testEndpoint',
+              responses: {
+                '200': {
+                  description: 'Success',
+                  content: {
+                    'application/json': {
+                      schema: {type: 'string'},
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      const code = generator.generate(spec);
+
+      // Should call getBaseRequestOptions()
+      expect(code).toContain('getBaseRequestOptions()');
+
+      // Should merge headers: baseHeaders + Content-Type + request headers
+      expect(code).toContain('Object.assign');
+      expect(code).toContain('baseHeaders');
+      expect(code).toContain('Content-Type');
+
+      // Should merge all options: baseOptions + {method, headers, body}
+      expect(code).toMatch(/Object\.assign\s*\(\s*\{\s*\}\s*,\s*baseOptions/);
+      expect(code).toContain('method');
+      expect(code).toContain('headers');
+      expect(code).toContain('body');
+    });
+
     it('should handle array types', () => {
       const spec: OpenApiSpecType = {
         openapi: '3.0.0',

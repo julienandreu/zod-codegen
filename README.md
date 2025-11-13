@@ -253,6 +253,8 @@ The generated client includes a protected `getBaseRequestOptions()` method that 
 - **CORS**: `mode`, `credentials` for cross-origin requests
 - **Request Options**: `signal` (AbortController), `cache`, `redirect`, `referrer`, etc.
 
+**Important**: Options from `getBaseRequestOptions()` are **merged with** (not replaced by) request-specific options. Base options like `mode`, `credentials`, and `signal` are preserved, while headers are merged (base headers + Content-Type + request headers). See [EXAMPLES.md](EXAMPLES.md) for detailed merging behavior.
+
 #### Basic Authentication Example
 
 ```typescript

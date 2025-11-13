@@ -1750,42 +1750,77 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
     // Handle enum
     if (prop['enum'] && Array.isArray(prop['enum']) && prop['enum'].length > 0) {
-      const enumValues = prop['enum'].map((val) => {
-        if (typeof val === 'string') {
-          return ts.factory.createStringLiteral(val, true);
-        }
-        if (typeof val === 'number') {
-          // Handle negative numbers correctly
-          if (val < 0) {
-            return ts.factory.createPrefixUnaryExpression(
-              ts.SyntaxKind.MinusToken,
-              ts.factory.createNumericLiteral(String(Math.abs(val))),
+      // Check if all enum values are strings (z.enum only works with strings)
+      const allStrings = prop['enum'].every((val) => typeof val === 'string');
+
+      if (allStrings) {
+        // Use z.enum() for string enums
+        const enumValues = prop['enum'].map((val) => ts.factory.createStringLiteral(val as string, true));
+        const enumExpression = ts.factory.createCallExpression(
+          ts.factory.createPropertyAccessExpression(
+            ts.factory.createIdentifier('z'),
+            ts.factory.createIdentifier('enum'),
+          ),
+          undefined,
+          [ts.factory.createArrayLiteralExpression(enumValues, false)],
+        );
+
+        return required
+          ? enumExpression
+          : ts.factory.createCallExpression(
+              ts.factory.createPropertyAccessExpression(enumExpression, ts.factory.createIdentifier('optional')),
+              undefined,
+              [],
             );
+      } else {
+        // Use z.union([z.literal(...), ...]) for numeric/boolean/mixed enums
+        const literalSchemas = prop['enum'].map((val) => {
+          let literalValue: ts.Expression;
+          if (typeof val === 'string') {
+            literalValue = ts.factory.createStringLiteral(val, true);
+          } else if (typeof val === 'number') {
+            // Handle negative numbers correctly
+            if (val < 0) {
+              literalValue = ts.factory.createPrefixUnaryExpression(
+                ts.SyntaxKind.MinusToken,
+                ts.factory.createNumericLiteral(String(Math.abs(val))),
+              );
+            } else {
+              literalValue = ts.factory.createNumericLiteral(String(val));
+            }
+          } else if (typeof val === 'boolean') {
+            literalValue = val ? ts.factory.createTrue() : ts.factory.createFalse();
+          } else {
+            literalValue = ts.factory.createStringLiteral(String(val), true);
           }
-          return ts.factory.createNumericLiteral(String(val));
-        }
-        if (typeof val === 'boolean') {
-          return val ? ts.factory.createTrue() : ts.factory.createFalse();
-        }
-        return ts.factory.createStringLiteral(String(val), true);
-      });
 
-      const enumExpression = ts.factory.createCallExpression(
-        ts.factory.createPropertyAccessExpression(
-          ts.factory.createIdentifier('z'),
-          ts.factory.createIdentifier('enum'),
-        ),
-        undefined,
-        [ts.factory.createArrayLiteralExpression(enumValues, false)],
-      );
-
-      return required
-        ? enumExpression
-        : ts.factory.createCallExpression(
-            ts.factory.createPropertyAccessExpression(enumExpression, ts.factory.createIdentifier('optional')),
+          return ts.factory.createCallExpression(
+            ts.factory.createPropertyAccessExpression(
+              ts.factory.createIdentifier('z'),
+              ts.factory.createIdentifier('literal'),
+            ),
             undefined,
-            [],
+            [literalValue],
           );
+        });
+
+        const unionExpression = ts.factory.createCallExpression(
+          ts.factory.createPropertyAccessExpression(
+            ts.factory.createIdentifier('z'),
+            ts.factory.createIdentifier('union'),
+          ),
+          undefined,
+          [ts.factory.createArrayLiteralExpression(literalSchemas, false)],
+        );
+
+        return required
+          ? unionExpression
+          : ts.factory.createCallExpression(
+              ts.factory.createPropertyAccessExpression(unionExpression, ts.factory.createIdentifier('optional')),
+              undefined,
+              [],
+            );
+      }
     }
 
     switch (prop['type']) {
