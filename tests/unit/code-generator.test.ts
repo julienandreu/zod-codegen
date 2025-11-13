@@ -185,6 +185,41 @@ describe('TypeScriptCodeGeneratorService', () => {
       expect(code).toContain('pending');
     });
 
+    it('should handle numeric enum types with z.union and z.literal', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            Status: {
+              type: 'integer',
+              enum: [-99, 0, 1, 2],
+            },
+            ExecutionMode: {
+              type: 'integer',
+              enum: [1, 2],
+            },
+          },
+        },
+      };
+
+      const code = generator.generate(spec);
+      // Numeric enums should use z.union([z.literal(...), ...])
+      expect(code).toContain('z.union');
+      expect(code).toContain('z.literal');
+      expect(code).toContain('-99');
+      expect(code).toContain('0');
+      expect(code).toContain('1');
+      expect(code).toContain('2');
+      // Should not use z.enum for numeric enums
+      expect(code).not.toContain('Status: z.enum');
+      expect(code).not.toContain('ExecutionMode: z.enum');
+    });
+
     it('should handle array types', () => {
       const spec: OpenApiSpecType = {
         openapi: '3.0.0',
