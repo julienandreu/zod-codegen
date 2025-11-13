@@ -1,3 +1,8 @@
+## <small>1.1.2 (2025-11-13)</small>
+
+- Merge pull request #30 from julienandreu/fix/cli-strict-mode ([d098ac7](https://github.com/julienandreu/zod-codegen/commit/d098ac7)), closes [#30](https://github.com/julienandreu/zod-codegen/issues/30)
+- fix: add strict mode to CLI to catch typos in arguments ([b5ad8aa](https://github.com/julienandreu/zod-codegen/commit/b5ad8aa))
+
 ## <small>1.1.1 (2025-11-13)</small>
 
 - Merge pull request #29 from julienandreu/feat/server-configuration-and-examples ([c598b5a](https://github.com/julienandreu/zod-codegen/commit/c598b5a)), closes [#29](https://github.com/julienandreu/zod-codegen/issues/29)
