@@ -1,0 +1,49 @@
+openapi: 3.0.0
+info:
+  title: Server Variables Example API
+  version: 1.0.0
+  description: Example API demonstrating server variables for different environments
+servers:
+  - url: https://{environment}.example.com:{port}/v{version}
+    description: Main API server with templated variables
+    variables:
+      environment:
+        default: api
+        enum:
+          - api
+          - api.dev
+          - api.staging
+        description: The environment to use (api, api.dev, api.staging)
+      port:
+        default: '443'
+        enum:
+          - '443'
+          - '8443'
+        description: The port number
+      version:
+        default: '2'
+        description: API version
+  - url: https://api.production.example.com/v2
+    description: Production server (no variables)
+paths:
+  /users:
+    get:
+      operationId: getUsers
+      summary: Get list of users
+      responses:
+        '200':
+          description: Success
+          content:
+            'application/json':
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    name:
+                      type: string
+                  required:
+                    - id
+                    - name

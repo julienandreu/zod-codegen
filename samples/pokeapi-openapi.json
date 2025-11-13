@@ -1,0 +1,212 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "PokéAPI",
+    "version": "2.0.0",
+    "description": "PokéAPI is a RESTful API that provides data about Pokémon"
+  },
+  "servers": [
+    {
+      "url": "https://pokeapi.co/api/v2",
+      "description": "PokéAPI production server"
+    }
+  ],
+  "paths": {
+    "/pokemon/{id}": {
+      "get": {
+        "operationId": "getPokemonById",
+        "summary": "Get Pokémon by ID or name",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Pokémon ID or name",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pokémon data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pokemon"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pokemon": {
+      "get": {
+        "operationId": "getPokemonList",
+        "summary": "Get list of Pokémon",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of Pokémon",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PokemonListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Pokemon": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Pokémon ID"
+          },
+          "name": {
+            "type": "string",
+            "description": "Pokémon name"
+          },
+          "height": {
+            "type": "integer",
+            "description": "Height in decimeters"
+          },
+          "weight": {
+            "type": "integer",
+            "description": "Weight in hectograms"
+          },
+          "base_experience": {
+            "type": "integer",
+            "description": "Base experience"
+          },
+          "types": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PokemonType"
+            }
+          },
+          "abilities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PokemonAbility"
+            }
+          },
+          "sprites": {
+            "$ref": "#/components/schemas/PokemonSprites"
+          }
+        },
+        "required": ["id", "name"]
+      },
+      "PokemonType": {
+        "type": "object",
+        "properties": {
+          "slot": {
+            "type": "integer"
+          },
+          "type": {
+            "$ref": "#/components/schemas/NamedAPIResource"
+          }
+        }
+      },
+      "PokemonAbility": {
+        "type": "object",
+        "properties": {
+          "ability": {
+            "$ref": "#/components/schemas/NamedAPIResource"
+          },
+          "is_hidden": {
+            "type": "boolean"
+          },
+          "slot": {
+            "type": "integer"
+          }
+        }
+      },
+      "PokemonSprites": {
+        "type": "object",
+        "properties": {
+          "front_default": {
+            "type": "string",
+            "format": "uri"
+          },
+          "front_shiny": {
+            "type": "string",
+            "format": "uri"
+          },
+          "back_default": {
+            "type": "string",
+            "format": "uri"
+          },
+          "back_shiny": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      },
+      "NamedAPIResource": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "required": ["name", "url"]
+      },
+      "PokemonListResponse": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer"
+          },
+          "next": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true
+          },
+          "previous": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NamedAPIResource"
+            }
+          }
+        },
+        "required": ["count", "results"]
+      }
+    }
+  }
+}

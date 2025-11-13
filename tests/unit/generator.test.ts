@@ -1,36 +1,128 @@
-import {beforeEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {Generator} from '../../src/generator.js';
 import {Reporter} from '../../src/utils/reporter.js';
+import {readFileSync, existsSync, mkdirSync, rmSync} from 'node:fs';
+import {join} from 'node:path';
+import {fileURLToPath} from 'node:url';
+import {dirname} from 'node:path';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const testOutputDir = join(__dirname, '../../test-output');
 
 describe('Generator', () => {
   let generator: Generator;
   let mockReporter: Reporter;
 
   beforeEach(() => {
+    // Clean up test output directory
+    if (existsSync(testOutputDir)) {
+      rmSync(testOutputDir, {recursive: true, force: true});
+    }
+    mkdirSync(testOutputDir, {recursive: true});
+
     // Create a mock reporter
     mockReporter = {
-      info: vi.fn(),
+      log: vi.fn(),
       error: vi.fn(),
-      warn: vi.fn(),
-      success: vi.fn(),
     } as unknown as Reporter;
+  });
 
-    generator = new Generator('test-app', '1.0.0', mockReporter, './test-input.json', './test-output');
+  afterEach(() => {
+    // Clean up test output directory
+    if (existsSync(testOutputDir)) {
+      rmSync(testOutputDir, {recursive: true, force: true});
+    }
   });
 
   describe('constructor', () => {
     it('should create a new Generator instance', () => {
+      generator = new Generator('test-app', '1.0.0', mockReporter, './samples/swagger-petstore.yaml', testOutputDir);
       expect(generator).toBeInstanceOf(Generator);
+    });
+
+    it('should initialize with correct parameters', () => {
+      generator = new Generator('test-app', '1.0.0', mockReporter, './samples/swagger-petstore.yaml', testOutputDir);
+      expect(generator).toBeDefined();
     });
   });
 
   describe('run', () => {
     it('should be a function', () => {
+      generator = new Generator('test-app', '1.0.0', mockReporter, './samples/swagger-petstore.yaml', testOutputDir);
       expect(typeof generator.run).toBe('function');
     });
 
-    it('should have the run method defined', () => {
-      expect(generator).toHaveProperty('run');
+    it('should generate code from a valid OpenAPI file', async () => {
+      generator = new Generator('test-app', '1.0.0', mockReporter, './samples/swagger-petstore.yaml', testOutputDir);
+
+      const exitCode = await generator.run();
+
+      expect(exitCode).toBe(0);
+      expect(mockReporter.log).toHaveBeenCalled();
+      expect(mockReporter.error).not.toHaveBeenCalled();
+
+      // Verify output file was created
+      const outputFile = join(testOutputDir, 'type.ts');
+      expect(existsSync(outputFile)).toBe(true);
+
+      // Verify file contains expected content
+      const content = readFileSync(outputFile, 'utf-8');
+      expect(content).toMatch(/import\s*{\s*z\s*}\s*from\s*['"]zod['"]/);
+      expect(content).toContain('export class');
+      expect(content).toContain('getBaseRequestOptions');
+    });
+
+    it('should handle invalid file paths gracefully', async () => {
+      generator = new Generator('test-app', '1.0.0', mockReporter, './non-existent-file.yaml', testOutputDir);
+
+      const exitCode = await generator.run();
+
+      expect(exitCode).toBe(1);
+      expect(mockReporter.error).toHaveBeenCalled();
+    });
+
+    it('should handle invalid OpenAPI specifications', async () => {
+      // Create a temporary invalid OpenAPI file
+      const invalidFile = join(testOutputDir, 'invalid.yaml');
+      mkdirSync(testOutputDir, {recursive: true});
+      readFileSync; // Ensure we can write
+      const {writeFileSync} = await import('node:fs');
+      writeFileSync(invalidFile, 'invalid: yaml: content: [unclosed');
+
+      generator = new Generator('test-app', '1.0.0', mockReporter, invalidFile, testOutputDir);
+
+      const exitCode = await generator.run();
+
+      expect(exitCode).toBe(1);
+      expect(mockReporter.error).toHaveBeenCalled();
+    });
+
+    it('should generate code with correct structure', async () => {
+      generator = new Generator('test-app', '1.0.0', mockReporter, './samples/swagger-petstore.yaml', testOutputDir);
+
+      await generator.run();
+
+      const outputFile = join(testOutputDir, 'type.ts');
+      const content = readFileSync(outputFile, 'utf-8');
+
+      // Check for key components
+      expect(content).toMatch(/import\s*{\s*z\s*}\s*from\s*['"]zod['"]/);
+      expect(content).toContain('export const');
+      expect(content).toContain('protected getBaseRequestOptions');
+      expect(content).toContain('async #makeRequest');
+    });
+
+    it('should include header comments in generated file', async () => {
+      generator = new Generator('test-app', '1.0.0', mockReporter, './samples/swagger-petstore.yaml', testOutputDir);
+
+      await generator.run();
+
+      const outputFile = join(testOutputDir, 'type.ts');
+      const content = readFileSync(outputFile, 'utf-8');
+
+      expect(content).toContain('AUTOGENERATED');
+      expect(content).toContain('test-app@1.0.0');
+      expect(content).toContain('eslint-disable');
     });
   });
 });

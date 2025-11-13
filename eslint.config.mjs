@@ -10,6 +10,7 @@ export default defineConfig([
       'node_modules/**/*',
       '**/*.test*.ts',
       '**/coverage/*',
+      'examples/**/*.ts',
     ],
   },
   eslint.configs.recommended,
