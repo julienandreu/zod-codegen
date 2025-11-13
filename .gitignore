@@ -1,60 +1,23 @@
 # Dependencies
 node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-/.pnp
+.pnp
 .pnp.js
-.yarn/install-state.gz
-
-# Build outputs
-dist/
-build/
-out/
-.next/
 
 # Testing
 coverage/
-.nyc_output/
-junit.xml
+.nyc_output
 
-# Environment
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-.env*.local
+# Production
+dist/
+build/
 
-# Cache
-.cache/
-.parcel-cache/
-.eslintcache
-.stylelintcache
-*.tsbuildinfo
-.tscache/
-
-# Runtime
-*.pid
-*.seed
-*.pid.lock
-
-# Logs
-logs/
+# Misc
+.DS_Store
 *.log
-lerna-debug.log*
-
-# Optional npm cache directory
-.npm
-
-# Optional REPL history
-.node_repl_history
-
-# Yarn
-.yarn/
-.pnp.*
-.yarn-integrity
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
 
 # IDE
 .vscode/
@@ -63,27 +26,13 @@ lerna-debug.log*
 *.swo
 *~
 
-# OS
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-*.pem
+# TypeScript
+*.tsbuildinfo
 
-# Generated files
-generated/
-generated/*
+# Test output
+test-output/
 
-# Temporary
-tmp/
-temp/
-.tmp/
-
-# Semantic release
-.semantic-release/
-
-# Coverage
-coverage.lcov
+# Environment
+.env
+.env.local
+.env.*.local

@@ -19,6 +19,9 @@ A powerful TypeScript code generator that creates **Zod schemas** and **type-saf
 - **📦 Single File Output**: Generates all schemas and client in one convenient TypeScript file
 - **🛡️ Runtime Validation**: Built-in Zod validation for request/response data
 - **🌍 Form Support**: Supports both JSON and form-urlencoded request bodies
+- **🔐 Extensible**: Override `getBaseRequestOptions()` to add authentication, custom headers, CORS, and other fetch options
+- **🌐 Server Configuration**: Full support for OpenAPI server variables and templating (e.g., `{environment}.example.com`)
+- **⚙️ Flexible Client Options**: Options-based constructor supporting server selection, variable overrides, and custom base URLs
 
 ## 📦 Installation
 
@@ -88,7 +91,56 @@ The generator creates a single TypeScript file (`type.ts`) containing:
 
 - **Zod Schemas**: Exported Zod validation schemas for all component schemas defined in your OpenAPI spec
 - **API Client Class**: A type-safe client class with methods for each endpoint operation
-- **Base URL Constant**: A `defaultBaseUrl` constant extracted from the OpenAPI servers configuration
+- **Server Configuration**: `serverConfigurations` array and `defaultBaseUrl` constant extracted from OpenAPI servers
+- **Client Options Type**: `ClientOptions` type for flexible server selection and variable overrides
+- **Protected Extension Point**: A `getBaseRequestOptions()` method that can be overridden for customization
+
+### Generated Client Structure
+
+The generated client class includes:
+
+```typescript
+export class YourAPI {
+  readonly #baseUrl: string;
+
+  // Options-based constructor (if servers are defined in OpenAPI spec)
+  constructor(options: ClientOptions);
+
+  // Or simple baseUrl constructor (if no servers defined)
+  constructor(baseUrl: string = '/', _?: unknown);
+
+  // Protected method - override to customize request options
+  protected getBaseRequestOptions(): Partial<Omit<RequestInit, 'method' | 'body'>>;
+
+  // Private method - handles all HTTP requests
+  async #makeRequest<T>(method: string, path: string, options: {...}): Promise<T>;
+
+  // Generated endpoint methods (one per operationId)
+  async yourEndpointMethod(...): Promise<ResponseType>;
+}
+
+// ClientOptions type (when servers are defined)
+export type ClientOptions = {
+  baseUrl?: string;                    // Override base URL directly
+  serverIndex?: number;                // Select server by index (0-based)
+  serverVariables?: Record<string, string>; // Override server template variables
+};
+
+// Server configuration (when servers are defined)
+export const serverConfigurations: Array<{
+  url: string;
+  description?: string;
+  variables?: Record<string, {
+    default: string;
+    enum?: string[];
+    description?: string;
+  }>;
+}>;
+
+export const defaultBaseUrl: string;   // First server with default variables
+```
+
+### File Structure
 
 ```
 generated/
@@ -149,14 +201,29 @@ export const User = z.object({
   email: z.string().email(),
 });
 
-const defaultBaseUrl = 'https://api.example.com';
+// Server configuration (when servers are defined in OpenAPI spec)
+export const serverConfigurations = [
+  {
+    url: 'https://api.example.com',
+  },
+];
+export const defaultBaseUrl = 'https://api.example.com';
+export type ClientOptions = {
+  baseUrl?: string;
+  serverIndex?: number;
+  serverVariables?: Record<string, string>;
+};
 
 // Client class
 export class UserAPI {
-  #baseUrl: string;
+  readonly #baseUrl: string;
 
-  constructor(baseUrl: string = defaultBaseUrl, _?: unknown) {
-    this.#baseUrl = baseUrl;
+  constructor(options: ClientOptions = {}) {
+    this.#baseUrl = options.baseUrl || defaultBaseUrl;
+  }
+
+  protected getBaseRequestOptions(): Partial<Omit<RequestInit, 'method' | 'body'>> {
+    return {};
   }
 
   async getUserById(id: number): Promise<z.infer<typeof User>> {
@@ -172,10 +239,137 @@ export class UserAPI {
 ```typescript
 import {UserAPI, User} from './generated/type.js';
 
-const client = new UserAPI();
+// Use default server from OpenAPI spec
+const client = new UserAPI({});
 const user = await client.getUserById(123);
 // user is fully typed and validated!
 ```
+
+### Extending the Client
+
+The generated client includes a protected `getBaseRequestOptions()` method that you can override to customize request options. This method returns `Partial<Omit<RequestInit, 'method' | 'body'>>`, allowing you to configure:
+
+- **Headers**: Authentication tokens, User-Agent, custom headers
+- **CORS**: `mode`, `credentials` for cross-origin requests
+- **Request Options**: `signal` (AbortController), `cache`, `redirect`, `referrer`, etc.
+
+#### Basic Authentication Example
+
+```typescript
+import {UserAPI, ClientOptions} from './generated/type.js';
+
+class AuthenticatedUserAPI extends UserAPI {
+  private accessToken: string | null = null;
+
+  constructor(options: ClientOptions = {}) {
+    super(options);
+  }
+
+  protected getBaseRequestOptions(): Partial<Omit<RequestInit, 'method' | 'body'>> {
+    const options = super.getBaseRequestOptions();
+    return {
+      ...options,
+      headers: {
+        ...((options.headers as Record<string, string>) || {}),
+        ...(this.accessToken ? {Authorization: `Bearer ${this.accessToken}`} : {}),
+      },
+    };
+  }
+
+  setAccessToken(token: string): void {
+    this.accessToken = token;
+  }
+}
+
+// Usage
+const client = new AuthenticatedUserAPI({});
+client.setAccessToken('your-token-here');
+const user = await client.getUserById(123); // Includes Authorization header
+```
+
+#### Complete Configuration Example
+
+```typescript
+import {UserAPI, ClientOptions} from './generated/type.js';
+
+class FullyConfiguredAPI extends UserAPI {
+  private accessToken: string | null = null;
+
+  constructor(options: ClientOptions = {}) {
+    super(options);
+  }
+
+  protected getBaseRequestOptions(): Partial<Omit<RequestInit, 'method' | 'body'>> {
+    const options = super.getBaseRequestOptions();
+    return {
+      ...options,
+      headers: {
+        ...((options.headers as Record<string, string>) || {}),
+        'User-Agent': 'MyApp/1.0.0',
+        ...(this.accessToken ? {Authorization: `Bearer ${this.accessToken}`} : {}),
+      },
+      mode: 'cors',
+      credentials: 'include',
+      cache: 'no-cache',
+    };
+  }
+
+  setAccessToken(token: string): void {
+    this.accessToken = token;
+  }
+}
+
+// Usage
+const client = new FullyConfiguredAPI({});
+client.setAccessToken('your-token');
+```
+
+#### Available Request Options
+
+You can set any `RequestInit` option except `method` and `body` (which are controlled by the generated code):
+
+| Option           | Type                 | Description                                                         |
+| ---------------- | -------------------- | ------------------------------------------------------------------- |
+| `headers`        | `HeadersInit`        | Request headers (authentication, User-Agent, etc.)                  |
+| `signal`         | `AbortSignal`        | AbortController signal for request cancellation                     |
+| `credentials`    | `RequestCredentials` | CORS credentials mode (`'include'`, `'same-origin'`, `'omit'`)      |
+| `mode`           | `RequestMode`        | Request mode (`'cors'`, `'no-cors'`, `'same-origin'`, `'navigate'`) |
+| `cache`          | `RequestCache`       | Cache mode (`'default'`, `'no-cache'`, `'reload'`, etc.)            |
+| `redirect`       | `RequestRedirect`    | Redirect handling (`'follow'`, `'error'`, `'manual'`)               |
+| `referrer`       | `string`             | Referrer URL                                                        |
+| `referrerPolicy` | `ReferrerPolicy`     | Referrer policy                                                     |
+| `integrity`      | `string`             | Subresource integrity hash                                          |
+| `keepalive`      | `boolean`            | Keep connection alive                                               |
+
+See [EXAMPLES.md](EXAMPLES.md) for comprehensive examples including:
+
+- Bearer token authentication
+- Session management with token refresh
+- Custom User-Agent headers
+- CORS configuration
+- Request cancellation with AbortController
+- Environment-specific configurations
+
+## 📖 Examples
+
+Check out the [examples directory](./examples/) for complete, runnable examples:
+
+- **[Petstore API](./examples/petstore/)** - Complete example with the Swagger Petstore API
+- **[PokéAPI](./examples/pokeapi/)** - Example with a public REST API
+
+Each example includes:
+
+- Generated client code
+- Basic usage examples
+- Authentication examples
+- README with instructions
+
+## 📚 Documentation
+
+- **[README.md](README.md)** - Project overview and quick start guide
+- **[EXAMPLES.md](EXAMPLES.md)** - Comprehensive examples and patterns for extending the client
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Guidelines for contributing to the project
+- **[CHANGELOG.md](CHANGELOG.md)** - Version history and changes
 
 ## 🛠️ Development
 

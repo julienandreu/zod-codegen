@@ -79,8 +79,9 @@
   },
   "scripts": {
     "build": "rm -rf dist && tsc --project tsconfig.json && cp -r src/assets dist/src/ && chmod +x ./dist/src/cli.js",
+    "build:native": "rm -rf dist && npx tsgo --project tsconfig.json && cp -r src/assets dist/src/ && chmod +x ./dist/src/cli.js",
     "build:watch": "tsc --project tsconfig.json --watch",
-    "dev": "npm run build && node ./dist/src/cli.js --input ./samples/saris-openapi.json && npm run format && npm run lint",
+    "dev": "npm run build && node ./dist/src/cli.js --input ./samples/swagger-petstore.yaml --output ./examples/petstore && npm run format && npm run lint",
     "lint": "eslint src --fix",
     "lint:check": "eslint src",
     "format": "prettier src --write --log-level error",
@@ -95,6 +96,7 @@
     "prepublishOnly": "npm run build && npm run test && npm run lint:check && npm run type-check",
     "clean": "rm -rf dist coverage node_modules/.cache",
     "validate": "npm run type-check && npm run lint:check && npm run format:check && npm run test",
+    "validate:examples": "tsc -p ./tsconfig.examples.json --noEmit",
     "release": "semantic-release",
     "release:dry": "semantic-release --dry-run"
   },

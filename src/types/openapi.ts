@@ -61,7 +61,7 @@ const ServerVariable = z.object({
 });
 
 const Server = z.object({
-  url: z.url(),
+  url: z.string(), // Allow templated URLs with {variables}
   description: z.string().optional(),
   variables: z.record(z.string(), ServerVariable).optional(),
 });
