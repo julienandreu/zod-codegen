@@ -10,13 +10,15 @@ A powerful TypeScript code generator that creates **Zod schemas** and **type-saf
 
 ## 🚀 Features
 
-- **🔥 Zod Schema Generation**: Automatically generate Zod validation schemas from OpenAPI specs
-- **🎯 Type-Safe**: Full TypeScript support with generated types
-- **📡 Multiple Formats**: Support for OpenAPI 3.x, Swagger 2.0, JSON, and YAML
-- **🌐 Remote Files**: Fetch OpenAPI specs from URLs
+- **🔥 Zod Schema Generation**: Automatically generate Zod validation schemas from OpenAPI component schemas
+- **🎯 Type-Safe Client**: Generate a fully type-safe API client class with methods for each endpoint
+- **📡 Multiple Formats**: Support for OpenAPI 3.x specifications in JSON and YAML formats
+- **🌐 Remote Files**: Fetch OpenAPI specs from URLs using native fetch API
 - **⚡ Fast**: Optimized for performance with minimal dependencies
-- **🔧 Configurable**: Flexible output options and customization
-- **📦 CLI & Programmatic**: Use as a CLI tool or integrate into your build process
+- **🔧 Advanced Schema Support**: Handles logical operators (anyOf, oneOf, allOf, not), enums, discriminators, and complex nested schemas
+- **📦 Single File Output**: Generates all schemas and client in one convenient TypeScript file
+- **🛡️ Runtime Validation**: Built-in Zod validation for request/response data
+- **🌍 Form Support**: Supports both JSON and form-urlencoded request bodies
 
 ## 📦 Installation
 
@@ -61,35 +63,36 @@ zod-codegen -i ./swagger.yaml -o ./src/generated
 ```typescript
 import {Generator} from 'zod-codegen';
 
-const generator = new Generator();
+// Create a simple reporter object
+const reporter = {
+  log: (...args: unknown[]) => console.log(...args),
+  error: (...args: unknown[]) => console.error(...args),
+};
 
-// Generate from local file
-await generator.generate({
-  input: './openapi.json',
-  output: './generated',
-});
+// Create generator instance
+const generator = new Generator(
+  'my-app',
+  '1.0.0',
+  reporter,
+  './openapi.json', // Input path or URL
+  './generated', // Output directory
+);
 
-// Generate from URL
-await generator.generate({
-  input: 'https://api.example.com/openapi.json',
-  output: './api',
-});
+// Run the generator
+const exitCode = await generator.run();
 ```
 
 ## 📁 Generated Output
 
-The generator creates the following structure:
+The generator creates a single TypeScript file (`type.ts`) containing:
+
+- **Zod Schemas**: Exported Zod validation schemas for all component schemas defined in your OpenAPI spec
+- **API Client Class**: A type-safe client class with methods for each endpoint operation
+- **Base URL Constant**: A `defaultBaseUrl` constant extracted from the OpenAPI servers configuration
 
 ```
 generated/
-├── schemas/           # Zod validation schemas
-│   ├── user.schema.ts
-│   └── product.schema.ts
-├── types/            # TypeScript type definitions
-│   ├── user.types.ts
-│   └── product.types.ts
-└── client/           # Type-safe API client
-    └── api.client.ts
+└── type.ts           # All schemas and client in one file
 ```
 
 ## 🎯 Example
@@ -101,69 +104,84 @@ openapi: 3.0.0
 info:
   title: User API
   version: 1.0.0
+servers:
+  - url: https://api.example.com
 paths:
-  /users:
+  /users/{id}:
     get:
+      operationId: getUserById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
       responses:
         '200':
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  id:
-                    type: integer
-                  name:
-                    type: string
-                  email:
-                    type: string
-                    format: email
-                required: [id, name, email]
+                $ref: '#/components/schemas/User'
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+      required: [id, name, email]
 ```
 
-**Generated Zod Schema** (`schemas/user.schema.ts`):
+**Generated Output** (`generated/type.ts`):
 
 ```typescript
 import {z} from 'zod';
 
-export const UserSchema = z.object({
+// Components schemas
+export const User = z.object({
   id: z.number().int(),
   name: z.string(),
   email: z.string().email(),
 });
 
-export type User = z.infer<typeof UserSchema>;
-```
+const defaultBaseUrl = 'https://api.example.com';
 
-**Generated Types** (`types/user.types.ts`):
+// Client class
+export class UserAPI {
+  #baseUrl: string;
 
-```typescript
-export interface User {
-  id: number;
-  name: string;
-  email: string;
-}
-```
-
-**Generated Client** (`client/api.client.ts`):
-
-```typescript
-import {UserSchema, type User} from '../schemas/user.schema.js';
-
-export class ApiClient {
-  async getUsers(): Promise<User[]> {
-    const response = await fetch('/api/users');
-    const data = await response.json();
-    return UserSchema.array().parse(data);
+  constructor(baseUrl: string = defaultBaseUrl, _?: unknown) {
+    this.#baseUrl = baseUrl;
   }
+
+  async getUserById(id: number): Promise<z.infer<typeof User>> {
+    return User.parse(await this.#makeRequest<z.infer<typeof User>>('GET', `/users/${id}`, {}));
+  }
+
+  // ... private #makeRequest method
 }
+```
+
+**Usage:**
+
+```typescript
+import {UserAPI, User} from './generated/type.js';
+
+const client = new UserAPI();
+const user = await client.getUserById(123);
+// user is fully typed and validated!
 ```
 
 ## 🛠️ Development
 
 ### Prerequisites
 
-- Node.js ≥ 18.0.0
+- Node.js ≥ 24.11.1
 - npm or yarn
 
 ### Setup
@@ -223,9 +241,9 @@ npm run test:ui
 
 ## 📋 Requirements
 
-- **Node.js**: ≥ 18.0.0
-- **TypeScript**: ≥ 5.0.0
-- **Zod**: ≥ 3.20.0
+- **Node.js**: ≥ 24.11.1
+- **TypeScript**: ≥ 5.9.3
+- **Zod**: ≥ 4.1.12
 
 ## 🤝 Contributing
 
