@@ -405,10 +405,17 @@ The generated client uses a layered approach to request configuration:
 
 When a request is made, options are merged in this order (later values override earlier ones):
 
-1. **Base Options** from `getBaseRequestOptions()` (headers, signal, credentials, etc.)
-2. **Content-Type Header** (automatically set based on request body: `application/json` or `application/x-www-form-urlencoded`)
-3. **Request-Specific Headers** from `options.headers` parameter (if provided)
-4. **Method and Body** (always set by generated code, cannot be overridden)
+1. **Base Options** from `getBaseRequestOptions()` - All RequestInit options (headers, signal, credentials, mode, cache, etc.)
+2. **Content-Type Header** - Automatically set based on request body (`application/json` or `application/x-www-form-urlencoded`)
+3. **Request-Specific Headers** - From `options.headers` parameter (if provided)
+4. **Method and Body** - Always set by generated code (cannot be overridden)
+
+**Important**: `getBaseRequestOptions()` returns **base options that are merged with**, not replaced by, request-specific options. This means:
+
+- ✅ Base options like `mode`, `credentials`, `signal` are preserved
+- ✅ Headers are merged (base headers + Content-Type + request headers)
+- ✅ Request-specific headers override base headers
+- ✅ Method and body always come from the request (not from baseOptions)
 
 ### Type Safety
 
@@ -419,20 +426,39 @@ The `getBaseRequestOptions()` method returns `Partial<Omit<RequestInit, 'method'
 
 This ensures type safety while preventing accidental overrides of critical request properties.
 
-### Header Merging Details
+### Complete Options Merging Details
 
-Headers are merged using `Object.assign()` with this priority:
+The final fetch request uses `Object.assign()` to merge options:
 
 ```typescript
+// Headers are merged first:
 const finalHeaders = Object.assign(
   {}, // Start with empty object
   baseOptions.headers || {}, // 1. Base headers from getBaseRequestOptions()
   {'Content-Type': contentType}, // 2. Content-Type (may override base)
   options.headers || {}, // 3. Request-specific headers (highest priority)
 );
+
+// Then all options are merged:
+const finalOptions = Object.assign(
+  {}, // Start with empty object
+  baseOptions, // 1. All base options (mode, credentials, signal, cache, etc.)
+  {
+    // 2. Request-specific options (override base)
+    method, // Always from endpoint
+    headers: finalHeaders, // Merged headers
+    body, // Always from request data
+  },
+);
+
+fetch(url, finalOptions);
 ```
 
-**Important**: Always return `Record<string, string>` for headers in `getBaseRequestOptions()` for predictable merging behavior.
+**Important**:
+
+- Always return `Record<string, string>` for headers in `getBaseRequestOptions()` for predictable merging behavior
+- Base options (like `mode`, `credentials`, `signal`) are preserved unless explicitly overridden
+- Headers are merged, not replaced - base headers + Content-Type + request headers
 
 ### Request Flow
 
