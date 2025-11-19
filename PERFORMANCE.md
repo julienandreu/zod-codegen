@@ -12,14 +12,14 @@ For even faster builds, you can optionally use the TypeScript Native Preview (TS
 ### Installation
 
 ```bash
-npm install -D @typescript/native-preview
+yarn add -D @typescript/native-preview
 ```
 
 ### Usage
 
 ```bash
 # Use native compiler for builds
-npm run build:native
+yarn build:native
 
 # Or use directly
 npx tsgo --project tsconfig.json
@@ -52,8 +52,8 @@ To compare performance:
 
 ```bash
 # Standard TypeScript
-time npm run build
+time yarn build
 
 # Native TypeScript
-time npm run build:native
+time yarn build:native
 ```

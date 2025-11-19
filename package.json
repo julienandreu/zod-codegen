@@ -8,13 +8,13 @@
   },
   "dependencies": {
     "@apidevtools/swagger-parser": "^12.1.0",
-    "debug": "^4.3.7",
+    "debug": "^4.4.3",
     "js-yaml": "^4.1.1",
     "jsonpath": "^1.1.1",
     "loud-rejection": "^2.2.0",
     "openapi-types": "^12.1.3",
     "openapi-typescript": "^7.10.1",
-    "path-to-regexp": "^8.2.0",
+    "path-to-regexp": "^8.3.0",
     "prettier": "^3.6.2",
     "typescript": "^5.9.3",
     "url-pattern": "^1.0.3",
@@ -54,7 +54,8 @@
     "ts-node": "^10.9.2",
     "typescript-eslint": "^8.46.4",
     "undici": "^7.16.0",
-    "vitest": "^4.0.8"
+    "vitest": "^4.0.8",
+    "yarn-audit-fix": "^10.1.1"
   },
   "optionalDependencies": {
     "undici": "^7.16.0"
@@ -77,11 +78,20 @@
   "engines": {
     "node": ">=24.11.1"
   },
+  "overrides": {
+    "npm": {
+      "glob": "^11.1.0",
+      "tar": "^7.5.2"
+    },
+    "glob": "^11.1.0",
+    "tar": "^7.5.2"
+  },
   "scripts": {
+    "audit:fix": "yarn-audit-fix",
     "build": "rm -rf dist && tsc --project tsconfig.json && cp -r src/assets dist/src/ && chmod +x ./dist/src/cli.js",
     "build:native": "rm -rf dist && npx tsgo --project tsconfig.json && cp -r src/assets dist/src/ && chmod +x ./dist/src/cli.js",
     "build:watch": "tsc --project tsconfig.json --watch",
-    "dev": "npm run build && node ./dist/src/cli.js --input ./samples/swagger-petstore.yaml --output ./examples/petstore && npm run format && npm run lint",
+    "dev": "yarn build && node ./dist/src/cli.js --input ./samples/swagger-petstore.yaml --output ./examples/petstore && yarn format && yarn lint",
     "lint": "eslint src --fix",
     "lint:check": "eslint src",
     "format": "prettier src --write --log-level error",
@@ -93,9 +103,9 @@
     "test:ui": "vitest --ui",
     "manifest:update": "ts-node scripts/update-manifest.ts",
     "prepare": "husky",
-    "prepublishOnly": "npm run build && npm run test && npm run lint:check && npm run type-check",
+    "prepublishOnly": "yarn build && yarn test && yarn lint:check && yarn type-check",
     "clean": "rm -rf dist coverage node_modules/.cache",
-    "validate": "npm run type-check && npm run lint:check && npm run format:check && npm run test",
+    "validate": "yarn type-check && yarn lint:check && yarn format:check && yarn test",
     "validate:examples": "tsc -p ./tsconfig.examples.json --noEmit",
     "release": "semantic-release",
     "release:dry": "semantic-release --dry-run"

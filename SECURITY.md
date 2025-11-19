@@ -75,7 +75,7 @@ When using zod-codegen, please follow these security best practices:
 
 - Keep zod-codegen and its dependencies up to date
 - Regularly audit your dependency tree for known vulnerabilities
-- Use tools like `npm audit` to check for security issues
+- Use tools like `yarn audit` or `npm audit` to check for security issues
 
 ## Known Security Considerations
 
