@@ -1,3 +1,10 @@
+## 1.2.0 (2025-11-19)
+
+- Merge pull request #31 from julienandreu/dependabot/npm_and_yarn/dev-dependencies-1dd8918b9f ([97ebb65](https://github.com/julienandreu/zod-codegen/commit/97ebb65)), closes [#31](https://github.com/julienandreu/zod-codegen/issues/31)
+- Merge pull request #32 from julienandreu/feat/add-jsdoc-comments ([9e0d589](https://github.com/julienandreu/zod-codegen/commit/9e0d589)), closes [#32](https://github.com/julienandreu/zod-codegen/issues/32)
+- feat: add JSDoc comments to generated API client methods ([4f42f97](https://github.com/julienandreu/zod-codegen/commit/4f42f97))
+- chore(deps-dev): bump the dev-dependencies group with 3 updates ([43be1ab](https://github.com/julienandreu/zod-codegen/commit/43be1ab))
+
 ## <small>1.1.2 (2025-11-13)</small>
 
 - Merge pull request #30 from julienandreu/fix/cli-strict-mode ([d098ac7](https://github.com/julienandreu/zod-codegen/commit/d098ac7)), closes [#30](https://github.com/julienandreu/zod-codegen/issues/30)

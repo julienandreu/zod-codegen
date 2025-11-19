@@ -1264,10 +1264,48 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
     const responseSchema = response.content['application/json'].schema;
     const typeName = this.getSchemaTypeName(responseSchema, schemas);
+    const inferredType = this.wrapTypeWithZInfer(typeName, schemas);
 
-    return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [
-      ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(typeName), undefined),
-    ]);
+    return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [inferredType]);
+  }
+
+  private wrapTypeWithZInfer(typeName: string, schemas: Record<string, ts.VariableStatement>): ts.TypeNode {
+    // Primitive types and Record types don't need z.infer
+    const primitiveTypes = ['string', 'number', 'boolean', 'unknown'];
+    if (primitiveTypes.includes(typeName) || typeName.startsWith('Record<')) {
+      return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(typeName), undefined);
+    }
+
+    // Handle array types like "Pet[]"
+    if (typeName.endsWith('[]')) {
+      const itemTypeName = typeName.slice(0, -2);
+      const sanitizedItemTypeName = this.typeBuilder.sanitizeIdentifier(itemTypeName);
+
+      // Check if the item type is a custom schema
+      if (schemas[sanitizedItemTypeName]) {
+        // Return z.infer<typeof ItemType>[]
+        const zInferType = ts.factory.createTypeReferenceNode(
+          ts.factory.createQualifiedName(ts.factory.createIdentifier('z'), ts.factory.createIdentifier('infer')),
+          [ts.factory.createTypeQueryNode(ts.factory.createIdentifier(sanitizedItemTypeName), undefined)],
+        );
+        return ts.factory.createArrayTypeNode(zInferType);
+      }
+      // If it's a primitive array, return as-is
+      return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(typeName), undefined);
+    }
+
+    // Handle custom schema types
+    const sanitizedTypeName = this.typeBuilder.sanitizeIdentifier(typeName);
+    if (schemas[sanitizedTypeName]) {
+      // Return z.infer<typeof TypeName>
+      return ts.factory.createTypeReferenceNode(
+        ts.factory.createQualifiedName(ts.factory.createIdentifier('z'), ts.factory.createIdentifier('infer')),
+        [ts.factory.createTypeQueryNode(ts.factory.createIdentifier(sanitizedTypeName), undefined)],
+      );
+    }
+
+    // Fallback: return as-is if we can't determine
+    return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(typeName), undefined);
   }
 
   private buildServerConfiguration(openapi: OpenApiSpecType): ts.Statement[] {
