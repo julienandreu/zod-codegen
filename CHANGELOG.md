@@ -1,3 +1,8 @@
+## <small>1.2.2 (2025-11-19)</small>
+
+- Merge pull request #35 from julienandreu/fix/generate-typescript-type-aliases ([b8d9250](https://github.com/julienandreu/zod-codegen/commit/b8d9250)), closes [#35](https://github.com/julienandreu/zod-codegen/issues/35)
+- fix: generate TypeScript type aliases alongside Zod schemas ([7032a69](https://github.com/julienandreu/zod-codegen/commit/7032a69))
+
 ## <small>1.2.1 (2025-11-19)</small>
 
 - Merge pull request #33 from julienandreu/fix/add-z-infer-to-response-types ([a14d81c](https://github.com/julienandreu/zod-codegen/commit/a14d81c)), closes [#33](https://github.com/julienandreu/zod-codegen/issues/33)
