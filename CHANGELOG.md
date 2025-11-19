@@ -1,3 +1,8 @@
+## <small>1.2.1 (2025-11-19)</small>
+
+- Merge pull request #33 from julienandreu/fix/add-z-infer-to-response-types ([a14d81c](https://github.com/julienandreu/zod-codegen/commit/a14d81c)), closes [#33](https://github.com/julienandreu/zod-codegen/issues/33)
+- fix: add z.infer to response types in generated methods ([c45ac77](https://github.com/julienandreu/zod-codegen/commit/c45ac77))
+
 ## 1.2.0 (2025-11-19)
 
 - Merge pull request #31 from julienandreu/dependabot/npm_and_yarn/dev-dependencies-1dd8918b9f ([97ebb65](https://github.com/julienandreu/zod-codegen/commit/97ebb65)), closes [#31](https://github.com/julienandreu/zod-codegen/issues/31)
