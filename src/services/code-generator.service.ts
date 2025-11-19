@@ -53,6 +53,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
   private buildAST(openapi: OpenApiSpecType): ts.Statement[] {
     const imports = this.importBuilder.buildImports();
     const schemas = this.buildSchemas(openapi);
+    const schemaTypeAliases = this.buildSchemaTypeAliases(schemas);
     const serverConfig = this.buildServerConfiguration(openapi);
     const clientClass = this.buildClientClass(openapi, schemas);
 
@@ -61,6 +62,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       ...imports,
       this.createComment('Components schemas'),
       ...Object.values(schemas),
+      ...schemaTypeAliases,
       ...serverConfig,
       this.createComment('Client class'),
       clientClass,
@@ -95,6 +97,21 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
         [name]: variableStatement,
       };
     }, {});
+  }
+
+  private buildSchemaTypeAliases(schemas: Record<string, ts.VariableStatement>): ts.TypeAliasDeclaration[] {
+    return Object.keys(schemas).map((name) => {
+      const sanitizedName = this.typeBuilder.sanitizeIdentifier(name);
+      return ts.factory.createTypeAliasDeclaration(
+        [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
+        ts.factory.createIdentifier(sanitizedName),
+        undefined,
+        ts.factory.createTypeReferenceNode(
+          ts.factory.createQualifiedName(ts.factory.createIdentifier('z'), ts.factory.createIdentifier('infer')),
+          [ts.factory.createTypeQueryNode(ts.factory.createIdentifier(sanitizedName), undefined)],
+        ),
+      );
+    });
   }
 
   private buildClientClass(
@@ -1264,48 +1281,41 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
     const responseSchema = response.content['application/json'].schema;
     const typeName = this.getSchemaTypeName(responseSchema, schemas);
-    const inferredType = this.wrapTypeWithZInfer(typeName, schemas);
-
-    return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [inferredType]);
-  }
-
-  private wrapTypeWithZInfer(typeName: string, schemas: Record<string, ts.VariableStatement>): ts.TypeNode {
-    // Primitive types and Record types don't need z.infer
-    const primitiveTypes = ['string', 'number', 'boolean', 'unknown'];
-    if (primitiveTypes.includes(typeName) || typeName.startsWith('Record<')) {
-      return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(typeName), undefined);
-    }
 
     // Handle array types like "Pet[]"
     if (typeName.endsWith('[]')) {
       const itemTypeName = typeName.slice(0, -2);
       const sanitizedItemTypeName = this.typeBuilder.sanitizeIdentifier(itemTypeName);
 
-      // Check if the item type is a custom schema
+      // Check if the item type is a custom schema (we have a type alias for it)
       if (schemas[sanitizedItemTypeName]) {
-        // Return z.infer<typeof ItemType>[]
-        const zInferType = ts.factory.createTypeReferenceNode(
-          ts.factory.createQualifiedName(ts.factory.createIdentifier('z'), ts.factory.createIdentifier('infer')),
-          [ts.factory.createTypeQueryNode(ts.factory.createIdentifier(sanitizedItemTypeName), undefined)],
-        );
-        return ts.factory.createArrayTypeNode(zInferType);
+        // Use the type alias directly (it already uses z.infer)
+        return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [
+          ts.factory.createArrayTypeNode(
+            ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(sanitizedItemTypeName), undefined),
+          ),
+        ]);
       }
-      // If it's a primitive array, return as-is
-      return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(typeName), undefined);
+      // If it's a primitive array, use the type name as-is
+      return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [
+        ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(typeName), undefined),
+      ]);
     }
 
-    // Handle custom schema types
     const sanitizedTypeName = this.typeBuilder.sanitizeIdentifier(typeName);
+
+    // Check if it's a custom schema type (we have a type alias for it)
     if (schemas[sanitizedTypeName]) {
-      // Return z.infer<typeof TypeName>
-      return ts.factory.createTypeReferenceNode(
-        ts.factory.createQualifiedName(ts.factory.createIdentifier('z'), ts.factory.createIdentifier('infer')),
-        [ts.factory.createTypeQueryNode(ts.factory.createIdentifier(sanitizedTypeName), undefined)],
-      );
+      // Use the type name directly (we have a type alias that already uses z.infer)
+      return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [
+        ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(sanitizedTypeName), undefined),
+      ]);
     }
 
-    // Fallback: return as-is if we can't determine
-    return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(typeName), undefined);
+    // For primitive types and Record types, use the type name directly
+    return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [
+      ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(typeName), undefined),
+    ]);
   }
 
   private buildServerConfiguration(openapi: OpenApiSpecType): ts.Statement[] {
