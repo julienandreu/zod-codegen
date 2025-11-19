@@ -28,13 +28,13 @@ A powerful TypeScript code generator that creates **Zod schemas** and **type-saf
 ### Global Installation (CLI)
 
 ```bash
-npm install -g zod-codegen
+yarn global add zod-codegen
 ```
 
 ### Project Installation
 
 ```bash
-npm install --save-dev zod-codegen
+yarn add --dev zod-codegen
 ```
 
 ## 🔧 Usage
@@ -378,7 +378,7 @@ Each example includes:
 ### Prerequisites
 
 - Node.js ≥ 24.11.1
-- npm or yarn
+- yarn
 
 ### Setup
 
@@ -388,52 +388,52 @@ git clone https://github.com/julienandreu/zod-codegen.git
 cd zod-codegen
 
 # Install dependencies
-npm install
+yarn install
 
 # Build the project
-npm run build
+yarn build
 
 # Run tests
-npm test
+yarn test
 
 # Run linting
-npm run lint
+yarn lint
 
 # Format code
-npm run format
+yarn format
 ```
 
 ### Testing
 
 ```bash
 # Run all tests
-npm test
+yarn test
 
 # Run tests in watch mode
-npm run test:watch
+yarn test:watch
 
 # Run tests with coverage
-npm run test:coverage
+yarn test:coverage
 
 # Run tests with UI
-npm run test:ui
+yarn test:ui
 ```
 
 ### Available Scripts
 
-| Script                  | Description                                     |
-| ----------------------- | ----------------------------------------------- |
-| `npm run build`         | Build the project                               |
-| `npm run build:watch`   | Build in watch mode                             |
-| `npm run dev`           | Development mode with example                   |
-| `npm test`              | Run tests                                       |
-| `npm run test:watch`    | Run tests in watch mode                         |
-| `npm run test:coverage` | Run tests with coverage                         |
-| `npm run lint`          | Lint and fix code                               |
-| `npm run format`        | Format code with Prettier                       |
-| `npm run type-check`    | Type check without emitting                     |
-| `npm run validate`      | Run all checks (lint, format, type-check, test) |
-| `npm run clean`         | Clean build artifacts                           |
+| Script               | Description                                     |
+| -------------------- | ----------------------------------------------- |
+| `yarn build`         | Build the project                               |
+| `yarn build:watch`   | Build in watch mode                             |
+| `yarn dev`           | Development mode with example                   |
+| `yarn test`          | Run tests                                       |
+| `yarn test:watch`    | Run tests in watch mode                         |
+| `yarn test:coverage` | Run tests with coverage                         |
+| `yarn lint`          | Lint and fix code                               |
+| `yarn format`        | Format code with Prettier                       |
+| `yarn type-check`    | Type check without emitting                     |
+| `yarn validate`      | Run all checks (lint, format, type-check, test) |
+| `yarn clean`         | Clean build artifacts                           |
 
 ## 📋 Requirements
 
@@ -450,8 +450,8 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 1. Fork the repository
 2. Create your feature branch: `git checkout -b feature/amazing-feature`
 3. Make your changes
-4. Run tests: `npm test`
-5. Run validation: `npm run validate`
+4. Run tests: `yarn test`
+5. Run validation: `yarn validate`
 6. Commit your changes: `git commit -m 'feat: add amazing feature'`
 7. Push to the branch: `git push origin feature/amazing-feature`
 8. Open a Pull Request

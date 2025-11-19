@@ -962,7 +962,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       statements.push(ts.factory.createReturnStatement(ts.factory.createAwaitExpression(makeRequestCall)));
     }
 
-    return ts.factory.createMethodDeclaration(
+    const methodDeclaration = ts.factory.createMethodDeclaration(
       [ts.factory.createToken(ts.SyntaxKind.AsyncKeyword)],
       undefined,
       ts.factory.createIdentifier(String(schema.operationId)),
@@ -972,6 +972,22 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       responseType,
       ts.factory.createBlock(statements, true),
     );
+
+    // Add JSDoc comment if summary or description exists
+    const jsdocComment = this.buildJSDocComment(schema.summary, schema.description, schema, responseType);
+
+    if (jsdocComment) {
+      // addSyntheticLeadingComment expects the comment content without delimiters
+      // and will wrap it in /** */ for JSDoc-style comments
+      ts.addSyntheticLeadingComment(
+        methodDeclaration,
+        ts.SyntaxKind.MultiLineCommentTrivia,
+        `*\n${jsdocComment}\n `,
+        true,
+      );
+    }
+
+    return methodDeclaration;
   }
 
   private buildPathExpression(path: string, pathParams: {name: string; type: string}[]): ts.Expression {
@@ -1668,6 +1684,96 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     const commentNode = ts.factory.createIdentifier('\n');
     ts.addSyntheticTrailingComment(commentNode, ts.SyntaxKind.SingleLineCommentTrivia, ` ${text}`, true);
     return ts.factory.createExpressionStatement(commentNode);
+  }
+
+  /**
+   * Builds a JSDoc comment string from operation metadata
+   */
+  private buildJSDocComment(
+    summary: string | undefined,
+    description: string | undefined,
+    schema: MethodSchemaType,
+    responseType: ts.TypeNode | undefined,
+  ): string {
+    const lines: string[] = [];
+
+    // Add summary or description as the main comment
+    if (summary) {
+      lines.push(` * ${summary}`);
+    } else if (description) {
+      // Use first line of description as summary if no summary exists
+      const firstLine = description.split('\n')[0]?.trim();
+      if (firstLine) {
+        lines.push(` * ${firstLine}`);
+      }
+    }
+
+    // Add full description if it exists and is different from summary
+    if (description && description !== summary) {
+      const descLines = description.split('\n');
+      if (descLines.length > 1 || descLines[0] !== summary) {
+        if (lines.length > 0) {
+          lines.push(' *');
+        }
+        descLines.forEach((line) => {
+          lines.push(` * ${line.trim() || ''}`);
+        });
+      }
+    }
+
+    // Add @param tags for each parameter
+    if (schema.parameters && schema.parameters.length > 0) {
+      if (lines.length > 0) {
+        lines.push(' *');
+      }
+      for (const param of schema.parameters) {
+        const paramName = this.typeBuilder.sanitizeIdentifier(param.name);
+        const paramDesc = param.description ? ` ${param.description}` : '';
+        lines.push(` * @param ${paramName}${paramDesc}`);
+      }
+    }
+
+    // Add @param tag for request body if present
+    if (schema.requestBody) {
+      const bodyDesc = schema.requestBody.description ? ` ${schema.requestBody.description}` : '';
+      lines.push(` * @param body${bodyDesc}`);
+    }
+
+    // Add @returns tag if we have a response type
+    if (responseType) {
+      // Extract the inner type from Promise<T> for JSDoc
+      let returnTypeText: string;
+      if (
+        ts.isTypeReferenceNode(responseType) &&
+        ts.isIdentifier(responseType.typeName) &&
+        responseType.typeName.text === 'Promise' &&
+        responseType.typeArguments &&
+        responseType.typeArguments.length > 0 &&
+        responseType.typeArguments[0]
+      ) {
+        // Extract the inner type from Promise<T>
+        const innerType = responseType.typeArguments[0];
+        returnTypeText = this.printer.printNode(
+          ts.EmitHint.Unspecified,
+          innerType,
+          ts.createSourceFile('', '', ts.ScriptTarget.Latest),
+        );
+      } else {
+        returnTypeText = this.printer.printNode(
+          ts.EmitHint.Unspecified,
+          responseType,
+          ts.createSourceFile('', '', ts.ScriptTarget.Latest),
+        );
+      }
+      lines.push(` * @returns {${returnTypeText}}`);
+    }
+
+    // Build the complete JSDoc comment (without delimiters, as addSyntheticLeadingComment adds them)
+    if (lines.length === 0) {
+      return '';
+    }
+
+    return lines.join('\n');
   }
 
   private buildZodAST(input: (string | z.infer<typeof this.ZodAST>)[]): ts.CallExpression {
