@@ -2286,7 +2286,10 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
           switch (prop['format']) {
             case 'email':
               stringSchema = ts.factory.createCallExpression(
-                ts.factory.createPropertyAccessExpression(stringSchema, ts.factory.createIdentifier('email')),
+                ts.factory.createPropertyAccessExpression(
+                  ts.factory.createIdentifier('z'),
+                  ts.factory.createIdentifier('email'),
+                ),
                 undefined,
                 [],
               );
@@ -2294,28 +2297,46 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
             case 'uri':
             case 'url':
               stringSchema = ts.factory.createCallExpression(
-                ts.factory.createPropertyAccessExpression(stringSchema, ts.factory.createIdentifier('url')),
+                ts.factory.createPropertyAccessExpression(
+                  ts.factory.createIdentifier('z'),
+                  ts.factory.createIdentifier('url'),
+                ),
                 undefined,
                 [],
               );
               break;
             case 'uuid':
               stringSchema = ts.factory.createCallExpression(
-                ts.factory.createPropertyAccessExpression(stringSchema, ts.factory.createIdentifier('uuid')),
+                ts.factory.createPropertyAccessExpression(
+                  ts.factory.createIdentifier('z'),
+                  ts.factory.createIdentifier('uuid'),
+                ),
                 undefined,
                 [],
               );
               break;
             case 'date-time':
               stringSchema = ts.factory.createCallExpression(
-                ts.factory.createPropertyAccessExpression(stringSchema, ts.factory.createIdentifier('datetime')),
+                ts.factory.createPropertyAccessExpression(
+                  ts.factory.createPropertyAccessExpression(
+                    ts.factory.createIdentifier('z'),
+                    ts.factory.createIdentifier('iso'),
+                  ),
+                  ts.factory.createIdentifier('datetime'),
+                ),
                 undefined,
-                [],
+                [this.buildDefaultValue({local: true})],
               );
               break;
             case 'date':
               stringSchema = ts.factory.createCallExpression(
-                ts.factory.createPropertyAccessExpression(stringSchema, ts.factory.createIdentifier('date')),
+                ts.factory.createPropertyAccessExpression(
+                  ts.factory.createPropertyAccessExpression(
+                    ts.factory.createIdentifier('z'),
+                    ts.factory.createIdentifier('iso'),
+                  ),
+                  ts.factory.createIdentifier('date'),
+                ),
                 undefined,
                 [],
               );
