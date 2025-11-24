@@ -1,3 +1,14 @@
+## 1.3.0 (2025-11-24)
+
+- Merge pull request #36 from julienandreu/dependabot/npm_and_yarn/dev-dependencies-16beb30ed0 ([3d85de4](https://github.com/julienandreu/zod-codegen/commit/3d85de4)), closes [#36](https://github.com/julienandreu/zod-codegen/issues/36)
+- Merge pull request #37 from julienandreu/dependabot/npm_and_yarn/production-dependencies-e947a059e9 ([25bfc2e](https://github.com/julienandreu/zod-codegen/commit/25bfc2e)), closes [#37](https://github.com/julienandreu/zod-codegen/issues/37)
+- Merge pull request #38 from julienandreu/dependabot/github_actions/actions/checkout-6 ([6377f8b](https://github.com/julienandreu/zod-codegen/commit/6377f8b)), closes [#38](https://github.com/julienandreu/zod-codegen/issues/38)
+- Merge pull request #39 from julienandreu/migrate-zod-string-api-v4 ([472d53f](https://github.com/julienandreu/zod-codegen/commit/472d53f)), closes [#39](https://github.com/julienandreu/zod-codegen/issues/39)
+- feat: migrate deprecated Zod string schema API to v4 ([b4461b4](https://github.com/julienandreu/zod-codegen/commit/b4461b4))
+- ci(deps): bump actions/checkout from 5 to 6 ([45d007c](https://github.com/julienandreu/zod-codegen/commit/45d007c))
+- chore(deps-dev): bump the dev-dependencies group with 3 updates ([644ecdc](https://github.com/julienandreu/zod-codegen/commit/644ecdc))
+- chore(deps): bump zod in the production-dependencies group ([69b5694](https://github.com/julienandreu/zod-codegen/commit/69b5694))
+
 ## <small>1.2.2 (2025-11-19)</small>
 
 - Merge pull request #35 from julienandreu/fix/generate-typescript-type-aliases ([b8d9250](https://github.com/julienandreu/zod-codegen/commit/b8d9250)), closes [#35](https://github.com/julienandreu/zod-codegen/issues/35)
