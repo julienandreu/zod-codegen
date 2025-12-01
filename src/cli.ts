@@ -72,15 +72,34 @@ const argv = yargs(hideBin(process.argv))
     description: 'Directory to output the generated files',
     default: 'generated',
   })
+  .option('naming-convention', {
+    alias: 'n',
+    type: 'string',
+    description: 'Naming convention to apply to operation IDs',
+    choices: ['camelCase', 'PascalCase', 'snake_case', 'kebab-case', 'SCREAMING_SNAKE_CASE', 'SCREAMING-KEBAB-CASE'],
+    default: undefined,
+  })
   .strict()
   .help()
   .parseSync();
 
-const {input, output} = argv;
+const {input, output, namingConvention} = argv;
 
 void (async () => {
   try {
-    const generator = new Generator(name, version, reporter, input, output);
+    const options = namingConvention
+      ? {
+          namingConvention: namingConvention as
+            | 'camelCase'
+            | 'PascalCase'
+            | 'snake_case'
+            | 'kebab-case'
+            | 'SCREAMING_SNAKE_CASE'
+            | 'SCREAMING-KEBAB-CASE',
+        }
+      : {};
+
+    const generator = new Generator(name, version, reporter, input, output, options);
     const exitCode = await generator.run();
     process.exit(exitCode);
   } catch (error) {
