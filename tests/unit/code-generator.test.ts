@@ -1,4 +1,4 @@
-import {describe, expect, it} from 'vitest';
+import {beforeEach, describe, expect, it} from 'vitest';
 import {TypeScriptCodeGeneratorService} from '../../src/services/code-generator.service.js';
 import type {OpenApiSpecType} from '../../src/types/openapi.js';
 
@@ -7,6 +7,194 @@ describe('TypeScriptCodeGeneratorService', () => {
 
   beforeEach(() => {
     generator = new TypeScriptCodeGeneratorService();
+  });
+
+  describe('naming conventions', () => {
+    it('should apply camelCase naming convention', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {
+          '/users': {
+            get: {
+              operationId: 'get_user_by_id',
+              responses: {
+                '200': {
+                  description: 'Success',
+                  content: {
+                    'application/json': {
+                      schema: {type: 'string'},
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      const generatorWithConvention = new TypeScriptCodeGeneratorService({
+        namingConvention: 'camelCase',
+      });
+      const code = generatorWithConvention.generate(spec);
+      expect(code).toContain('async getUserById');
+      expect(code).not.toContain('async get_user_by_id');
+    });
+
+    it('should apply PascalCase naming convention', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {
+          '/users': {
+            get: {
+              operationId: 'get_user_by_id',
+              responses: {
+                '200': {
+                  description: 'Success',
+                  content: {
+                    'application/json': {
+                      schema: {type: 'string'},
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      const generatorWithConvention = new TypeScriptCodeGeneratorService({
+        namingConvention: 'PascalCase',
+      });
+      const code = generatorWithConvention.generate(spec);
+      expect(code).toContain('async GetUserById');
+      expect(code).not.toContain('async get_user_by_id');
+    });
+
+    it('should apply snake_case naming convention', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {
+          '/users': {
+            get: {
+              operationId: 'getUserById',
+              responses: {
+                '200': {
+                  description: 'Success',
+                  content: {
+                    'application/json': {
+                      schema: {type: 'string'},
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      const generatorWithConvention = new TypeScriptCodeGeneratorService({
+        namingConvention: 'snake_case',
+      });
+      const code = generatorWithConvention.generate(spec);
+      expect(code).toContain('async get_user_by_id');
+      expect(code).not.toContain('async getUserById');
+    });
+
+    it('should use custom transformer when provided', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {
+          '/users/{id}': {
+            get: {
+              operationId: 'getUserById',
+              tags: ['users'],
+              summary: 'Get user',
+              responses: {
+                '200': {
+                  description: 'Success',
+                  content: {
+                    'application/json': {
+                      schema: {type: 'string'},
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      const customTransformer = (details: {
+        operationId: string;
+        method: string;
+        path: string;
+        tags?: string[];
+        summary?: string;
+        description?: string;
+      }) => {
+        return `${details.method.toUpperCase()}_${details.tags?.[0] || 'default'}_${details.operationId}`;
+      };
+
+      const generatorWithTransformer = new TypeScriptCodeGeneratorService({
+        operationNameTransformer: customTransformer,
+      });
+      const code = generatorWithTransformer.generate(spec);
+      expect(code).toContain('async GET_users_getUserById');
+    });
+
+    it('should prioritize custom transformer over naming convention', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {
+          '/users': {
+            get: {
+              operationId: 'get_user_by_id',
+              responses: {
+                '200': {
+                  description: 'Success',
+                  content: {
+                    'application/json': {
+                      schema: {type: 'string'},
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      const customTransformer = () => 'customName';
+
+      const generatorWithBoth = new TypeScriptCodeGeneratorService({
+        namingConvention: 'PascalCase',
+        operationNameTransformer: customTransformer,
+      });
+      const code = generatorWithBoth.generate(spec);
+      expect(code).toContain('async customName');
+      expect(code).not.toContain('GetUserById');
+      expect(code).not.toContain('get_user_by_id');
+    });
   });
 
   describe('generate', () => {

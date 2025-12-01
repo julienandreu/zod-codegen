@@ -3,14 +3,28 @@ import * as ts from 'typescript';
 import {z} from 'zod';
 import type {CodeGenerator, SchemaBuilder} from '../interfaces/code-generator.js';
 import type {MethodSchemaType, OpenApiSpecType, ReferenceType} from '../types/openapi.js';
+import type {GeneratorOptions} from '../types/generator-options.js';
 import {MethodSchema, Reference, SchemaProperties} from '../types/openapi.js';
 import {TypeScriptImportBuilderService} from './import-builder.service.js';
 import {TypeScriptTypeBuilderService} from './type-builder.service.js';
+import {
+  type NamingConvention,
+  type OperationDetails,
+  type OperationNameTransformer,
+  transformNamingConvention,
+} from '../utils/naming-convention.js';
 
 export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuilder {
   private readonly typeBuilder = new TypeScriptTypeBuilderService();
   private readonly importBuilder = new TypeScriptImportBuilderService();
   private readonly printer = ts.createPrinter({newLine: ts.NewLineKind.LineFeed});
+  private readonly namingConvention: NamingConvention | undefined;
+  private readonly operationNameTransformer: OperationNameTransformer | undefined;
+
+  constructor(options: GeneratorOptions = {}) {
+    this.namingConvention = options.namingConvention;
+    this.operationNameTransformer = options.operationNameTransformer;
+  }
 
   private readonly ZodAST = z.object({
     type: z.enum(['string', 'number', 'boolean', 'object', 'array', 'unknown', 'record']),
@@ -894,6 +908,36 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     }, []);
   }
 
+  /**
+   * Transforms operation ID according to the configured naming convention or transformer
+   * Ensures the result is a valid TypeScript identifier
+   */
+  private transformOperationName(operationId: string, method: string, path: string, schema: MethodSchemaType): string {
+    let transformed: string;
+
+    // Custom transformer takes precedence
+    if (this.operationNameTransformer) {
+      const details: OperationDetails = {
+        operationId,
+        method,
+        path,
+        ...(schema.tags !== undefined && {tags: schema.tags}),
+        ...(schema.summary !== undefined && {summary: schema.summary}),
+        ...(schema.description !== undefined && {description: schema.description}),
+      };
+      transformed = this.operationNameTransformer(details);
+    } else if (this.namingConvention) {
+      // Apply naming convention if specified
+      transformed = transformNamingConvention(operationId, this.namingConvention);
+    } else {
+      // Return original operationId if no transformation is configured
+      transformed = operationId;
+    }
+
+    // Sanitize to ensure valid TypeScript identifier (handles edge cases from custom transformers)
+    return this.typeBuilder.sanitizeIdentifier(transformed);
+  }
+
   private buildEndpointMethod(
     method: string,
     path: string,
@@ -979,10 +1023,12 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       statements.push(ts.factory.createReturnStatement(ts.factory.createAwaitExpression(makeRequestCall)));
     }
 
+    const transformedOperationId = this.transformOperationName(String(schema.operationId), method, path, schema);
+
     const methodDeclaration = ts.factory.createMethodDeclaration(
       [ts.factory.createToken(ts.SyntaxKind.AsyncKeyword)],
       undefined,
-      ts.factory.createIdentifier(String(schema.operationId)),
+      ts.factory.createIdentifier(transformedOperationId),
       undefined,
       undefined,
       parameters,

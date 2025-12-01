@@ -8,7 +8,7 @@ export const signalReceived = (process: NodeJS.Process, startTime: bigint, event
 
 export const handleSignals = (process: NodeJS.Process, startTime: bigint): void => {
   const catchSignals: NodeJS.Signals[] = ['SIGTERM', 'SIGINT', 'SIGUSR2'];
-  catchSignals.map((event): NodeJS.EventEmitter => {
-    return process.once(event, signalReceived(process, startTime, event));
+  catchSignals.forEach((event) => {
+    process.once(event, signalReceived(process, startTime, event));
   });
 };

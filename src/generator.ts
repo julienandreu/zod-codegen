@@ -1,13 +1,18 @@
 import type {Reporter} from './utils/reporter.js';
 import type {OpenApiSpecType} from './types/openapi.js';
+import type {GeneratorOptions} from './types/generator-options.js';
 import {OpenApiFileParserService, SyncFileReaderService} from './services/file-reader.service.js';
 import {TypeScriptCodeGeneratorService} from './services/code-generator.service.js';
 import {SyncFileWriterService} from './services/file-writer.service.js';
 
+// Re-export types for library users
+export type {GeneratorOptions} from './types/generator-options.js';
+export type {NamingConvention, OperationDetails, OperationNameTransformer} from './utils/naming-convention.js';
+
 export class Generator {
   private readonly fileReader = new SyncFileReaderService();
   private readonly fileParser = new OpenApiFileParserService();
-  private readonly codeGenerator = new TypeScriptCodeGeneratorService();
+  private readonly codeGenerator: TypeScriptCodeGeneratorService;
   private readonly fileWriter: SyncFileWriterService;
   private readonly outputPath: string;
 
@@ -17,9 +22,11 @@ export class Generator {
     private readonly reporter: Reporter,
     private readonly inputPath: string,
     private readonly _outputDir: string,
+    options: GeneratorOptions = {},
   ) {
     this.fileWriter = new SyncFileWriterService(this._name, this._version, inputPath);
     this.outputPath = this.fileWriter.resolveOutputPath(this._outputDir);
+    this.codeGenerator = new TypeScriptCodeGeneratorService(options);
   }
 
   async run(): Promise<number> {

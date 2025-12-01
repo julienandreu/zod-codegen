@@ -1,7 +1,7 @@
 # zod-codegen
 
 [![npm version](https://img.shields.io/npm/v/zod-codegen.svg)](https://www.npmjs.com/package/zod-codegen)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![CI](https://github.com/julienandreu/zod-codegen/workflows/CI/badge.svg)](https://github.com/julienandreu/zod-codegen/actions)
 [![Coverage](https://img.shields.io/codecov/c/github/julienandreu/zod-codegen)](https://codecov.io/gh/julienandreu/zod-codegen)
@@ -54,17 +54,42 @@ zod-codegen -i ./swagger.yaml -o ./src/generated
 
 #### CLI Options
 
-| Option      | Alias | Description                         | Default     |
-| ----------- | ----- | ----------------------------------- | ----------- |
-| `--input`   | `-i`  | Path or URL to OpenAPI file         | Required    |
-| `--output`  | `-o`  | Directory to output generated files | `generated` |
-| `--help`    | `-h`  | Show help                           |             |
-| `--version` | `-v`  | Show version                        |             |
+| Option                | Alias | Description                         | Default     |
+| --------------------- | ----- | ----------------------------------- | ----------- |
+| `--input`             | `-i`  | Path or URL to OpenAPI file         | Required    |
+| `--output`            | `-o`  | Directory to output generated files | `generated` |
+| `--naming-convention` | `-n`  | Naming convention for operation IDs | (none)      |
+| `--help`              | `-h`  | Show help                           |             |
+| `--version`           | `-v`  | Show version                        |             |
+
+#### Naming Conventions
+
+The `--naming-convention` option allows you to transform operation IDs according to common naming conventions. Supported conventions:
+
+- `camelCase` - e.g., `getUserById`
+- `PascalCase` - e.g., `GetUserById`
+- `snake_case` - e.g., `get_user_by_id`
+- `kebab-case` - e.g., `get-user-by-id`
+- `SCREAMING_SNAKE_CASE` - e.g., `GET_USER_BY_ID`
+- `SCREAMING-KEBAB-CASE` - e.g., `GET-USER-BY-ID`
+
+**Example:**
+
+```bash
+# Transform operation IDs to camelCase
+zod-codegen --input ./openapi.json --output ./generated --naming-convention camelCase
+
+# Transform operation IDs to snake_case
+zod-codegen -i ./openapi.json -o ./generated -n snake_case
+```
+
+This is particularly useful when OpenAPI specs have inconsistent or poorly named operation IDs.
 
 ### Programmatic Usage
 
 ```typescript
 import {Generator} from 'zod-codegen';
+import type {GeneratorOptions} from 'zod-codegen';
 
 // Create a simple reporter object
 const reporter = {
@@ -72,18 +97,45 @@ const reporter = {
   error: (...args: unknown[]) => console.error(...args),
 };
 
-// Create generator instance
+// Create generator instance with naming convention
 const generator = new Generator(
   'my-app',
   '1.0.0',
   reporter,
   './openapi.json', // Input path or URL
   './generated', // Output directory
+  {
+    namingConvention: 'camelCase', // Transform operation IDs to camelCase
+  },
 );
 
 // Run the generator
 const exitCode = await generator.run();
 ```
+
+#### Custom Operation Name Transformer
+
+For more advanced use cases, you can provide a custom transformer function that receives full operation details:
+
+```typescript
+import {Generator} from 'zod-codegen';
+import type {GeneratorOptions, OperationDetails} from 'zod-codegen';
+
+const customTransformer: GeneratorOptions['operationNameTransformer'] = (details: OperationDetails) => {
+  // details includes: operationId, method, path, tags, summary, description
+  const {operationId, method, tags} = details;
+
+  // Example: Prefix with HTTP method and tag
+  const tag = tags?.[0] || 'default';
+  return `${method.toUpperCase()}_${tag}_${operationId}`;
+};
+
+const generator = new Generator('my-app', '1.0.0', reporter, './openapi.json', './generated', {
+  operationNameTransformer: customTransformer,
+});
+```
+
+**Note:** Custom transformers take precedence over naming conventions if both are provided.
 
 ## 📁 Generated Output
 
@@ -458,7 +510,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 ## 📝 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENCE) file for details.
 
 ## 🙏 Acknowledgments
 
