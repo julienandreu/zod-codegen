@@ -1,7 +1,7 @@
 # zod-codegen
 
 [![npm version](https://img.shields.io/npm/v/zod-codegen.svg)](https://www.npmjs.com/package/zod-codegen)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![CI](https://github.com/julienandreu/zod-codegen/workflows/CI/badge.svg)](https://github.com/julienandreu/zod-codegen/actions)
 [![Coverage](https://img.shields.io/codecov/c/github/julienandreu/zod-codegen)](https://codecov.io/gh/julienandreu/zod-codegen)
@@ -510,7 +510,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 ## 📝 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENCE) file for details.
 
 ## 🙏 Acknowledgments
 

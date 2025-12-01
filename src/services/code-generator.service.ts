@@ -9,9 +9,9 @@ import {TypeScriptImportBuilderService} from './import-builder.service.js';
 import {TypeScriptTypeBuilderService} from './type-builder.service.js';
 import {
   type NamingConvention,
-  NamingConventionTransformer,
   type OperationDetails,
   type OperationNameTransformer,
+  transformNamingConvention,
 } from '../utils/naming-convention.js';
 
 export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuilder {
@@ -910,28 +910,32 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
   /**
    * Transforms operation ID according to the configured naming convention or transformer
+   * Ensures the result is a valid TypeScript identifier
    */
   private transformOperationName(operationId: string, method: string, path: string, schema: MethodSchemaType): string {
+    let transformed: string;
+
     // Custom transformer takes precedence
     if (this.operationNameTransformer) {
       const details: OperationDetails = {
         operationId,
         method,
         path,
-        ...(schema.tags && {tags: schema.tags}),
-        ...(schema.summary && {summary: schema.summary}),
-        ...(schema.description && {description: schema.description}),
+        ...(schema.tags !== undefined && {tags: schema.tags}),
+        ...(schema.summary !== undefined && {summary: schema.summary}),
+        ...(schema.description !== undefined && {description: schema.description}),
       };
-      return this.operationNameTransformer(details);
+      transformed = this.operationNameTransformer(details);
+    } else if (this.namingConvention) {
+      // Apply naming convention if specified
+      transformed = transformNamingConvention(operationId, this.namingConvention);
+    } else {
+      // Return original operationId if no transformation is configured
+      transformed = operationId;
     }
 
-    // Apply naming convention if specified
-    if (this.namingConvention) {
-      return NamingConventionTransformer.transform(operationId, this.namingConvention);
-    }
-
-    // Return original operationId if no transformation is configured
-    return operationId;
+    // Sanitize to ensure valid TypeScript identifier (handles edge cases from custom transformers)
+    return this.typeBuilder.sanitizeIdentifier(transformed);
   }
 
   private buildEndpointMethod(

@@ -1,5 +1,12 @@
 /**
- * Supported naming conventions for operation IDs
+ * Supported naming conventions for operation IDs.
+ * These conventions transform operation IDs to match common programming language styles.
+ *
+ * @example
+ * ```typescript
+ * transformNamingConvention('get_user_by_id', 'camelCase') // 'getUserById'
+ * transformNamingConvention('getUserById', 'snake_case') // 'get_user_by_id'
+ * ```
  */
 export type NamingConvention =
   | 'camelCase'
@@ -10,7 +17,15 @@ export type NamingConvention =
   | 'SCREAMING-KEBAB-CASE';
 
 /**
- * Operation details for custom transformers
+ * Operation details provided to custom transformers.
+ * Contains all available information about an OpenAPI operation.
+ *
+ * @example
+ * ```typescript
+ * const transformer: OperationNameTransformer = (details) => {
+ *   return `${details.method.toUpperCase()}_${details.operationId}`;
+ * };
+ * ```
  */
 export interface OperationDetails {
   /** Original operationId from OpenAPI spec */
@@ -28,8 +43,22 @@ export interface OperationDetails {
 }
 
 /**
- * Custom transformer function for operation names
- * Receives operation details and returns the transformed name
+ * Custom transformer function for operation names.
+ * Receives operation details and returns the transformed name.
+ *
+ * **Note:** The returned name will be sanitized to ensure it's a valid TypeScript identifier.
+ * Invalid characters will be replaced with underscores, and names starting with digits will be prefixed.
+ *
+ * @param details - Complete operation details from OpenAPI spec
+ * @returns The transformed operation name
+ *
+ * @example
+ * ```typescript
+ * const transformer: OperationNameTransformer = (details) => {
+ *   const tag = details.tags?.[0] || 'default';
+ *   return `${details.method}_${tag}_${details.operationId}`;
+ * };
+ * ```
  */
 export type OperationNameTransformer = (details: OperationDetails) => string;
 
@@ -49,8 +78,6 @@ function splitCamelCase(input: string): string[] {
   let currentWord = '';
 
   for (const char of input) {
-    if (!char) continue;
-
     const isUpperCase = char === char.toUpperCase() && char !== char.toLowerCase();
     const isDigit = /\d/.test(char);
     const lastChar = currentWord[currentWord.length - 1];
@@ -84,7 +111,7 @@ function normalizeToWords(input: string): string[] {
   }
 
   // Split by common delimiters: underscore, hyphen, space, dot
-  let words = input.split(/[_\-\s.]+/).filter((w) => w.length > 0);
+  let words = input.split(/[-_\s.]+/).filter((w) => w.length > 0);
 
   // If no delimiters found, try to split camelCase/PascalCase
   if (words.length === 1) {
@@ -139,37 +166,49 @@ function toScreamingSnakeCase(words: string[]): string {
 function toScreamingKebabCase(words: string[]): string {
   return words.map((w) => w.toUpperCase()).join('-');
 }
-
 /**
- * Naming convention transformer functions
+ * Transforms a string to the specified naming convention.
+ *
+ * Handles various input formats including camelCase, PascalCase, snake_case, kebab-case,
+ * and mixed delimiters. The function normalizes the input by splitting on common delimiters
+ * (underscores, hyphens, spaces, dots) and then applies the target convention.
+ *
+ * **Note:** This function does not sanitize the output. The caller should ensure the result
+ * is a valid identifier for the target language (e.g., using `sanitizeIdentifier`).
+ *
+ * @param input - The input string to transform (can be in any naming convention)
+ * @param convention - The target naming convention to apply
+ * @returns The transformed string in the target convention
+ *
+ * @example
+ * ```typescript
+ * transformNamingConvention('get_user_by_id', 'camelCase') // 'getUserById'
+ * transformNamingConvention('getUserById', 'snake_case') // 'get_user_by_id'
+ * transformNamingConvention('get-user-by-id', 'PascalCase') // 'GetUserById'
+ * ```
+ *
+ * @throws Will return empty string if input is empty (preserves empty input)
  */
-export const NamingConventionTransformer = {
-  /**
-   * Transforms a string to the specified naming convention
-   */
-  transform(input: string, convention: NamingConvention): string {
-    if (!input || input.length === 0) {
-      return input;
-    }
+export function transformNamingConvention(input: string, convention: NamingConvention): string {
+  if (!input || input.length === 0) {
+    return input;
+  }
 
-    // Normalize input: split by common delimiters and convert to words
-    const words = normalizeToWords(input);
+  // Normalize input: split by common delimiters and convert to words
+  const words = normalizeToWords(input);
 
-    switch (convention) {
-      case 'camelCase':
-        return toCamelCase(words);
-      case 'PascalCase':
-        return toPascalCase(words);
-      case 'snake_case':
-        return toSnakeCase(words);
-      case 'kebab-case':
-        return toKebabCase(words);
-      case 'SCREAMING_SNAKE_CASE':
-        return toScreamingSnakeCase(words);
-      case 'SCREAMING-KEBAB-CASE':
-        return toScreamingKebabCase(words);
-      default:
-        return input;
-    }
-  },
-};
+  switch (convention) {
+    case 'camelCase':
+      return toCamelCase(words);
+    case 'PascalCase':
+      return toPascalCase(words);
+    case 'snake_case':
+      return toSnakeCase(words);
+    case 'kebab-case':
+      return toKebabCase(words);
+    case 'SCREAMING_SNAKE_CASE':
+      return toScreamingSnakeCase(words);
+    case 'SCREAMING-KEBAB-CASE':
+      return toScreamingKebabCase(words);
+  }
+}

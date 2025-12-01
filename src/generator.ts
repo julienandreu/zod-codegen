@@ -7,7 +7,7 @@ import {SyncFileWriterService} from './services/file-writer.service.js';
 
 // Re-export types for library users
 export type {GeneratorOptions} from './types/generator-options.js';
-export type {OperationDetails, OperationNameTransformer, NamingConvention} from './utils/naming-convention.js';
+export type {NamingConvention, OperationDetails, OperationNameTransformer} from './utils/naming-convention.js';
 
 export class Generator {
   private readonly fileReader = new SyncFileReaderService();
