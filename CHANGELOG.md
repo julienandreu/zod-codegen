@@ -1,3 +1,9 @@
+## 1.4.0 (2025-12-01)
+
+- Merge pull request #40 from julienandreu/feat/naming-conventions-and-improvements ([d7c8146](https://github.com/julienandreu/zod-codegen/commit/d7c8146)), closes [#40](https://github.com/julienandreu/zod-codegen/issues/40)
+- feat: add naming convention support and code quality improvements ([3ec8824](https://github.com/julienandreu/zod-codegen/commit/3ec8824))
+- feat: add naming convention support for operation IDs ([0a52f14](https://github.com/julienandreu/zod-codegen/commit/0a52f14))
+
 ## 1.3.0 (2025-11-24)
 
 - Merge pull request #36 from julienandreu/dependabot/npm_and_yarn/dev-dependencies-16beb30ed0 ([3d85de4](https://github.com/julienandreu/zod-codegen/commit/3d85de4)), closes [#36](https://github.com/julienandreu/zod-codegen/issues/36)
