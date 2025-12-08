@@ -68,7 +68,7 @@ describe('Generator', () => {
       // Verify file contains expected content
       const content = readFileSync(outputFile, 'utf-8');
       expect(content).toMatch(/import\s*{\s*z\s*}\s*from\s*['"]zod['"]/);
-      expect(content).toContain('export class');
+      expect(content).toContain('export default class');
       expect(content).toContain('getBaseRequestOptions');
     });
 
@@ -109,7 +109,7 @@ describe('Generator', () => {
       expect(content).toMatch(/import\s*{\s*z\s*}\s*from\s*['"]zod['"]/);
       expect(content).toContain('export const');
       expect(content).toContain('protected getBaseRequestOptions');
-      expect(content).toContain('async #makeRequest');
+      expect(content).toContain('protected async makeRequest');
     });
 
     it('should include header comments in generated file', async () => {

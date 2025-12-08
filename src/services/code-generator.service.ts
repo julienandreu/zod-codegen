@@ -136,7 +136,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     const methods = this.buildClientMethods(openapi, schemas);
 
     return ts.factory.createClassDeclaration(
-      [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
+      [ts.factory.createToken(ts.SyntaxKind.ExportKeyword), ts.factory.createToken(ts.SyntaxKind.DefaultKeyword)],
       ts.factory.createIdentifier(clientName),
       undefined,
       undefined,
@@ -275,9 +275,9 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
   private buildHttpRequestMethod(): ts.MethodDeclaration {
     return ts.factory.createMethodDeclaration(
-      [ts.factory.createToken(ts.SyntaxKind.AsyncKeyword)],
+      [ts.factory.createToken(ts.SyntaxKind.ProtectedKeyword), ts.factory.createToken(ts.SyntaxKind.AsyncKeyword)],
       undefined,
-      ts.factory.createPrivateIdentifier('#makeRequest'),
+      ts.factory.createIdentifier('makeRequest'),
       undefined,
       [this.typeBuilder.createGenericType('T')],
       [
@@ -1002,10 +1002,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
     // Call makeRequest
     const makeRequestCall = ts.factory.createCallExpression(
-      ts.factory.createPropertyAccessExpression(
-        ts.factory.createThis(),
-        ts.factory.createPrivateIdentifier('#makeRequest'),
-      ),
+      ts.factory.createPropertyAccessExpression(ts.factory.createThis(), ts.factory.createIdentifier('makeRequest')),
       undefined,
       [ts.factory.createStringLiteral(method.toUpperCase(), true), pathExpression, optionsExpression],
     );
