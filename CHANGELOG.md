@@ -1,3 +1,14 @@
+## <small>1.4.1 (2025-12-08)</small>
+
+- Merge branch 'refactor/build-config-and-class-exports' of github.com:julienandreu/zod-codegen into r ([bdd9bc5](https://github.com/julienandreu/zod-codegen/commit/bdd9bc5))
+- Merge pull request #41 from julienandreu/dependabot/npm_and_yarn/tar-7.5.2 ([192cd47](https://github.com/julienandreu/zod-codegen/commit/192cd47)), closes [#41](https://github.com/julienandreu/zod-codegen/issues/41)
+- Merge pull request #43 from julienandreu/refactor/build-config-and-class-exports ([61de21b](https://github.com/julienandreu/zod-codegen/commit/61de21b)), closes [#43](https://github.com/julienandreu/zod-codegen/issues/43)
+- refactor: improve build configuration and class exports ([060f714](https://github.com/julienandreu/zod-codegen/commit/060f714))
+- refactor: improve build configuration and class exports ([b8771ad](https://github.com/julienandreu/zod-codegen/commit/b8771ad))
+- refactor: remove tsconfig.build.json and use tsconfig.json directly ([407c46a](https://github.com/julienandreu/zod-codegen/commit/407c46a))
+- chore: restore yarn.lock for yarn 4 with corepack ([a93f018](https://github.com/julienandreu/zod-codegen/commit/a93f018))
+- chore(deps): bump tar from 7.5.1 to 7.5.2 ([b867dce](https://github.com/julienandreu/zod-codegen/commit/b867dce))
+
 ## 1.4.0 (2025-12-01)
 
 - Merge pull request #40 from julienandreu/feat/naming-conventions-and-improvements ([d7c8146](https://github.com/julienandreu/zod-codegen/commit/d7c8146)), closes [#40](https://github.com/julienandreu/zod-codegen/issues/40)
