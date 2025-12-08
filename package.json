@@ -1,8 +1,6 @@
 {
   "author": "Julien Andreu <julienandreu@me.com>",
-  "bin": {
-    "zod-codegen": "dist/src/cli.js"
-  },
+  "bin": "dist/src/cli.js",
   "bugs": {
     "url": "https://github.com/julienandreu/zod-codegen/issues"
   },
@@ -46,6 +44,7 @@
     "@types/node": "^24.10.1",
     "@types/yargs": "^17.0.35",
     "@vitest/coverage-v8": "^4.0.14",
+    "cross-env": "^10.1.0",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
     "husky": "^9.1.7",
@@ -54,8 +53,7 @@
     "ts-node": "^10.9.2",
     "typescript-eslint": "^8.46.4",
     "undici": "^7.16.0",
-    "vitest": "^4.0.14",
-    "yarn-audit-fix": "^10.1.1"
+    "vitest": "^4.0.14"
   },
   "optionalDependencies": {
     "undici": "^7.16.0"
@@ -88,15 +86,12 @@
     "tar": "^7.5.2",
     "yargs": "^18.0.0"
   },
-  "resolutions": {
-    "yargs": "^18.0.0"
-  },
   "scripts": {
-    "audit:fix": "yarn-audit-fix",
-    "build": "rm -rf dist && tsc --project tsconfig.json && cp -r src/assets dist/src/ && chmod +x ./dist/src/cli.js",
-    "build:native": "rm -rf dist && npx tsgo --project tsconfig.json && cp -r src/assets dist/src/ && chmod +x ./dist/src/cli.js",
+    "audit:fix": "npm audit fix",
+    "build": "NODE_OPTIONS='--no-deprecation' sh -c 'rm -rf dist && tsc --project tsconfig.json && cp -r src/assets dist/src/ && chmod +x ./dist/src/cli.js'",
+    "build:native": "rm -rf dist && NODE_OPTIONS='--no-deprecation' npx tsgo --project tsconfig.json && cp -r src/assets dist/src/ && chmod +x ./dist/src/cli.js",
     "build:watch": "tsc --project tsconfig.json --watch",
-    "dev": "yarn build && node ./dist/src/cli.js --input ./samples/swagger-petstore.yaml --output ./examples/petstore && yarn format && yarn lint",
+    "dev": "npm run build && node ./dist/src/cli.js --input ./samples/swagger-petstore.yaml --output ./examples/petstore && npm run format && npm run lint",
     "lint": "eslint src --fix",
     "lint:check": "eslint src",
     "format": "prettier src --write --log-level error",
@@ -108,9 +103,9 @@
     "test:ui": "vitest --ui",
     "manifest:update": "ts-node scripts/update-manifest.ts",
     "prepare": "husky",
-    "prepublishOnly": "yarn build && yarn test && yarn lint:check && yarn type-check",
+    "prepublishOnly": "npm run build && npm run test && npm run lint:check && npm run type-check",
     "clean": "rm -rf dist coverage node_modules/.cache",
-    "validate": "yarn type-check && yarn lint:check && yarn format:check && yarn test",
+    "validate": "npm run type-check && npm run lint:check && npm run format:check && npm run test",
     "validate:examples": "tsc -p ./tsconfig.examples.json --noEmit",
     "release": "semantic-release",
     "release:dry": "semantic-release --dry-run"

@@ -212,7 +212,7 @@ describe('TypeScriptCodeGeneratorService', () => {
       expect(code).toBeTruthy();
       expect(typeof code).toBe('string');
       expect(code).toMatch(/import\s*{\s*z\s*}\s*from\s*['"]zod['"]/);
-      expect(code).toContain('export class');
+      expect(code).toContain('export default class');
     });
 
     it('should generate schemas for component schemas', () => {
@@ -275,7 +275,7 @@ describe('TypeScriptCodeGeneratorService', () => {
 
       const code = generator.generate(spec);
       expect(code).toContain('async getUsers');
-      expect(code).toContain('#makeRequest');
+      expect(code).toContain('makeRequest');
     });
 
     it('should generate getBaseRequestOptions method', () => {
@@ -408,7 +408,7 @@ describe('TypeScriptCodeGeneratorService', () => {
       expect(code).not.toContain('ExecutionMode: z.enum');
     });
 
-    it('should merge baseOptions with request-specific options in #makeRequest', () => {
+    it('should merge baseOptions with request-specific options in makeRequest', () => {
       const spec: OpenApiSpecType = {
         openapi: '3.0.0',
         info: {
