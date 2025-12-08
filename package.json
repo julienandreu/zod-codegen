@@ -46,6 +46,7 @@
     "@types/node": "^24.10.1",
     "@types/yargs": "^17.0.35",
     "@vitest/coverage-v8": "^4.0.14",
+    "cross-env": "^10.1.0",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
     "husky": "^9.1.7",
@@ -93,8 +94,8 @@
   },
   "scripts": {
     "audit:fix": "yarn-audit-fix",
-    "build": "rm -rf dist && tsc --project tsconfig.json && cp -r src/assets dist/src/ && chmod +x ./dist/src/cli.js",
-    "build:native": "rm -rf dist && npx tsgo --project tsconfig.json && cp -r src/assets dist/src/ && chmod +x ./dist/src/cli.js",
+    "build": "NODE_OPTIONS='--no-deprecation' sh -c 'rm -rf dist && tsc --project tsconfig.build.json && cp -r src/assets dist/src/ && chmod +x ./dist/src/cli.js'",
+    "build:native": "rm -rf dist && NODE_OPTIONS='--no-deprecation' npx tsgo --project tsconfig.build.json && cp -r src/assets dist/src/ && chmod +x ./dist/src/cli.js",
     "build:watch": "tsc --project tsconfig.json --watch",
     "dev": "yarn build && node ./dist/src/cli.js --input ./samples/swagger-petstore.yaml --output ./examples/petstore && yarn format && yarn lint",
     "lint": "eslint src --fix",
