@@ -506,4 +506,200 @@ describe('TypeScriptCodeGeneratorService', () => {
       expect(result).toBeDefined();
     });
   });
+
+  describe('circular dependencies', () => {
+    it('should use z.lazy() for direct self-referencing schemas', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            TreeNode: {
+              type: 'object',
+              properties: {
+                value: {type: 'string'},
+                children: {
+                  type: 'array',
+                  items: {$ref: '#/components/schemas/TreeNode'},
+                },
+              },
+              required: ['value'],
+            },
+          },
+        },
+      };
+
+      const code = generator.generate(spec);
+      expect(code).toContain('z.lazy(() => TreeNode)');
+    });
+
+    it('should use z.lazy() for indirect circular dependencies (A -> B -> A)', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            Person: {
+              type: 'object',
+              properties: {
+                name: {type: 'string'},
+                bestFriend: {$ref: '#/components/schemas/Friend'},
+              },
+              required: ['name'],
+            },
+            Friend: {
+              type: 'object',
+              properties: {
+                nickname: {type: 'string'},
+                person: {$ref: '#/components/schemas/Person'},
+              },
+              required: ['nickname'],
+            },
+          },
+        },
+      };
+
+      const code = generator.generate(spec);
+      // Both references should use z.lazy()
+      expect(code).toContain('z.lazy(() => Friend)');
+      expect(code).toContain('z.lazy(() => Person)');
+    });
+
+    it('should not use z.lazy() for non-circular references', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            User: {
+              type: 'object',
+              properties: {
+                id: {type: 'integer'},
+                profile: {$ref: '#/components/schemas/Profile'},
+              },
+              required: ['id'],
+            },
+            Profile: {
+              type: 'object',
+              properties: {
+                name: {type: 'string'},
+              },
+              required: ['name'],
+            },
+          },
+        },
+      };
+
+      const code = generator.generate(spec);
+      // Profile should be referenced directly, not with z.lazy()
+      expect(code).not.toContain('z.lazy(() => Profile)');
+      expect(code).toContain('profile: Profile.optional()');
+    });
+
+    it('should handle complex circular chains (A -> B -> C -> A)', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            Alpha: {
+              type: 'object',
+              properties: {
+                beta: {$ref: '#/components/schemas/Beta'},
+              },
+            },
+            Beta: {
+              type: 'object',
+              properties: {
+                gamma: {$ref: '#/components/schemas/Gamma'},
+              },
+            },
+            Gamma: {
+              type: 'object',
+              properties: {
+                alpha: {$ref: '#/components/schemas/Alpha'},
+              },
+            },
+          },
+        },
+      };
+
+      const code = generator.generate(spec);
+      // All references in the cycle should use z.lazy()
+      expect(code).toContain('z.lazy(() => Beta)');
+      expect(code).toContain('z.lazy(() => Gamma)');
+      expect(code).toContain('z.lazy(() => Alpha)');
+    });
+
+    it('should handle self-referencing schemas in arrays', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            Category: {
+              type: 'object',
+              properties: {
+                name: {type: 'string'},
+                subcategories: {
+                  type: 'array',
+                  items: {$ref: '#/components/schemas/Category'},
+                },
+              },
+              required: ['name'],
+            },
+          },
+        },
+      };
+
+      const code = generator.generate(spec);
+      expect(code).toContain('z.array(z.lazy(() => Category))');
+    });
+
+    it('should handle self-referencing schemas in anyOf', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            Expression: {
+              type: 'object',
+              properties: {
+                value: {
+                  anyOf: [{type: 'string'}, {$ref: '#/components/schemas/Expression'}],
+                },
+              },
+            },
+          },
+        },
+      };
+
+      const code = generator.generate(spec);
+      expect(code).toContain('z.lazy(() => Expression)');
+    });
+  });
 });

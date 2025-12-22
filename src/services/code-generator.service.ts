@@ -21,6 +21,10 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
   private readonly namingConvention: NamingConvention | undefined;
   private readonly operationNameTransformer: OperationNameTransformer | undefined;
 
+  // Track circular dependencies for z.lazy() wrapping
+  private circularSchemas = new Set<string>();
+  private currentSchemaName: string | null = null;
+
   constructor(options: GeneratorOptions = {}) {
     this.namingConvention = options.namingConvention;
     this.operationNameTransformer = options.operationNameTransformer;
@@ -85,11 +89,24 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
   private buildSchemas(openapi: OpenApiSpecType): Record<string, ts.VariableStatement> {
     const schemasEntries = Object.entries(openapi.components?.schemas ?? {});
-    const sortedSchemaNames = this.topologicalSort(Object.fromEntries(schemasEntries));
+    const schemasMap = Object.fromEntries(schemasEntries);
+
+    // Detect circular dependencies before building schemas
+    this.circularSchemas = this.detectCircularDependencies(schemasMap);
+
+    const sortedSchemaNames = this.topologicalSort(schemasMap);
 
     return sortedSchemaNames.reduce<Record<string, ts.VariableStatement>>((schemaRegistered, name) => {
       const schema = openapi.components?.schemas?.[name];
       if (!schema) return schemaRegistered;
+
+      // Set context for current schema being built
+      this.currentSchemaName = name;
+
+      const schemaExpression = this.buildSchema(schema);
+
+      // Clear context
+      this.currentSchemaName = null;
 
       const variableStatement = ts.factory.createVariableStatement(
         [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
@@ -99,7 +116,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
               ts.factory.createIdentifier(this.typeBuilder.sanitizeIdentifier(name)),
               undefined,
               undefined,
-              this.buildSchema(schema),
+              schemaExpression,
             ),
           ],
           ts.NodeFlags.Const,
@@ -2688,10 +2705,145 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     return false;
   }
 
-  private buildFromReference(reference: ReferenceType): ts.Identifier {
+  private buildFromReference(reference: ReferenceType): ts.CallExpression | ts.Identifier {
     const {$ref = ''} = Reference.parse(reference);
     const refName = $ref.split('/').pop() ?? 'never';
-    return ts.factory.createIdentifier(this.typeBuilder.sanitizeIdentifier(refName));
+    const sanitizedRefName = this.typeBuilder.sanitizeIdentifier(refName);
+
+    // Check if this reference creates a circular dependency
+    if (this.isCircularReference(refName)) {
+      // Generate: z.lazy(() => RefSchema)
+      return ts.factory.createCallExpression(
+        ts.factory.createPropertyAccessExpression(
+          ts.factory.createIdentifier('z'),
+          ts.factory.createIdentifier('lazy'),
+        ),
+        undefined,
+        [
+          ts.factory.createArrowFunction(
+            undefined,
+            undefined,
+            [],
+            undefined,
+            ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+            ts.factory.createIdentifier(sanitizedRefName),
+          ),
+        ],
+      );
+    }
+
+    return ts.factory.createIdentifier(sanitizedRefName);
+  }
+
+  /**
+   * Determines if a reference creates a circular dependency that needs z.lazy().
+   * A reference is circular if:
+   * 1. It's a direct self-reference (schema references itself)
+   * 2. It's part of a circular dependency chain (A -> B -> A)
+   */
+  private isCircularReference(refName: string): boolean {
+    // Case 1: Direct self-reference
+    if (refName === this.currentSchemaName) {
+      return true;
+    }
+
+    // Case 2: Reference to a schema that's part of a circular dependency chain
+    // and we're currently building a schema that's also in that chain
+    if (
+      this.circularSchemas.has(refName) &&
+      this.currentSchemaName !== null &&
+      this.circularSchemas.has(this.currentSchemaName)
+    ) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Detects schemas that are part of circular dependency chains.
+   * Uses a modified Tarjan's algorithm to find strongly connected components (SCCs).
+   * Schemas in SCCs with more than one node, or self-referencing schemas, are circular.
+   */
+  private detectCircularDependencies(schemas: Record<string, unknown>): Set<string> {
+    const circularSchemas = new Set<string>();
+
+    // Build dependency graph
+    const graph = new Map<string, string[]>();
+    for (const [name, schema] of Object.entries(schemas)) {
+      const dependencies = jp
+        .query(schema, '$..["$ref"]')
+        .filter((ref: string) => ref.startsWith('#/components/schemas/'))
+        .map((ref: string) => ref.replace('#/components/schemas/', ''))
+        .filter((dep: string) => dep in schemas);
+      graph.set(name, dependencies);
+    }
+
+    // Tarjan's algorithm for finding SCCs
+    let index = 0;
+    const indices = new Map<string, number>();
+    const lowlinks = new Map<string, number>();
+    const onStack = new Set<string>();
+    const stack: string[] = [];
+
+    const strongConnect = (node: string): void => {
+      indices.set(node, index);
+      lowlinks.set(node, index);
+      index++;
+      stack.push(node);
+      onStack.add(node);
+
+      const neighbors = graph.get(node) ?? [];
+      for (const neighbor of neighbors) {
+        if (!indices.has(neighbor)) {
+          strongConnect(neighbor);
+          const currentLowlink = lowlinks.get(node) ?? 0;
+          const neighborLowlink = lowlinks.get(neighbor) ?? 0;
+          lowlinks.set(node, Math.min(currentLowlink, neighborLowlink));
+        } else if (onStack.has(neighbor)) {
+          const currentLowlink = lowlinks.get(node) ?? 0;
+          const neighborIndex = indices.get(neighbor) ?? 0;
+          lowlinks.set(node, Math.min(currentLowlink, neighborIndex));
+        }
+      }
+
+      // If node is a root of an SCC
+      if (lowlinks.get(node) === indices.get(node)) {
+        const scc: string[] = [];
+        let w: string | undefined;
+        do {
+          w = stack.pop();
+          if (w !== undefined) {
+            onStack.delete(w);
+            scc.push(w);
+          }
+        } while (w !== undefined && w !== node);
+
+        // An SCC is circular if it has more than one node
+        // or if it has one node that references itself
+        if (scc.length > 1) {
+          for (const schemaName of scc) {
+            circularSchemas.add(schemaName);
+          }
+        } else if (scc.length === 1) {
+          const schemaName = scc[0];
+          if (schemaName !== undefined) {
+            const deps = graph.get(schemaName) ?? [];
+            if (deps.includes(schemaName)) {
+              circularSchemas.add(schemaName);
+            }
+          }
+        }
+      }
+    };
+
+    for (const node of graph.keys()) {
+      if (!indices.has(node)) {
+        strongConnect(node);
+      }
+    }
+
+    return circularSchemas;
   }
 
   private topologicalSort(schemas: Record<string, unknown>): string[] {
