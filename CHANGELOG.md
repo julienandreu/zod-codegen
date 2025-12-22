@@ -1,3 +1,18 @@
+## 1.5.0 (2025-12-22)
+
+- Merge pull request #44 from julienandreu/dependabot/github_actions/actions/upload-artifact-6 ([cebfd55](https://github.com/julienandreu/zod-codegen/commit/cebfd55)), closes [#44](https://github.com/julienandreu/zod-codegen/issues/44)
+- Merge pull request #45 from julienandreu/dependabot/npm_and_yarn/dev-dependencies-ab633d47b1 ([8663f40](https://github.com/julienandreu/zod-codegen/commit/8663f40)), closes [#45](https://github.com/julienandreu/zod-codegen/issues/45)
+- Merge pull request #46 from julienandreu/dependabot/npm_and_yarn/production-dependencies-eefc12583a ([eac5279](https://github.com/julienandreu/zod-codegen/commit/eac5279)), closes [#46](https://github.com/julienandreu/zod-codegen/issues/46)
+- Merge pull request #47 from julienandreu/dependabot/npm_and_yarn/types/node-25.0.2 ([687ce64](https://github.com/julienandreu/zod-codegen/commit/687ce64)), closes [#47](https://github.com/julienandreu/zod-codegen/issues/47)
+- Merge pull request #49 from julienandreu/dependabot/npm_and_yarn/production-dependencies-5419ff3310 ([1d6485c](https://github.com/julienandreu/zod-codegen/commit/1d6485c)), closes [#49](https://github.com/julienandreu/zod-codegen/issues/49)
+- Merge pull request #50 from julienandreu/feat/circular-dependency-detection ([527cbb6](https://github.com/julienandreu/zod-codegen/commit/527cbb6)), closes [#50](https://github.com/julienandreu/zod-codegen/issues/50)
+- feat: detect circular dependencies and wrap with z.lazy() ([4f5f545](https://github.com/julienandreu/zod-codegen/commit/4f5f545))
+- chore(deps-dev): bump @types/node from 24.10.1 to 25.0.2 ([da9bbc7](https://github.com/julienandreu/zod-codegen/commit/da9bbc7))
+- chore(deps-dev): bump the dev-dependencies group with 2 updates ([29ad3ef](https://github.com/julienandreu/zod-codegen/commit/29ad3ef))
+- chore(deps): bump zod in the production-dependencies group ([391d6ea](https://github.com/julienandreu/zod-codegen/commit/391d6ea))
+- chore(deps): bump zod in the production-dependencies group ([41177c8](https://github.com/julienandreu/zod-codegen/commit/41177c8))
+- ci(deps): bump actions/upload-artifact from 4 to 6 ([c19e254](https://github.com/julienandreu/zod-codegen/commit/c19e254))
+
 ## <small>1.4.1 (2025-12-08)</small>
 
 - Merge branch 'refactor/build-config-and-class-exports' of github.com:julienandreu/zod-codegen into r ([bdd9bc5](https://github.com/julienandreu/zod-codegen/commit/bdd9bc5))
