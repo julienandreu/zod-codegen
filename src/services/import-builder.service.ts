@@ -33,7 +33,7 @@ export class TypeScriptImportBuilderService implements ImportBuilder {
     const namedImports =
       namedImportList.length > 0
         ? ts.factory.createNamedImports(
-            namedImportList.map(([name, isTypeImport = false]) => {
+            namedImportList.map(([name, isTypeImport]) => {
               return ts.factory.createImportSpecifier(isTypeImport, undefined, ts.factory.createIdentifier(name));
             }),
           )
