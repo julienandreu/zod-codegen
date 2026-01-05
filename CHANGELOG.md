@@ -1,3 +1,11 @@
+## <small>1.5.1 (2026-01-05)</small>
+
+- Merge pull request #52 from julienandreu/dependabot/npm_and_yarn/production-dependencies-3204786a64 ([c2fa562](https://github.com/julienandreu/zod-codegen/commit/c2fa562)), closes [#52](https://github.com/julienandreu/zod-codegen/issues/52)
+- Merge pull request #53 from julienandreu/dependabot/npm_and_yarn/dev-dependencies-a389c980d8 ([408b886](https://github.com/julienandreu/zod-codegen/commit/408b886)), closes [#53](https://github.com/julienandreu/zod-codegen/issues/53)
+- fix: remove useless default value in import-builder destructuring ([7bb9325](https://github.com/julienandreu/zod-codegen/commit/7bb9325))
+- chore(deps-dev): bump the dev-dependencies group across 1 directory with 6 updates ([f869a2a](https://github.com/julienandreu/zod-codegen/commit/f869a2a))
+- chore(deps): bump zod in the production-dependencies group ([a51b0f1](https://github.com/julienandreu/zod-codegen/commit/a51b0f1))
+
 ## 1.5.0 (2025-12-22)
 
 - Merge pull request #44 from julienandreu/dependabot/github_actions/actions/upload-artifact-6 ([cebfd55](https://github.com/julienandreu/zod-codegen/commit/cebfd55)), closes [#44](https://github.com/julienandreu/zod-codegen/issues/44)
