@@ -960,6 +960,28 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     openapi: OpenApiSpecType,
     schemas: Record<string, ts.VariableStatement>,
   ): ts.MethodDeclaration[] {
+    // Track operation IDs to detect duplicates
+    const operationIdMap = new Map<string, {method: string; path: string}[]>();
+
+    // First pass: collect all operation IDs and their methods/paths
+    Object.entries(openapi.paths).forEach(([path, pathItem]) => {
+      Object.entries(pathItem)
+        .filter(([method]) => ['get', 'post', 'put', 'patch', 'delete', 'head', 'options'].includes(method))
+        .forEach(([method, methodSchema]) => {
+          const safeMethodSchema = MethodSchema.parse(methodSchema);
+          if (safeMethodSchema.operationId) {
+            const operationId = safeMethodSchema.operationId;
+            const existing = operationIdMap.get(operationId);
+            if (existing) {
+              existing.push({method, path});
+            } else {
+              operationIdMap.set(operationId, [{method, path}]);
+            }
+          }
+        });
+    });
+
+    // Second pass: build methods, appending method name for HEAD/OPTIONS or when duplicates exist
     return Object.entries(openapi.paths).reduce<ts.MethodDeclaration[]>((endpoints, [path, pathItem]) => {
       const methods = Object.entries(pathItem)
         .filter(([method]) => ['get', 'post', 'put', 'patch', 'delete', 'head', 'options'].includes(method))
@@ -968,6 +990,26 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
           if (!safeMethodSchema.operationId) {
             return null;
+          }
+
+          const operationId = safeMethodSchema.operationId;
+          const methodLower = method.toLowerCase();
+
+          // Check if this operationId is used by multiple methods
+          const operations = operationIdMap.get(operationId);
+          const hasDuplicates = operations !== undefined && operations.length > 1;
+
+          // For HEAD/OPTIONS or when duplicates exist, we need to ensure uniqueness
+          // We'll handle this in transformOperationName by appending the method
+          // But we need to mark it here so transformOperationName knows to append
+          if (hasDuplicates || methodLower === 'head' || methodLower === 'options') {
+            // Temporarily modify the operationId to include method for uniqueness
+            // This will be handled in transformOperationName
+            const modifiedSchema = {
+              ...safeMethodSchema,
+              operationId: `${operationId}_${methodLower}`,
+            };
+            return this.buildEndpointMethod(method, path, modifiedSchema, schemas);
           }
 
           return this.buildEndpointMethod(method, path, safeMethodSchema, schemas);
@@ -981,6 +1023,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
   /**
    * Transforms operation ID according to the configured naming convention or transformer
    * Ensures the result is a valid TypeScript identifier
+   * For HEAD and OPTIONS methods, appends the method name to ensure uniqueness when same operationId is used
    */
   private transformOperationName(operationId: string, method: string, path: string, schema: MethodSchemaType): string {
     let transformed: string;
@@ -1002,6 +1045,16 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     } else {
       // Return original operationId if no transformation is configured
       transformed = operationId;
+    }
+
+    // For HEAD and OPTIONS methods, append method name to ensure uniqueness
+    // This prevents duplicate method names when GET and HEAD share the same operationId
+    const methodLower = method.toLowerCase();
+    if (methodLower === 'head' || methodLower === 'options') {
+      // Only append if not already present to avoid double-appending
+      if (!transformed.toLowerCase().endsWith(`_${methodLower}`)) {
+        transformed = `${transformed}_${methodLower}`;
+      }
     }
 
     // Sanitize to ensure valid TypeScript identifier (handles edge cases from custom transformers)
