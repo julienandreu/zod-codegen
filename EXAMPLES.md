@@ -728,3 +728,160 @@ protected getBaseRequestOptions(): Partial<Omit<RequestInit, 'method' | 'body'>>
   // ✅ Correct return type
 }
 ```
+
+## Response Handling with Policies
+
+The generated client includes a protected `handleResponse()` method that you can override to implement response handling policies such as retries, circuit breakers, logging, and more.
+
+### Understanding handleResponse
+
+The `handleResponse()` method is called **before** error checking, allowing you to:
+
+- Intercept responses and handle special cases
+- Implement retry logic for specific status codes
+- Add circuit breaker patterns
+- Log requests and responses
+- Transform or modify responses
+
+**Method Signature:**
+
+```typescript
+protected async handleResponse<T>(
+  response: Response,
+  method: string,
+  path: string,
+  options: {
+    params?: Record<string, string | number | boolean>;
+    data?: unknown;
+    contentType?: string;
+    headers?: Record<string, string>;
+  },
+): Promise<Response>
+```
+
+### Example: Basic Retry Handler
+
+```typescript
+import {SwaggerPetstoreOpenAPI30} from './generated/type.js';
+
+class PetstoreClientWithRetry extends SwaggerPetstoreOpenAPI30 {
+  private retrying = false;
+
+  protected async handleResponse<T>(
+    response: Response,
+    method: string,
+    path: string,
+    options: {...},
+  ): Promise<Response> {
+    // Prevent infinite loops
+    if (this.retrying) {
+      return response;
+    }
+
+    // Handle 429 Too Many Requests
+    if (response.status === 429) {
+      const retryAfter = response.headers.get('Retry-After');
+      const delay = retryAfter ? parseInt(retryAfter, 10) * 1000 : 1000;
+
+      for (let attempt = 0; attempt < 3; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, delay * (attempt + 1)));
+
+        this.retrying = true;
+        try {
+          const retryResponse = await this.retryRequest(method, path, options);
+          if (retryResponse.ok) {
+            return retryResponse;
+          }
+        } finally {
+          this.retrying = false;
+        }
+      }
+    }
+
+    return response;
+  }
+
+  private async retryRequest(...): Promise<Response> {
+    // Reconstruct and make the request
+  }
+}
+```
+
+### Using the Policy System
+
+For more advanced use cases, you can use the built-in policy system:
+
+```typescript
+import {SwaggerPetstoreOpenAPI30} from './generated/type.js';
+import {RetryPolicy, PolicyHelper} from 'zod-codegen/policies';
+
+class PetstoreClientWithPolicies extends SwaggerPetstoreOpenAPI30 {
+  private readonly policyHelper: PolicyHelper;
+  private retrying = false;
+
+  constructor(options = {}) {
+    super(options);
+
+    const retryPolicy = new RetryPolicy({
+      maxRetries: 3,
+      baseDelay: 1000,
+      strategy: 'exponential',
+      retryableStatusCodes: [429, 503, 504],
+    });
+
+    this.policyHelper = new PolicyHelper([retryPolicy]);
+  }
+
+  protected async handleResponse<T>(
+    response: Response,
+    method: string,
+    path: string,
+    options: {...},
+  ): Promise<Response> {
+    if (this.retrying) {
+      return response;
+    }
+
+    this.retrying = true;
+    try {
+      return await this.policyHelper.execute(
+        response,
+        method,
+        path,
+        options,
+        () => this.retryRequest(method, path, options),
+      );
+    } finally {
+      this.retrying = false;
+    }
+  }
+}
+```
+
+### Available Policies
+
+The policy system includes several built-in policies:
+
+1. **RetryPolicy** - Automatic retries with configurable backoff strategies
+2. **CircuitBreakerPolicy** - Prevents cascading failures
+3. **LoggingPolicy** - Request/response logging
+
+See [examples/petstore/POLICIES.md](./examples/petstore/POLICIES.md) for detailed documentation on all available policies and their configuration options.
+
+### Combining Multiple Policies
+
+You can combine multiple policies for comprehensive response handling:
+
+```typescript
+import {RetryPolicy, CircuitBreakerPolicy, LoggingPolicy, PolicyHelper} from 'zod-codegen/policies';
+
+const policies = [
+  new LoggingPolicy({logResponses: true, logErrors: true}),
+  new CircuitBreakerPolicy({failureThreshold: 5}),
+  new RetryPolicy({maxRetries: 3, strategy: 'exponential'}),
+];
+
+const policyHelper = new PolicyHelper(policies);
+```
+
+See [examples/petstore/policy-usage.ts](./examples/petstore/policy-usage.ts) for complete examples.

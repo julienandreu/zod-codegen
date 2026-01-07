@@ -24,7 +24,15 @@ zod-codegen --input ./samples/swagger-petstore.yaml --output ./examples/petstore
 ```bash
 npx ts-node examples/petstore/basic-usage.ts
 npx ts-node examples/petstore/authenticated-usage.ts
+npx ts-node examples/petstore/retry-handler-usage.ts
+npx ts-node examples/petstore/policy-usage.ts
 ```
+
+**Additional examples:**
+
+- `retry-handler-usage.ts` - Custom retry handler implementation
+- `policy-usage.ts` - Using the built-in policy system
+- `POLICIES.md` - Complete policy system documentation
 
 ### ⚡ [PokéAPI](./pokeapi/)
 

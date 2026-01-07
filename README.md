@@ -20,6 +20,7 @@ A powerful TypeScript code generator that creates **Zod schemas** and **type-saf
 - **🛡️ Runtime Validation**: Built-in Zod validation for request/response data
 - **🌍 Form Support**: Supports both JSON and form-urlencoded request bodies
 - **🔐 Extensible**: Override `getBaseRequestOptions()` to add authentication, custom headers, CORS, and other fetch options
+- **🔄 Response Policies**: Built-in policy system for retries, circuit breakers, logging, and custom response handling
 - **🌐 Server Configuration**: Full support for OpenAPI server variables and templating (e.g., `{environment}.example.com`)
 - **⚙️ Flexible Client Options**: Options-based constructor supporting server selection, variable overrides, and custom base URLs
 
@@ -145,7 +146,9 @@ The generator creates a single TypeScript file (`type.ts`) containing:
 - **API Client Class**: A type-safe client class with methods for each endpoint operation
 - **Server Configuration**: `serverConfigurations` array and `defaultBaseUrl` constant extracted from OpenAPI servers
 - **Client Options Type**: `ClientOptions` type for flexible server selection and variable overrides
-- **Protected Extension Point**: A `getBaseRequestOptions()` method that can be overridden for customization
+- **Protected Extension Points**:
+  - `getBaseRequestOptions()` method for customizing request options
+  - `handleResponse()` method for response handling (retries, circuit breakers, etc.)
 
 ### Generated Client Structure
 
@@ -163,6 +166,9 @@ export class YourAPI {
 
   // Protected method - override to customize request options
   protected getBaseRequestOptions(): Partial<Omit<RequestInit, 'method' | 'body'>>;
+
+  // Protected method - override to handle responses (retries, circuit breakers, etc.)
+  protected async handleResponse<T>(response: Response, method: string, path: string, options: {...}): Promise<Response>;
 
   // Private method - handles all HTTP requests
   async #makeRequest<T>(method: string, path: string, options: {...}): Promise<T>;
@@ -403,6 +409,7 @@ See [EXAMPLES.md](EXAMPLES.md) for comprehensive examples including:
 - CORS configuration
 - Request cancellation with AbortController
 - Environment-specific configurations
+- Response handling policies (retries, circuit breakers, logging)
 
 ## 📖 Examples
 

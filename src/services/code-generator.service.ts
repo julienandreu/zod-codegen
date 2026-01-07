@@ -161,6 +161,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
         this.typeBuilder.createProperty('#baseUrl', 'string', true),
         this.buildConstructor(openapi),
         this.buildGetBaseRequestOptionsMethod(),
+        this.buildHandleResponseMethod(),
         this.buildHttpRequestMethod(),
         ...methods,
       ],
@@ -287,6 +288,29 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
         [ts.factory.createReturnStatement(ts.factory.createObjectLiteralExpression([], false))],
         true,
       ),
+    );
+  }
+
+  private buildHandleResponseMethod(): ts.MethodDeclaration {
+    return ts.factory.createMethodDeclaration(
+      [ts.factory.createToken(ts.SyntaxKind.ProtectedKeyword), ts.factory.createToken(ts.SyntaxKind.AsyncKeyword)],
+      undefined,
+      ts.factory.createIdentifier('handleResponse'),
+      undefined,
+      [this.typeBuilder.createGenericType('T')],
+      [
+        this.typeBuilder.createParameter('response', 'Response'),
+        this.typeBuilder.createParameter('method', 'string'),
+        this.typeBuilder.createParameter('path', 'string'),
+        this.typeBuilder.createParameter(
+          'options',
+          '{params?: Record<string, string | number | boolean>; data?: unknown; contentType?: string; headers?: Record<string, string>}',
+        ),
+      ],
+      ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [
+        ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Response'), undefined),
+      ]),
+      ts.factory.createBlock([ts.factory.createReturnStatement(ts.factory.createIdentifier('response'))], true),
     );
   }
 
@@ -812,7 +836,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
             ts.factory.createVariableDeclarationList(
               [
                 ts.factory.createVariableDeclaration(
-                  ts.factory.createIdentifier('response'),
+                  ts.factory.createIdentifier('rawResponse'),
                   undefined,
                   undefined,
                   ts.factory.createAwaitExpression(
@@ -847,6 +871,35 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
                         ],
                       ),
                     ]),
+                  ),
+                ),
+              ],
+              ts.NodeFlags.Const,
+            ),
+          ),
+          // Handle response through hook (allows subclasses to intercept and modify response)
+          ts.factory.createVariableStatement(
+            undefined,
+            ts.factory.createVariableDeclarationList(
+              [
+                ts.factory.createVariableDeclaration(
+                  ts.factory.createIdentifier('response'),
+                  undefined,
+                  undefined,
+                  ts.factory.createAwaitExpression(
+                    ts.factory.createCallExpression(
+                      ts.factory.createPropertyAccessExpression(
+                        ts.factory.createThis(),
+                        ts.factory.createIdentifier('handleResponse'),
+                      ),
+                      [ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('T'), undefined)],
+                      [
+                        ts.factory.createIdentifier('rawResponse'),
+                        ts.factory.createIdentifier('method'),
+                        ts.factory.createIdentifier('path'),
+                        ts.factory.createIdentifier('options'),
+                      ],
+                    ),
                   ),
                 ),
               ],
