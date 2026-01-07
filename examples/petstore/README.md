@@ -56,10 +56,10 @@ const variableClient = new SwaggerPetstoreOpenAPI30({
 ## Example: Finding Pets
 
 ```typescript
-import {SwaggerPetstoreOpenAPI30, defaultBaseUrl} from './type.js';
+import {SwaggerPetstoreOpenAPI30} from './type.js';
 
 async function findAvailablePets() {
-  const client = new SwaggerPetstoreOpenAPI30(defaultBaseUrl);
+  const client = new SwaggerPetstoreOpenAPI30({});
 
   try {
     // Find pets by status
@@ -84,11 +84,11 @@ findAvailablePets();
 ## Example: Adding a Pet
 
 ```typescript
-import {SwaggerPetstoreOpenAPI30, Pet, PetStatus, defaultBaseUrl} from './type.js';
+import {SwaggerPetstoreOpenAPI30, Pet, PetStatus} from './type.js';
 import {z} from 'zod';
 
 async function addNewPet() {
-  const client = new SwaggerPetstoreOpenAPI30(defaultBaseUrl);
+  const client = new SwaggerPetstoreOpenAPI30({});
 
   const newPet: z.infer<typeof Pet> = {
     id: 12345,

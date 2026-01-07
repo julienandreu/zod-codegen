@@ -24,12 +24,14 @@ zod-codegen --input ./samples/swagger-petstore.yaml --output ./examples/petstore
 ```bash
 npx ts-node examples/petstore/basic-usage.ts
 npx ts-node examples/petstore/authenticated-usage.ts
+npx ts-node examples/petstore/server-variables-usage.ts
 npx ts-node examples/petstore/retry-handler-usage.ts
 npx ts-node examples/petstore/policy-usage.ts
 ```
 
 **Additional examples:**
 
+- `server-variables-usage.ts` - Using server variables for different environments
 - `retry-handler-usage.ts` - Custom retry handler implementation
 - `policy-usage.ts` - Using the built-in policy system
 - `POLICIES.md` - Complete policy system documentation
@@ -45,8 +47,10 @@ PokéAPI is a public RESTful API that provides data about Pokémon. This example
 **Generate the client:**
 
 ```bash
-zod-codegen --input https://pokeapi.co/api/v2/openapi.json --output ./examples/pokeapi
+zod-codegen --input ./samples/pokeapi-openapi.json --output ./examples/pokeapi
 ```
+
+**Note**: PokéAPI doesn't provide an official OpenAPI specification, so we use a simplified OpenAPI spec based on their API structure.
 
 ## Structure
 
