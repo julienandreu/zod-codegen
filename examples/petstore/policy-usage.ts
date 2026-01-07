@@ -17,7 +17,7 @@ import {
   PolicyHelper,
   RetryPolicy,
   type ResponsePolicy,
-} from '../../src/policies/index.js';
+} from 'zod-codegen/policies';
 
 // ============================================================================
 // Example 1: Basic Retry Policy
