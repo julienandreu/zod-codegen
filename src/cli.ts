@@ -53,8 +53,8 @@ const startTime = process.hrtime.bigint();
 debug(`${name}:${String(process.pid)}`);
 
 loudRejection();
-handleSignals(process, startTime);
-handleErrors(process, startTime);
+handleSignals(process, startTime, reporter);
+handleErrors(process, startTime, reporter);
 
 const argv = yargs(hideBin(process.argv))
   .scriptName(name)

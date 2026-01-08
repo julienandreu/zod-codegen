@@ -9,6 +9,33 @@ import {SyncFileWriterService} from './services/file-writer.service.js';
 export type {GeneratorOptions} from './types/generator-options.js';
 export type {NamingConvention, OperationDetails, OperationNameTransformer} from './utils/naming-convention.js';
 
+/**
+ * Main generator class for creating TypeScript code from OpenAPI specifications.
+ *
+ * This class orchestrates the code generation process:
+ * 1. Reads the OpenAPI specification file (local or remote)
+ * 2. Parses and validates the specification
+ * 3. Generates TypeScript code with Zod schemas and type-safe API client
+ * 4. Writes the generated code to the output directory
+ *
+ * @example
+ * ```typescript
+ * import {Generator} from 'zod-codegen';
+ * import {Reporter} from './utils/reporter.js';
+ *
+ * const reporter = new Reporter(process.stdout, process.stderr);
+ * const generator = new Generator(
+ *   'my-app',
+ *   '1.0.0',
+ *   reporter,
+ *   './openapi.yaml',
+ *   './generated',
+ *   {namingConvention: 'camelCase'}
+ * );
+ *
+ * const exitCode = await generator.run();
+ * ```
+ */
 export class Generator {
   private readonly fileReader = new SyncFileReaderService();
   private readonly fileParser = new OpenApiFileParserService();
@@ -16,6 +43,16 @@ export class Generator {
   private readonly fileWriter: SyncFileWriterService;
   private readonly outputPath: string;
 
+  /**
+   * Creates a new Generator instance.
+   *
+   * @param _name - The name of the application/library (used in generated file headers)
+   * @param _version - The version of the application/library (used in generated file headers)
+   * @param reporter - Reporter instance for logging messages and errors
+   * @param inputPath - Path or URL to the OpenAPI specification file
+   * @param _outputDir - Directory where generated files will be written
+   * @param options - Optional configuration for code generation
+   */
   constructor(
     private readonly _name: string,
     private readonly _version: string,
@@ -29,6 +66,11 @@ export class Generator {
     this.codeGenerator = new TypeScriptCodeGeneratorService(options);
   }
 
+  /**
+   * Executes the code generation process.
+   *
+   * @returns Promise that resolves to an exit code (0 for success, 1 for failure)
+   */
   async run(): Promise<number> {
     try {
       const rawSource = await this.readFile();
