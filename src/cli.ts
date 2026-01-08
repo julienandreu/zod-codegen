@@ -47,7 +47,7 @@ const packageData = JSON.parse(readFileSync(packageJsonPath, 'utf-8')) as {
 };
 
 const {name, description, version} = packageData;
-const reporter = new Reporter(process.stdout);
+const reporter = new Reporter(process.stdout, process.stderr);
 const startTime = process.hrtime.bigint();
 
 debug(`${name}:${String(process.pid)}`);
