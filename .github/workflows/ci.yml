@@ -137,6 +137,12 @@ jobs:
       - name: Build project
         run: npm run build
 
+      - name: Verify build output
+        run: |
+          test -f dist/src/cli.js || (echo "ERROR: dist/src/cli.js not found" && exit 1)
+          test -f dist/src/utils/reporter.js || (echo "ERROR: dist/src/utils/reporter.js not found" && exit 1)
+          echo "Build output verified successfully"
+
       - name: Preview semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
