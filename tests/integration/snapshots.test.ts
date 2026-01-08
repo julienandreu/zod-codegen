@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
-import {Generator} from '../../src/generator.js';
-import {Reporter} from '../../src/utils/reporter.js';
+import {Generator} from '../../src/generator';
+import {Reporter} from '../../src/utils/reporter';
 import {readFileSync, existsSync, mkdirSync, rmSync, writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';

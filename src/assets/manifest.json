@@ -1,5 +1,5 @@
 {
   "name": "zod-codegen",
-  "version": "1.0.1",
+  "version": "1.5.0",
   "description": "A powerful TypeScript code generator that creates Zod schemas and type-safe clients from OpenAPI specifications"
 }

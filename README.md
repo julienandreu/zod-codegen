@@ -295,7 +295,7 @@ export class UserAPI {
 **Usage:**
 
 ```typescript
-import {UserAPI, User} from './generated/type.js';
+import {UserAPI, User} from './generated/type';
 
 // Use default server from OpenAPI spec
 const client = new UserAPI({});
@@ -316,7 +316,7 @@ The generated client includes a protected `getBaseRequestOptions()` method that 
 #### Basic Authentication Example
 
 ```typescript
-import {UserAPI, ClientOptions} from './generated/type.js';
+import {UserAPI, ClientOptions} from './generated/type';
 
 class AuthenticatedUserAPI extends UserAPI {
   private accessToken: string | null = null;
@@ -350,7 +350,7 @@ const user = await client.getUserById(123); // Includes Authorization header
 #### Complete Configuration Example
 
 ```typescript
-import {UserAPI, ClientOptions} from './generated/type.js';
+import {UserAPI, ClientOptions} from './generated/type';
 
 class FullyConfiguredAPI extends UserAPI {
   private accessToken: string | null = null;

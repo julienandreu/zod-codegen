@@ -7,7 +7,7 @@
  * For a real example, generate a client from an OpenAPI spec with server variables.
  */
 
-import {SwaggerPetstoreOpenAPI30, ClientOptions} from './type.js';
+import {SwaggerPetstoreOpenAPI30, ClientOptions} from './type';
 
 async function main() {
   // Example 1: Use default server (first server from OpenAPI spec)

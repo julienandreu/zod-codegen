@@ -1,6 +1,6 @@
 import {existsSync, mkdirSync, writeFileSync} from 'node:fs';
 import {dirname, resolve} from 'node:path';
-import type {FileWriter} from '../interfaces/code-generator.js';
+import type {FileWriter} from '../interfaces/code-generator';
 
 export class SyncFileWriterService implements FileWriter {
   constructor(

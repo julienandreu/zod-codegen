@@ -11,7 +11,7 @@ After running `zod-codegen`, you'll get:
 ## Basic Usage
 
 ```typescript
-import {SwaggerPetstoreOpenAPI30} from './type.js';
+import {SwaggerPetstoreOpenAPI30} from './type';
 
 // Create a client instance using default server from OpenAPI spec
 const client = new SwaggerPetstoreOpenAPI30({});
@@ -26,7 +26,7 @@ console.log('Available pets:', pets);
 The generated client supports flexible server configuration:
 
 ```typescript
-import {SwaggerPetstoreOpenAPI30, ClientOptions} from './type.js';
+import {SwaggerPetstoreOpenAPI30, ClientOptions} from './type';
 
 // Option 1: Use default server (first server from OpenAPI spec)
 const defaultClient = new SwaggerPetstoreOpenAPI30({});
@@ -56,7 +56,7 @@ const variableClient = new SwaggerPetstoreOpenAPI30({
 ## Example: Finding Pets
 
 ```typescript
-import {SwaggerPetstoreOpenAPI30} from './type.js';
+import {SwaggerPetstoreOpenAPI30} from './type';
 
 async function findAvailablePets() {
   const client = new SwaggerPetstoreOpenAPI30({});
@@ -84,7 +84,7 @@ findAvailablePets();
 ## Example: Adding a Pet
 
 ```typescript
-import {SwaggerPetstoreOpenAPI30, Pet, PetStatus} from './type.js';
+import {SwaggerPetstoreOpenAPI30, Pet, PetStatus} from './type';
 import {z} from 'zod';
 
 async function addNewPet() {

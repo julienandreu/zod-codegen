@@ -1,5 +1,5 @@
-import {getExecutionTime} from './execution-time.js';
-import type {Reporter} from './reporter.js';
+import {getExecutionTime} from './execution-time';
+import type {Reporter} from './reporter';
 
 export const signalReceived =
   (process: NodeJS.Process, startTime: bigint, event: NodeJS.Signals, reporter: Reporter) => (): void => {

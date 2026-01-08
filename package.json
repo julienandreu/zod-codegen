@@ -85,8 +85,8 @@
   },
   "scripts": {
     "audit:fix": "npm audit fix",
-    "build": "NODE_OPTIONS='--no-deprecation' sh -c 'rm -rf dist && tsc --project tsconfig.json && mkdir -p dist/src/assets && cp -r src/assets/. dist/src/assets/ && chmod +x ./dist/src/cli.js'",
-    "build:native": "rm -rf dist && NODE_OPTIONS='--no-deprecation' npx tsgo --project tsconfig.json && cp -r src/assets dist/src/ && chmod +x ./dist/src/cli.js",
+    "build": "NODE_OPTIONS='--no-deprecation' sh -c 'rm -rf dist && tsc --project tsconfig.json && ts-node scripts/add-js-extensions.ts && mkdir -p dist/src/assets && cp -r src/assets/. dist/src/assets/ && chmod +x ./dist/src/cli.js'",
+    "build:native": "rm -rf dist && NODE_OPTIONS='--no-deprecation' npx tsgo --project tsconfig.json && ts-node scripts/add-js-extensions.ts && cp -r src/assets dist/src/ && chmod +x ./dist/src/cli.js",
     "build:watch": "tsc --project tsconfig.json --watch",
     "dev": "npm run build && node ./dist/src/cli.js --input ./samples/swagger-petstore.yaml --output ./examples/petstore && npm run format && npm run lint",
     "lint": "eslint src --fix",

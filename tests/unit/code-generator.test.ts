@@ -1,6 +1,6 @@
 import {beforeEach, describe, expect, it} from 'vitest';
-import {TypeScriptCodeGeneratorService} from '../../src/services/code-generator.service.js';
-import type {OpenApiSpecType} from '../../src/types/openapi.js';
+import {TypeScriptCodeGeneratorService} from '../../src/services/code-generator.service';
+import type {OpenApiSpecType} from '../../src/types/openapi';
 
 describe('TypeScriptCodeGeneratorService', () => {
   let generator: TypeScriptCodeGeneratorService;

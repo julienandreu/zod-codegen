@@ -1,5 +1,6 @@
-import {readFileSync, writeFileSync} from 'fs';
-import {resolve} from 'path';
+import {readFileSync, writeFileSync} from 'node:fs';
+import {dirname, resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {z} from 'zod';
 
 interface PackageJson {
@@ -30,6 +31,7 @@ export function isPackageJson(input: unknown): input is PackageJson {
   return success;
 }
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
 const sourcePath = resolve(__dirname, '..', 'package.json');
 
 const data: unknown = JSON.parse(readFileSync(sourcePath, 'utf8'));

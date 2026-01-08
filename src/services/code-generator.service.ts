@@ -1,18 +1,18 @@
 import jp from 'jsonpath';
 import * as ts from 'typescript';
 import {z} from 'zod';
-import type {CodeGenerator, SchemaBuilder} from '../interfaces/code-generator.js';
-import type {MethodSchemaType, OpenApiSpecType, ReferenceType} from '../types/openapi.js';
-import type {GeneratorOptions} from '../types/generator-options.js';
-import {MethodSchema, Reference, SchemaProperties} from '../types/openapi.js';
-import {TypeScriptImportBuilderService} from './import-builder.service.js';
-import {TypeScriptTypeBuilderService} from './type-builder.service.js';
+import type {CodeGenerator, SchemaBuilder} from '../interfaces/code-generator';
+import type {MethodSchemaType, OpenApiSpecType, ReferenceType} from '../types/openapi';
+import type {GeneratorOptions} from '../types/generator-options';
+import {MethodSchema, Reference, SchemaProperties} from '../types/openapi';
+import {TypeScriptImportBuilderService} from './import-builder.service';
+import {TypeScriptTypeBuilderService} from './type-builder.service';
 import {
   type NamingConvention,
   type OperationDetails,
   type OperationNameTransformer,
   transformNamingConvention,
-} from '../utils/naming-convention.js';
+} from '../utils/naming-convention';
 
 export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuilder {
   private readonly typeBuilder = new TypeScriptTypeBuilderService();

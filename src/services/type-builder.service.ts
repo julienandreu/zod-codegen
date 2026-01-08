@@ -1,5 +1,5 @@
 import * as ts from 'typescript';
-import type {TypeBuilder} from '../interfaces/code-generator.js';
+import type {TypeBuilder} from '../interfaces/code-generator';
 
 export class TypeScriptTypeBuilderService implements TypeBuilder {
   buildType(type: string): ts.TypeNode {

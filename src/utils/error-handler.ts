@@ -1,5 +1,5 @@
-import {getExecutionTime} from './execution-time.js';
-import type {Reporter} from './reporter.js';
+import {getExecutionTime} from './execution-time';
+import type {Reporter} from './reporter';
 
 export const errorReceived = (process: NodeJS.Process, startTime: bigint, reporter: Reporter) => (): void => {
   reporter.log(`Done after ${String(getExecutionTime(startTime))}s`);

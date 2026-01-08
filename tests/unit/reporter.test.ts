@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {Reporter} from '../../src/utils/reporter.js';
+import {Reporter} from '../../src/utils/reporter';
 
 describe('Reporter', () => {
   it('should write log messages to stdout', () => {

@@ -1,6 +1,6 @@
 import {beforeEach, describe, expect, it} from 'vitest';
-import {TypeScriptCodeGeneratorService} from '../../src/services/code-generator.service.js';
-import type {OpenApiSpecType} from '../../src/types/openapi.js';
+import {TypeScriptCodeGeneratorService} from '../../src/services/code-generator.service';
+import type {OpenApiSpecType} from '../../src/types/openapi';
 
 describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
   let generator: TypeScriptCodeGeneratorService;
@@ -408,6 +408,144 @@ describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
       expect(code).toContain('z.any');
       expect(code).toContain('refine');
       expect(code).toMatch(/forbidden|Value must not match/);
+    });
+  });
+
+  describe('buildSchemaFromLogicalOperator edge cases', () => {
+    it('should handle unknown type in default case of buildSchemaFromLogicalOperator', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            UnknownTypeInLogical: {
+              anyOf: [
+                {
+                  type: 'custom' as any, // Unknown type that hits default case
+                },
+              ],
+            },
+          },
+        },
+      };
+
+      const code = generator.generate(spec);
+      expect(code).toContain('z.unknown()');
+    });
+
+    it('should handle buildObjectTypeFromSchema with empty properties', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            EmptyObjectInLogical: {
+              anyOf: [
+                {
+                  type: 'object',
+                  properties: {},
+                },
+              ],
+            },
+          },
+        },
+      };
+
+      const code = generator.generate(spec);
+      // Should fallback to record type when properties are empty
+      expect(code).toContain('z.record');
+    });
+
+    it('should handle buildObjectTypeFromSchema with properties', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            ObjectWithPropsInLogical: {
+              anyOf: [
+                {
+                  type: 'object',
+                  properties: {
+                    name: {type: 'string'},
+                    value: {type: 'number'},
+                  },
+                },
+              ],
+            },
+          },
+        },
+      };
+
+      const code = generator.generate(spec);
+      expect(code).toContain('name');
+      expect(code).toContain('value');
+      expect(code).toContain('z.object');
+    });
+
+    it('should handle buildArrayTypeFromSchema without items', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            ArrayNoItemsInLogical: {
+              anyOf: [
+                {
+                  type: 'array',
+                  // No items property
+                },
+              ],
+            },
+          },
+        },
+      };
+
+      const code = generator.generate(spec);
+      expect(code).toContain('z.array');
+    });
+
+    it('should handle buildArrayTypeFromSchema with items', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            ArrayWithItemsInLogical: {
+              anyOf: [
+                {
+                  type: 'array',
+                  items: {type: 'string'},
+                },
+              ],
+            },
+          },
+        },
+      };
+
+      const code = generator.generate(spec);
+      expect(code).toContain('z.array');
+      expect(code).toContain('z.string()');
     });
   });
 });

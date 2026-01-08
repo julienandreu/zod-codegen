@@ -15,7 +15,7 @@ zod-codegen --input ./samples/pokeapi-openapi.json --output ./examples/pokeapi
 ## Basic Usage
 
 ```typescript
-import {PokAPI, defaultBaseUrl} from './type.js';
+import {PokAPI, defaultBaseUrl} from './type';
 
 // Create a client instance
 const client = new PokAPI(defaultBaseUrl);
@@ -30,7 +30,7 @@ console.log('Pokemon:', pokemon);
 See [basic-usage.ts](./basic-usage.ts) for a complete example:
 
 ```typescript
-import {PokAPI, defaultBaseUrl} from './type.js';
+import {PokAPI, defaultBaseUrl} from './type';
 
 async function getPokemonInfo() {
   const client = new PokAPI(defaultBaseUrl);
@@ -73,7 +73,7 @@ npx ts-node examples/pokeapi/basic-usage.ts
 See [custom-client.ts](./custom-client.ts) for a complete example:
 
 ```typescript
-import {PokAPI, defaultBaseUrl} from './type.js';
+import {PokAPI, defaultBaseUrl} from './type';
 
 class CustomPokeAPI extends PokAPI {
   protected getBaseRequestOptions(): Partial<Omit<RequestInit, 'method' | 'body'>> {

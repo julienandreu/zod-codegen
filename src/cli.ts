@@ -2,16 +2,16 @@
 
 import yargs from 'yargs';
 import {hideBin} from 'yargs/helpers';
-import {Generator, type GeneratorOptions, type NamingConvention} from './generator.js';
+import {Generator, type GeneratorOptions, type NamingConvention} from './generator';
 import {readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
 
 import loudRejection from 'loud-rejection';
-import {handleErrors} from './utils/error-handler.js';
-import {handleSignals} from './utils/signal-handler.js';
+import {handleErrors} from './utils/error-handler';
+import {handleSignals} from './utils/signal-handler';
 import debug from 'debug';
-import {Reporter} from './utils/reporter.js';
+import {Reporter} from './utils/reporter';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Read package.json from the project root

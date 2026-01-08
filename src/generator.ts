@@ -1,13 +1,13 @@
-import type {Reporter} from './utils/reporter.js';
-import type {OpenApiSpecType} from './types/openapi.js';
-import type {GeneratorOptions} from './types/generator-options.js';
-import {OpenApiFileParserService, SyncFileReaderService} from './services/file-reader.service.js';
-import {TypeScriptCodeGeneratorService} from './services/code-generator.service.js';
-import {SyncFileWriterService} from './services/file-writer.service.js';
+import type {Reporter} from './utils/reporter';
+import type {OpenApiSpecType} from './types/openapi';
+import type {GeneratorOptions} from './types/generator-options';
+import {OpenApiFileParserService, SyncFileReaderService} from './services/file-reader.service';
+import {TypeScriptCodeGeneratorService} from './services/code-generator.service';
+import {SyncFileWriterService} from './services/file-writer.service';
 
 // Re-export types for library users
-export type {GeneratorOptions} from './types/generator-options.js';
-export type {NamingConvention, OperationDetails, OperationNameTransformer} from './utils/naming-convention.js';
+export type {GeneratorOptions} from './types/generator-options';
+export type {NamingConvention, OperationDetails, OperationNameTransformer} from './utils/naming-convention';
 
 /**
  * Main generator class for creating TypeScript code from OpenAPI specifications.
@@ -21,7 +21,7 @@ export type {NamingConvention, OperationDetails, OperationNameTransformer} from 
  * @example
  * ```typescript
  * import {Generator} from 'zod-codegen';
- * import {Reporter} from './utils/reporter.js';
+ * import {Reporter} from './utils/reporter';
  *
  * const reporter = new Reporter(process.stdout, process.stderr);
  * const generator = new Generator(
