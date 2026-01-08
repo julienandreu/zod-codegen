@@ -81,8 +81,7 @@
     },
     "glob": "^11.1.0",
     "tar": "^7.5.2",
-    "yargs": "^18.0.0",
-    "semver-diff": "file:.npm-overrides/semver-diff"
+    "yargs": "^18.0.0"
   },
   "scripts": {
     "audit:fix": "npm audit fix",
