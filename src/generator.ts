@@ -88,7 +88,7 @@ export class Generator {
         this.reporter.error('❌ An unknown error occurred');
       }
 
-      return Promise.resolve(1);
+      return 1;
     }
   }
 
