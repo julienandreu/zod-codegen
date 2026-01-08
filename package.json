@@ -81,11 +81,12 @@
     },
     "glob": "^11.1.0",
     "tar": "^7.5.2",
-    "yargs": "^18.0.0"
+    "yargs": "^18.0.0",
+    "semver-diff": "file:.npm-overrides/semver-diff"
   },
   "scripts": {
     "audit:fix": "npm audit fix",
-    "build": "NODE_OPTIONS='--no-deprecation' sh -c 'rm -rf dist && tsc --project tsconfig.json && cp -r src/assets dist/src/ && chmod +x ./dist/src/cli.js'",
+    "build": "NODE_OPTIONS='--no-deprecation' sh -c 'rm -rf dist && tsc --project tsconfig.json && mkdir -p dist/src/assets && cp -r src/assets/. dist/src/assets/ && chmod +x ./dist/src/cli.js'",
     "build:native": "rm -rf dist && NODE_OPTIONS='--no-deprecation' npx tsgo --project tsconfig.json && cp -r src/assets dist/src/ && chmod +x ./dist/src/cli.js",
     "build:watch": "tsc --project tsconfig.json --watch",
     "dev": "npm run build && node ./dist/src/cli.js --input ./samples/swagger-petstore.yaml --output ./examples/petstore && npm run format && npm run lint",
