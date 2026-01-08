@@ -10,10 +10,7 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "exactOptionalPropertyTypes": false,
-    "verbatimModuleSyntax": false,
-    "paths": {
-      "zod-codegen/policies": ["./src/policies/index.ts"]
-    }
+    "verbatimModuleSyntax": false
   },
   "include": ["examples/**/*.ts"],
   "exclude": []

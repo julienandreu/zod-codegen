@@ -2,6 +2,8 @@
 
 The policy system allows you to handle HTTP responses with configurable strategies for retries, circuit breakers, logging, and more.
 
+**Important**: `zod-codegen` is a dev-dependency (code generation tool), not a runtime dependency. Policies should be implemented locally in your project, not imported from `zod-codegen`. This example demonstrates how to implement policies locally. You can copy the implementations from this example or implement your own custom policies.
+
 ## Available Policies
 
 ### 1. RetryPolicy
@@ -23,7 +25,8 @@ Handles automatic retries for specific HTTP status codes with configurable backo
 **Example:**
 
 ```typescript
-import {RetryPolicy, PolicyHelper} from 'zod-codegen/policies';
+// Import from your local policies implementation
+import {RetryPolicy, PolicyHelper} from './policies.js';
 
 const retryPolicy = new RetryPolicy({
   maxRetries: 5,
@@ -53,7 +56,8 @@ Prevents cascading failures by opening the circuit after a threshold of failures
 **Example:**
 
 ```typescript
-import {CircuitBreakerPolicy, PolicyHelper} from 'zod-codegen/policies';
+// Import from your local policies implementation
+import {CircuitBreakerPolicy, PolicyHelper} from './policies.js';
 
 const circuitBreaker = new CircuitBreakerPolicy({
   failureThreshold: 5,
@@ -79,7 +83,8 @@ Logs requests, responses, and errors for debugging and monitoring.
 **Example:**
 
 ```typescript
-import {LoggingPolicy, PolicyHelper} from 'zod-codegen/policies';
+// Import from your local policies implementation
+import {LoggingPolicy, PolicyHelper} from './policies.js';
 
 const logging = new LoggingPolicy({
   logResponses: true,
@@ -98,7 +103,8 @@ To use policies with your generated client, extend the client and override `hand
 
 ```typescript
 import { YourGeneratedClient } from './generated/type.js';
-import { RetryPolicy, PolicyHelper } from 'zod-codegen/policies';
+// Import from your local policies implementation
+import { RetryPolicy, PolicyHelper } from './policies.js';
 
 class MyClient extends YourGeneratedClient {
   private readonly policyHelper: PolicyHelper;
@@ -178,7 +184,8 @@ The RetryPolicy supports several backoff strategies:
 You can create custom policies by implementing the `ResponsePolicy` interface:
 
 ```typescript
-import type {ResponsePolicy, ResponseContext, PolicyResult} from 'zod-codegen/policies';
+// Import from your local policies implementation
+import type {ResponsePolicy, ResponseContext, PolicyResult} from './policies.js';
 
 class MyCustomPolicy implements ResponsePolicy {
   readonly name = 'MyCustomPolicy';

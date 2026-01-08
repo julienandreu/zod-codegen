@@ -809,11 +809,15 @@ class PetstoreClientWithRetry extends SwaggerPetstoreOpenAPI30 {
 
 ### Using the Policy System
 
-For more advanced use cases, you can use the built-in policy system:
+For more advanced use cases, you can use a policy system to handle retries, circuit breakers, logging, and more.
+
+**Important**: `zod-codegen` is a dev-dependency (code generation tool), not a runtime dependency. Policies should be implemented locally in your project. You can copy the policy implementations from the examples or implement your own custom policies. See [examples/petstore/policies.ts](./examples/petstore/policies.ts) for a reference implementation.
 
 ```typescript
 import {SwaggerPetstoreOpenAPI30} from './generated/type.js';
-import {RetryPolicy, PolicyHelper} from 'zod-codegen/policies';
+// Import from your local policies implementation
+// NOTE: zod-codegen is a dev-dependency, so policies should be implemented locally
+import {RetryPolicy, PolicyHelper} from './policies.js';
 
 class PetstoreClientWithPolicies extends SwaggerPetstoreOpenAPI30 {
   private readonly policyHelper: PolicyHelper;
@@ -873,7 +877,9 @@ See [examples/petstore/POLICIES.md](./examples/petstore/POLICIES.md) for detaile
 You can combine multiple policies for comprehensive response handling:
 
 ```typescript
-import {RetryPolicy, CircuitBreakerPolicy, LoggingPolicy, PolicyHelper} from 'zod-codegen/policies';
+// Import from your local policies implementation
+// NOTE: zod-codegen is a dev-dependency, so policies should be implemented locally
+import {RetryPolicy, CircuitBreakerPolicy, LoggingPolicy, PolicyHelper} from './policies.js';
 
 const policies = [
   new LoggingPolicy({logResponses: true, logErrors: true}),

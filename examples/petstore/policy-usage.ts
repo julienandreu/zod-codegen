@@ -11,13 +11,7 @@
  */
 
 import {SwaggerPetstoreOpenAPI30, type ClientOptions} from './type.js';
-import {
-  CircuitBreakerPolicy,
-  LoggingPolicy,
-  PolicyHelper,
-  RetryPolicy,
-  type ResponsePolicy,
-} from 'zod-codegen/policies';
+import {CircuitBreakerPolicy, LoggingPolicy, PolicyHelper, RetryPolicy, type ResponsePolicy} from './policies.js';
 
 // ============================================================================
 // Example 1: Basic Retry Policy

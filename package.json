@@ -68,11 +68,6 @@
       "types": "./dist/src/generator.d.ts",
       "import": "./dist/src/generator.js",
       "require": "./dist/src/generator.js"
-    },
-    "./policies": {
-      "types": "./dist/src/policies/index.d.ts",
-      "import": "./dist/src/policies/index.js",
-      "require": "./dist/src/policies/index.js"
     }
   },
   "repository": {
