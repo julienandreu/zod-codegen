@@ -729,9 +729,9 @@ protected getBaseRequestOptions(): Partial<Omit<RequestInit, 'method' | 'body'>>
 }
 ```
 
-## Response Handling with Policies
+## Response Handling
 
-The generated client includes a protected `handleResponse()` method that you can override to implement response handling policies such as retries, circuit breakers, logging, and more.
+The generated client includes a protected `handleResponse()` method that you can override to implement custom response handling logic such as retries, logging, and error transformation.
 
 ### Understanding handleResponse
 
@@ -739,7 +739,6 @@ The `handleResponse()` method is called **before** error checking, allowing you 
 
 - Intercept responses and handle special cases
 - Implement retry logic for specific status codes
-- Add circuit breaker patterns
 - Log requests and responses
 - Transform or modify responses
 
@@ -807,87 +806,4 @@ class PetstoreClientWithRetry extends SwaggerPetstoreOpenAPI30 {
 }
 ```
 
-### Using the Policy System
-
-For more advanced use cases, you can use a policy system to handle retries, circuit breakers, logging, and more.
-
-**Important**: `zod-codegen` is a dev-dependency (code generation tool), not a runtime dependency. Policies should be implemented locally in your project. You can copy the policy implementations from the examples or implement your own custom policies. See [examples/petstore/policies.ts](./examples/petstore/policies.ts) for a reference implementation.
-
-```typescript
-import {SwaggerPetstoreOpenAPI30} from './generated/type.js';
-// Import from your local policies implementation
-// NOTE: zod-codegen is a dev-dependency, so policies should be implemented locally
-import {RetryPolicy, PolicyHelper} from './policies.js';
-
-class PetstoreClientWithPolicies extends SwaggerPetstoreOpenAPI30 {
-  private readonly policyHelper: PolicyHelper;
-  private retrying = false;
-
-  constructor(options = {}) {
-    super(options);
-
-    const retryPolicy = new RetryPolicy({
-      maxRetries: 3,
-      baseDelay: 1000,
-      strategy: 'exponential',
-      retryableStatusCodes: [429, 503, 504],
-    });
-
-    this.policyHelper = new PolicyHelper([retryPolicy]);
-  }
-
-  protected async handleResponse<T>(
-    response: Response,
-    method: string,
-    path: string,
-    options: {...},
-  ): Promise<Response> {
-    if (this.retrying) {
-      return response;
-    }
-
-    this.retrying = true;
-    try {
-      return await this.policyHelper.execute(
-        response,
-        method,
-        path,
-        options,
-        () => this.retryRequest(method, path, options),
-      );
-    } finally {
-      this.retrying = false;
-    }
-  }
-}
-```
-
-### Available Policies
-
-The policy system includes several built-in policies:
-
-1. **RetryPolicy** - Automatic retries with configurable backoff strategies
-2. **CircuitBreakerPolicy** - Prevents cascading failures
-3. **LoggingPolicy** - Request/response logging
-
-See [examples/petstore/POLICIES.md](./examples/petstore/POLICIES.md) for detailed documentation on all available policies and their configuration options.
-
-### Combining Multiple Policies
-
-You can combine multiple policies for comprehensive response handling:
-
-```typescript
-// Import from your local policies implementation
-// NOTE: zod-codegen is a dev-dependency, so policies should be implemented locally
-import {RetryPolicy, CircuitBreakerPolicy, LoggingPolicy, PolicyHelper} from './policies.js';
-
-const policies = [
-  new LoggingPolicy({logResponses: true, logErrors: true}),
-  new CircuitBreakerPolicy({failureThreshold: 5}),
-  new RetryPolicy({maxRetries: 3, strategy: 'exponential'}),
-];
-
-const policyHelper = new PolicyHelper(policies);
-```
-
-See [examples/petstore/policy-usage.ts](./examples/petstore/policy-usage.ts) for complete examples.
+See [examples/petstore/retry-handler-usage.ts](./examples/petstore/retry-handler-usage.ts) for a complete example.

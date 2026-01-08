@@ -20,7 +20,7 @@ A powerful TypeScript code generator that creates **Zod schemas** and **type-saf
 - **🛡️ Runtime Validation**: Built-in Zod validation for request/response data
 - **🌍 Form Support**: Supports both JSON and form-urlencoded request bodies
 - **🔐 Extensible**: Override `getBaseRequestOptions()` to add authentication, custom headers, CORS, and other fetch options
-- **🔄 Response Policies**: Built-in policy system for retries, circuit breakers, logging, and custom response handling
+- **🔄 Response Handling**: Override `handleResponse()` to implement custom retry logic, logging, and error handling
 - **🌐 Server Configuration**: Full support for OpenAPI server variables and templating (e.g., `{environment}.example.com`)
 - **⚙️ Flexible Client Options**: Options-based constructor supporting server selection, variable overrides, and custom base URLs
 
@@ -409,7 +409,7 @@ See [EXAMPLES.md](EXAMPLES.md) for comprehensive examples including:
 - CORS configuration
 - Request cancellation with AbortController
 - Environment-specific configurations
-- Response handling policies (retries, circuit breakers, logging)
+- Response handling with custom retry logic and error handling
 
 ## 📖 Examples
 

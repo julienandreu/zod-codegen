@@ -26,15 +26,12 @@ npx ts-node examples/petstore/basic-usage.ts
 npx ts-node examples/petstore/authenticated-usage.ts
 npx ts-node examples/petstore/server-variables-usage.ts
 npx ts-node examples/petstore/retry-handler-usage.ts
-npx ts-node examples/petstore/policy-usage.ts
 ```
 
 **Additional examples:**
 
 - `server-variables-usage.ts` - Using server variables for different environments
 - `retry-handler-usage.ts` - Custom retry handler implementation
-- `policy-usage.ts` - Using the built-in policy system
-- `POLICIES.md` - Complete policy system documentation
 
 ### ⚡ [PokéAPI](./pokeapi/)
 
