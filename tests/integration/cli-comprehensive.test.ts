@@ -21,7 +21,7 @@ describe('CLI Comprehensive Integration', () => {
 
   describe('Basic CLI Usage', () => {
     it('should generate code with default output directory', () => {
-      execSync('npm run build && node ./dist/src/cli.js --input ./samples/swagger-petstore.yaml --output generated', {
+      execSync('node ./dist/src/cli.js --input ./samples/swagger-petstore.yaml --output generated', {
         encoding: 'utf-8',
         cwd,
       });
@@ -34,13 +34,10 @@ describe('CLI Comprehensive Integration', () => {
     });
 
     it('should generate code with custom output directory', () => {
-      execSync(
-        `npm run build && node ./dist/src/cli.js --input ./samples/swagger-petstore.yaml --output ${testOutputDir}`,
-        {
-          encoding: 'utf-8',
-          cwd,
-        },
-      );
+      execSync(`node ./dist/src/cli.js --input ./samples/swagger-petstore.yaml --output ${testOutputDir}`, {
+        encoding: 'utf-8',
+        cwd,
+      });
 
       const outputFile = resolve(testOutputDir, 'type.ts');
       expect(existsSync(outputFile)).toBe(true);
@@ -48,7 +45,7 @@ describe('CLI Comprehensive Integration', () => {
 
     it('should accept naming convention option', () => {
       execSync(
-        `npm run build && node ./dist/src/cli.js --input ./samples/swagger-petstore.yaml --output ${testOutputDir} --naming-convention camelCase`,
+        `node ./dist/src/cli.js --input ./samples/swagger-petstore.yaml --output ${testOutputDir} --naming-convention camelCase`,
         {
           encoding: 'utf-8',
           cwd,
@@ -65,7 +62,7 @@ describe('CLI Comprehensive Integration', () => {
     it('should reject invalid naming convention', () => {
       expect(() => {
         execSync(
-          `npm run build && node ./dist/src/cli.js --input ./samples/swagger-petstore.yaml --output ${testOutputDir} --naming-convention invalid`,
+          `node ./dist/src/cli.js --input ./samples/swagger-petstore.yaml --output ${testOutputDir} --naming-convention invalid`,
           {
             encoding: 'utf-8',
             cwd,
@@ -79,7 +76,7 @@ describe('CLI Comprehensive Integration', () => {
   describe('CLI Error Handling', () => {
     it('should exit with code 1 on invalid input file', () => {
       try {
-        execSync('npm run build && node ./dist/src/cli.js --input ./nonexistent.yaml --output generated', {
+        execSync('node ./dist/src/cli.js --input ./nonexistent.yaml --output generated', {
           encoding: 'utf-8',
           cwd,
           stdio: 'pipe',
@@ -93,7 +90,7 @@ describe('CLI Comprehensive Integration', () => {
 
     it('should require input option', () => {
       expect(() => {
-        execSync('npm run build && node ./dist/src/cli.js --output generated', {
+        execSync('node ./dist/src/cli.js --output generated', {
           encoding: 'utf-8',
           cwd,
           stdio: 'pipe',
@@ -104,26 +101,20 @@ describe('CLI Comprehensive Integration', () => {
 
   describe('CLI with Different Spec Formats', () => {
     it('should handle JSON format', () => {
-      execSync(
-        `npm run build && node ./dist/src/cli.js --input ./samples/pokeapi-openapi.json --output ${testOutputDir}`,
-        {
-          encoding: 'utf-8',
-          cwd,
-        },
-      );
+      execSync(`node ./dist/src/cli.js --input ./samples/pokeapi-openapi.json --output ${testOutputDir}`, {
+        encoding: 'utf-8',
+        cwd,
+      });
 
       const outputFile = resolve(testOutputDir, 'type.ts');
       expect(existsSync(outputFile)).toBe(true);
     });
 
     it('should handle YAML format', () => {
-      execSync(
-        `npm run build && node ./dist/src/cli.js --input ./samples/swagger-petstore.yaml --output ${testOutputDir}`,
-        {
-          encoding: 'utf-8',
-          cwd,
-        },
-      );
+      execSync(`node ./dist/src/cli.js --input ./samples/swagger-petstore.yaml --output ${testOutputDir}`, {
+        encoding: 'utf-8',
+        cwd,
+      });
 
       const outputFile = resolve(testOutputDir, 'type.ts');
       expect(existsSync(outputFile)).toBe(true);

@@ -44,11 +44,11 @@ jobs:
       - name: Run formatter check
         run: npm run format:check
 
-      - name: Run tests with coverage
-        run: npm run test:coverage
-
       - name: Build project
         run: npm run build
+
+      - name: Run tests with coverage
+        run: npm run test:coverage
 
       - name: Test CLI functionality
         run: |
