@@ -1,3 +1,8 @@
+## <small>1.6.1 (2026-01-09)</small>
+
+- Merge pull request #55 from julienandreu/fix/integration-tests-timeout ([1e48796](https://github.com/julienandreu/zod-codegen/commit/1e48796)), closes [#55](https://github.com/julienandreu/zod-codegen/issues/55)
+- fix: remove npm build from integration tests to prevent timeouts ([1cfceac](https://github.com/julienandreu/zod-codegen/commit/1cfceac))
+
 ## 1.6.0 (2026-01-09)
 
 - Merge pull request #54 from julienandreu/feat/response-handling-policies ([3f99c8f](https://github.com/julienandreu/zod-codegen/commit/3f99c8f)), closes [#54](https://github.com/julienandreu/zod-codegen/issues/54)
