@@ -5,7 +5,7 @@ import {resolve} from 'node:path';
 describe('CLI Integration', () => {
   describe('--help', () => {
     it('should display help information', () => {
-      const result = execSync('npm run build && node ./dist/src/cli.js --help', {
+      const result = execSync('node ./dist/src/cli.js --help', {
         encoding: 'utf-8',
         cwd: resolve(__dirname, '../..'),
       });
@@ -18,7 +18,7 @@ describe('CLI Integration', () => {
 
   describe('--version', () => {
     it('should display version information', () => {
-      const result = execSync('npm run build && node ./dist/src/cli.js --version', {
+      const result = execSync('node ./dist/src/cli.js --version', {
         encoding: 'utf-8',
         cwd: resolve(__dirname, '../..'),
       });
