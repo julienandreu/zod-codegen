@@ -1,3 +1,27 @@
+## 1.6.0 (2026-01-09)
+
+- Merge pull request #54 from julienandreu/feat/response-handling-policies ([3f99c8f](https://github.com/julienandreu/zod-codegen/commit/3f99c8f)), closes [#54](https://github.com/julienandreu/zod-codegen/issues/54)
+- fix: add path mapping for zod-codegen/policies in examples ([d3dd5c9](https://github.com/julienandreu/zod-codegen/commit/d3dd5c9))
+- fix: export policies from package.json ([c1a3344](https://github.com/julienandreu/zod-codegen/commit/c1a3344))
+- fix: prevent duplicate method names for HEAD/OPTIONS with same operationId ([8c0b891](https://github.com/julienandreu/zod-codegen/commit/8c0b891))
+- fix: remove invalid semver-diff override causing CI failure ([278db05](https://github.com/julienandreu/zod-codegen/commit/278db05))
+- fix: remove unnecessary Promise.resolve in error handler ([d730ef4](https://github.com/julienandreu/zod-codegen/commit/d730ef4))
+- fix: update example to use zod-codegen/policies import path ([c7e3b07](https://github.com/julienandreu/zod-codegen/commit/c7e3b07))
+- fix: update TypeScript module resolution for Node.js ESM compatibility ([2d8f6a0](https://github.com/julienandreu/zod-codegen/commit/2d8f6a0))
+- fix: use extensionless imports in TypeScript source files ([dc0698c](https://github.com/julienandreu/zod-codegen/commit/dc0698c))
+- ci: add build output verification step to diagnose module resolution issue ([5174320](https://github.com/julienandreu/zod-codegen/commit/5174320))
+- docs: fix examples documentation ([04d6db8](https://github.com/julienandreu/zod-codegen/commit/04d6db8))
+- docs: update Node.js version requirement in CONTRIBUTING.md ([16cdc1e](https://github.com/julienandreu/zod-codegen/commit/16cdc1e))
+- docs: update PR description with latest test count ([f2ef4a8](https://github.com/julienandreu/zod-codegen/commit/f2ef4a8))
+- test: add comprehensive test suite to increase confidence ([48a7e2d](https://github.com/julienandreu/zod-codegen/commit/48a7e2d))
+- test: add tests for buildBasicTypeFromSchema edge cases ([c567c51](https://github.com/julienandreu/zod-codegen/commit/c567c51))
+- test: improve code coverage for code-generator.service.ts ([edbc92a](https://github.com/julienandreu/zod-codegen/commit/edbc92a))
+- refactor: completely remove policy system ([7c6439a](https://github.com/julienandreu/zod-codegen/commit/7c6439a))
+- refactor: implement quality improvements ([a5b1b14](https://github.com/julienandreu/zod-codegen/commit/a5b1b14))
+- refactor: remove policies export, keep zod-codegen as dev-dependency ([4eae513](https://github.com/julienandreu/zod-codegen/commit/4eae513))
+- refactor: remove unused code and improve Reporter ([51ae06a](https://github.com/julienandreu/zod-codegen/commit/51ae06a))
+- feat: add response handling policies system ([ad98229](https://github.com/julienandreu/zod-codegen/commit/ad98229))
+
 ## <small>1.5.1 (2026-01-05)</small>
 
 - Merge pull request #52 from julienandreu/dependabot/npm_and_yarn/production-dependencies-3204786a64 ([c2fa562](https://github.com/julienandreu/zod-codegen/commit/c2fa562)), closes [#52](https://github.com/julienandreu/zod-codegen/issues/52)
