@@ -13,7 +13,7 @@ All examples below demonstrate how to extend the generated client class to add t
 ### Example: Adding Bearer Token Authentication
 
 ```typescript
-import {SwaggerPetstoreOpenAPI30, ClientOptions} from './generated/type.js';
+import {SwaggerPetstoreOpenAPI30, ClientOptions} from './generated/type';
 
 class AuthenticatedPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
   private accessToken: string | null = null;
@@ -69,7 +69,7 @@ void main();
 ### Example: Session Management with Token Refresh
 
 ```typescript
-import {SwaggerPetstoreOpenAPI30} from './generated/type.js';
+import {SwaggerPetstoreOpenAPI30} from './generated/type';
 
 class SessionManagedPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
   private accessToken: string | null = null;
@@ -132,7 +132,7 @@ class SessionManagedPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
 If you need to pass custom headers for specific requests, you can extend the client and add helper methods:
 
 ```typescript
-import {SwaggerPetstoreOpenAPI30, ClientOptions} from './generated/type.js';
+import {SwaggerPetstoreOpenAPI30, ClientOptions} from './generated/type';
 
 class CustomHeadersPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
   constructor(options: ClientOptions = {}) {
@@ -159,7 +159,7 @@ class CustomHeadersPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
 ### Example: API Key Authentication
 
 ```typescript
-import {SwaggerPetstoreOpenAPI30, ClientOptions} from './generated/type.js';
+import {SwaggerPetstoreOpenAPI30, ClientOptions} from './generated/type';
 
 class ApiKeyAuthenticatedPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
   constructor(options: ClientOptions & {apiKey: string}) {
@@ -185,7 +185,7 @@ class ApiKeyAuthenticatedPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
 ### Example: Using AbortController for Request Cancellation
 
 ```typescript
-import {SwaggerPetstoreOpenAPI30, ClientOptions} from './generated/type.js';
+import {SwaggerPetstoreOpenAPI30, ClientOptions} from './generated/type';
 
 class CancellablePetstoreAPI extends SwaggerPetstoreOpenAPI30 {
   constructor(options: ClientOptions = {}) {
@@ -220,7 +220,7 @@ client.cancelRequests();
 ### Example: Custom Credentials and CORS Mode
 
 ```typescript
-import {SwaggerPetstoreOpenAPI30, ClientOptions} from './generated/type.js';
+import {SwaggerPetstoreOpenAPI30, ClientOptions} from './generated/type';
 
 class CustomCorsPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
   constructor(options: ClientOptions = {}) {
@@ -249,7 +249,7 @@ grep
 Here's a comprehensive example showing how to combine CORS settings, custom User-Agent, and authentication:
 
 ```typescript
-import {SwaggerPetstoreOpenAPI30, ClientOptions} from './generated/type.js';
+import {SwaggerPetstoreOpenAPI30, ClientOptions} from './generated/type';
 
 class FullyConfiguredPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
   private accessToken: string | null = null;
@@ -315,7 +315,7 @@ const pets = await client.findPetsByStatus('available');
 You can also create different configurations for different environments:
 
 ```typescript
-import {SwaggerPetstoreOpenAPI30, ClientOptions} from './generated/type.js';
+import {SwaggerPetstoreOpenAPI30, ClientOptions} from './generated/type';
 
 interface ClientConfig {
   userAgent?: string;
@@ -595,7 +595,7 @@ class RobustAPI extends YourAPI {
 ### Pattern 1: Simple Authentication
 
 ```typescript
-import {YourAPI, ClientOptions} from './generated/type.js';
+import {YourAPI, ClientOptions} from './generated/type';
 
 class SimpleAuthAPI extends YourAPI {
   private token: string | null = null;
@@ -620,7 +620,7 @@ class SimpleAuthAPI extends YourAPI {
 ### Pattern 2: Multiple Headers
 
 ```typescript
-import {YourAPI, ClientOptions} from './generated/type.js';
+import {YourAPI, ClientOptions} from './generated/type';
 
 class MultiHeaderAPI extends YourAPI {
   constructor(options: ClientOptions = {}) {
@@ -645,7 +645,7 @@ class MultiHeaderAPI extends YourAPI {
 ### Pattern 3: Conditional Options
 
 ```typescript
-import {YourAPI, ClientOptions} from './generated/type.js';
+import {YourAPI, ClientOptions} from './generated/type';
 
 class ConditionalAPI extends YourAPI {
   constructor(options: ClientOptions = {}) {
@@ -702,7 +702,7 @@ return {
 **Solution**: Store token as instance property:
 
 ```typescript
-import {YourAPI, ClientOptions} from './generated/type.js';
+import {YourAPI, ClientOptions} from './generated/type';
 
 class MyAPI extends YourAPI {
   private token: string | null = null; // ✅ Instance property
@@ -728,3 +728,82 @@ protected getBaseRequestOptions(): Partial<Omit<RequestInit, 'method' | 'body'>>
   // ✅ Correct return type
 }
 ```
+
+## Response Handling
+
+The generated client includes a protected `handleResponse()` method that you can override to implement custom response handling logic such as retries, logging, and error transformation.
+
+### Understanding handleResponse
+
+The `handleResponse()` method is called **before** error checking, allowing you to:
+
+- Intercept responses and handle special cases
+- Implement retry logic for specific status codes
+- Log requests and responses
+- Transform or modify responses
+
+**Method Signature:**
+
+```typescript
+protected async handleResponse<T>(
+  response: Response,
+  method: string,
+  path: string,
+  options: {
+    params?: Record<string, string | number | boolean>;
+    data?: unknown;
+    contentType?: string;
+    headers?: Record<string, string>;
+  },
+): Promise<Response>
+```
+
+### Example: Basic Retry Handler
+
+```typescript
+import {SwaggerPetstoreOpenAPI30} from './generated/type';
+
+class PetstoreClientWithRetry extends SwaggerPetstoreOpenAPI30 {
+  private retrying = false;
+
+  protected async handleResponse<T>(
+    response: Response,
+    method: string,
+    path: string,
+    options: {...},
+  ): Promise<Response> {
+    // Prevent infinite loops
+    if (this.retrying) {
+      return response;
+    }
+
+    // Handle 429 Too Many Requests
+    if (response.status === 429) {
+      const retryAfter = response.headers.get('Retry-After');
+      const delay = retryAfter ? parseInt(retryAfter, 10) * 1000 : 1000;
+
+      for (let attempt = 0; attempt < 3; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, delay * (attempt + 1)));
+
+        this.retrying = true;
+        try {
+          const retryResponse = await this.retryRequest(method, path, options);
+          if (retryResponse.ok) {
+            return retryResponse;
+          }
+        } finally {
+          this.retrying = false;
+        }
+      }
+    }
+
+    return response;
+  }
+
+  private async retryRequest(...): Promise<Response> {
+    // Reconstruct and make the request
+  }
+}
+```
+
+See [examples/petstore/retry-handler-usage.ts](./examples/petstore/retry-handler-usage.ts) for a complete example.

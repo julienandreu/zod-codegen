@@ -1,18 +1,18 @@
 import jp from 'jsonpath';
 import * as ts from 'typescript';
 import {z} from 'zod';
-import type {CodeGenerator, SchemaBuilder} from '../interfaces/code-generator.js';
-import type {MethodSchemaType, OpenApiSpecType, ReferenceType} from '../types/openapi.js';
-import type {GeneratorOptions} from '../types/generator-options.js';
-import {MethodSchema, Reference, SchemaProperties} from '../types/openapi.js';
-import {TypeScriptImportBuilderService} from './import-builder.service.js';
-import {TypeScriptTypeBuilderService} from './type-builder.service.js';
+import type {CodeGenerator, SchemaBuilder} from '../interfaces/code-generator';
+import type {MethodSchemaType, OpenApiSpecType, ReferenceType} from '../types/openapi';
+import type {GeneratorOptions} from '../types/generator-options';
+import {MethodSchema, Reference, SchemaProperties} from '../types/openapi';
+import {TypeScriptImportBuilderService} from './import-builder.service';
+import {TypeScriptTypeBuilderService} from './type-builder.service';
 import {
   type NamingConvention,
   type OperationDetails,
   type OperationNameTransformer,
   transformNamingConvention,
-} from '../utils/naming-convention.js';
+} from '../utils/naming-convention';
 
 export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuilder {
   private readonly typeBuilder = new TypeScriptTypeBuilderService();
@@ -161,6 +161,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
         this.typeBuilder.createProperty('#baseUrl', 'string', true),
         this.buildConstructor(openapi),
         this.buildGetBaseRequestOptionsMethod(),
+        this.buildHandleResponseMethod(),
         this.buildHttpRequestMethod(),
         ...methods,
       ],
@@ -287,6 +288,29 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
         [ts.factory.createReturnStatement(ts.factory.createObjectLiteralExpression([], false))],
         true,
       ),
+    );
+  }
+
+  private buildHandleResponseMethod(): ts.MethodDeclaration {
+    return ts.factory.createMethodDeclaration(
+      [ts.factory.createToken(ts.SyntaxKind.ProtectedKeyword), ts.factory.createToken(ts.SyntaxKind.AsyncKeyword)],
+      undefined,
+      ts.factory.createIdentifier('handleResponse'),
+      undefined,
+      [this.typeBuilder.createGenericType('T')],
+      [
+        this.typeBuilder.createParameter('response', 'Response'),
+        this.typeBuilder.createParameter('method', 'string'),
+        this.typeBuilder.createParameter('path', 'string'),
+        this.typeBuilder.createParameter(
+          'options',
+          '{params?: Record<string, string | number | boolean>; data?: unknown; contentType?: string; headers?: Record<string, string>}',
+        ),
+      ],
+      ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [
+        ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Response'), undefined),
+      ]),
+      ts.factory.createBlock([ts.factory.createReturnStatement(ts.factory.createIdentifier('response'))], true),
     );
   }
 
@@ -812,7 +836,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
             ts.factory.createVariableDeclarationList(
               [
                 ts.factory.createVariableDeclaration(
-                  ts.factory.createIdentifier('response'),
+                  ts.factory.createIdentifier('rawResponse'),
                   undefined,
                   undefined,
                   ts.factory.createAwaitExpression(
@@ -847,6 +871,35 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
                         ],
                       ),
                     ]),
+                  ),
+                ),
+              ],
+              ts.NodeFlags.Const,
+            ),
+          ),
+          // Handle response through hook (allows subclasses to intercept and modify response)
+          ts.factory.createVariableStatement(
+            undefined,
+            ts.factory.createVariableDeclarationList(
+              [
+                ts.factory.createVariableDeclaration(
+                  ts.factory.createIdentifier('response'),
+                  undefined,
+                  undefined,
+                  ts.factory.createAwaitExpression(
+                    ts.factory.createCallExpression(
+                      ts.factory.createPropertyAccessExpression(
+                        ts.factory.createThis(),
+                        ts.factory.createIdentifier('handleResponse'),
+                      ),
+                      [ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('T'), undefined)],
+                      [
+                        ts.factory.createIdentifier('rawResponse'),
+                        ts.factory.createIdentifier('method'),
+                        ts.factory.createIdentifier('path'),
+                        ts.factory.createIdentifier('options'),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -907,6 +960,28 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     openapi: OpenApiSpecType,
     schemas: Record<string, ts.VariableStatement>,
   ): ts.MethodDeclaration[] {
+    // Track operation IDs to detect duplicates
+    const operationIdMap = new Map<string, {method: string; path: string}[]>();
+
+    // First pass: collect all operation IDs and their methods/paths
+    Object.entries(openapi.paths).forEach(([path, pathItem]) => {
+      Object.entries(pathItem)
+        .filter(([method]) => ['get', 'post', 'put', 'patch', 'delete', 'head', 'options'].includes(method))
+        .forEach(([method, methodSchema]) => {
+          const safeMethodSchema = MethodSchema.parse(methodSchema);
+          if (safeMethodSchema.operationId) {
+            const operationId = safeMethodSchema.operationId;
+            const existing = operationIdMap.get(operationId);
+            if (existing) {
+              existing.push({method, path});
+            } else {
+              operationIdMap.set(operationId, [{method, path}]);
+            }
+          }
+        });
+    });
+
+    // Second pass: build methods, appending method name for HEAD/OPTIONS or when duplicates exist
     return Object.entries(openapi.paths).reduce<ts.MethodDeclaration[]>((endpoints, [path, pathItem]) => {
       const methods = Object.entries(pathItem)
         .filter(([method]) => ['get', 'post', 'put', 'patch', 'delete', 'head', 'options'].includes(method))
@@ -915,6 +990,26 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
           if (!safeMethodSchema.operationId) {
             return null;
+          }
+
+          const operationId = safeMethodSchema.operationId;
+          const methodLower = method.toLowerCase();
+
+          // Check if this operationId is used by multiple methods
+          const operations = operationIdMap.get(operationId);
+          const hasDuplicates = operations !== undefined && operations.length > 1;
+
+          // For HEAD/OPTIONS or when duplicates exist, we need to ensure uniqueness
+          // We'll handle this in transformOperationName by appending the method
+          // But we need to mark it here so transformOperationName knows to append
+          if (hasDuplicates || methodLower === 'head' || methodLower === 'options') {
+            // Temporarily modify the operationId to include method for uniqueness
+            // This will be handled in transformOperationName
+            const modifiedSchema = {
+              ...safeMethodSchema,
+              operationId: `${operationId}_${methodLower}`,
+            };
+            return this.buildEndpointMethod(method, path, modifiedSchema, schemas);
           }
 
           return this.buildEndpointMethod(method, path, safeMethodSchema, schemas);
@@ -928,6 +1023,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
   /**
    * Transforms operation ID according to the configured naming convention or transformer
    * Ensures the result is a valid TypeScript identifier
+   * For HEAD and OPTIONS methods, appends the method name to ensure uniqueness when same operationId is used
    */
   private transformOperationName(operationId: string, method: string, path: string, schema: MethodSchemaType): string {
     let transformed: string;
@@ -949,6 +1045,16 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     } else {
       // Return original operationId if no transformation is configured
       transformed = operationId;
+    }
+
+    // For HEAD and OPTIONS methods, append method name to ensure uniqueness
+    // This prevents duplicate method names when GET and HEAD share the same operationId
+    const methodLower = method.toLowerCase();
+    if (methodLower === 'head' || methodLower === 'options') {
+      // Only append if not already present to avoid double-appending
+      if (!transformed.toLowerCase().endsWith(`_${methodLower}`)) {
+        transformed = `${transformed}_${methodLower}`;
+      }
     }
 
     // Sanitize to ensure valid TypeScript identifier (handles edge cases from custom transformers)

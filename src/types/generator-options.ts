@@ -1,4 +1,4 @@
-import type {NamingConvention, OperationNameTransformer} from '../utils/naming-convention.js';
+import type {NamingConvention, OperationNameTransformer} from '../utils/naming-convention';
 
 /**
  * Configuration options for the Generator class.

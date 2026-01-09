@@ -2,16 +2,16 @@
 
 import yargs from 'yargs';
 import {hideBin} from 'yargs/helpers';
-import {Generator, type GeneratorOptions, type NamingConvention} from './generator.js';
+import {Generator, type GeneratorOptions, type NamingConvention} from './generator';
 import {readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
 
 import loudRejection from 'loud-rejection';
-import {handleErrors} from './utils/error-handler.js';
-import {handleSignals} from './utils/signal-handler.js';
+import {handleErrors} from './utils/error-handler';
+import {handleSignals} from './utils/signal-handler';
 import debug from 'debug';
-import {Reporter} from './utils/reporter.js';
+import {Reporter} from './utils/reporter';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Read package.json from the project root
@@ -47,14 +47,14 @@ const packageData = JSON.parse(readFileSync(packageJsonPath, 'utf-8')) as {
 };
 
 const {name, description, version} = packageData;
-const reporter = new Reporter(process.stdout);
+const reporter = new Reporter(process.stdout, process.stderr);
 const startTime = process.hrtime.bigint();
 
 debug(`${name}:${String(process.pid)}`);
 
 loudRejection();
-handleSignals(process, startTime);
-handleErrors(process, startTime);
+handleSignals(process, startTime, reporter);
+handleErrors(process, startTime, reporter);
 
 const argv = yargs(hideBin(process.argv))
   .scriptName(name)

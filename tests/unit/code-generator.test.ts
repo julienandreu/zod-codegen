@@ -1,6 +1,6 @@
 import {beforeEach, describe, expect, it} from 'vitest';
-import {TypeScriptCodeGeneratorService} from '../../src/services/code-generator.service.js';
-import type {OpenApiSpecType} from '../../src/types/openapi.js';
+import {TypeScriptCodeGeneratorService} from '../../src/services/code-generator.service';
+import type {OpenApiSpecType} from '../../src/types/openapi';
 
 describe('TypeScriptCodeGeneratorService', () => {
   let generator: TypeScriptCodeGeneratorService;
@@ -700,6 +700,389 @@ describe('TypeScriptCodeGeneratorService', () => {
 
       const code = generator.generate(spec);
       expect(code).toContain('z.lazy(() => Expression)');
+    });
+  });
+
+  describe('logical operators edge cases', () => {
+    it('should handle anyOf with basic type schemas', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            StringOrNumber: {
+              anyOf: [{type: 'string'}, {type: 'number'}],
+            },
+          },
+        },
+      };
+
+      const code = generator.generate(spec);
+      expect(code).toContain('z.union');
+      expect(code).toContain('z.string()');
+      expect(code).toContain('z.number()');
+    });
+
+    it('should handle oneOf with object schemas', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            Variant: {
+              oneOf: [
+                {type: 'object', properties: {name: {type: 'string'}}},
+                {type: 'object', properties: {id: {type: 'number'}}},
+              ],
+            },
+          },
+        },
+      };
+
+      const code = generator.generate(spec);
+      expect(code).toContain('z.union');
+    });
+
+    it('should handle allOf with multiple schemas', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            Combined: {
+              allOf: [
+                {type: 'object', properties: {id: {type: 'number'}}},
+                {type: 'object', properties: {name: {type: 'string'}}},
+              ],
+            },
+          },
+        },
+      };
+
+      const code = generator.generate(spec);
+      expect(code).toContain('z.intersection');
+    });
+
+    it('should handle object type with empty properties in logical operators', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            EmptyObject: {
+              anyOf: [{type: 'object', properties: {}}],
+            },
+          },
+        },
+      };
+
+      const code = generator.generate(spec);
+      // Empty object should fallback to record type
+      expect(code).toContain('z.record');
+    });
+
+    it('should handle array type without items in logical operators', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            GenericArray: {
+              anyOf: [{type: 'array'}],
+            },
+          },
+        },
+      };
+
+      const code = generator.generate(spec);
+      // Array without items should use z.array() with unknown
+      expect(code).toContain('z.array');
+      expect(code).toContain('z.unknown()');
+    });
+
+    it('should handle unknown type in logical operators', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            UnknownType: {
+              anyOf: [{type: 'unknown' as any}],
+            },
+          },
+        },
+      };
+
+      const code = generator.generate(spec);
+      expect(code).toContain('z.unknown()');
+    });
+
+    it('should handle non-object schema in logical operators', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            InvalidSchema: {
+              anyOf: [null as any],
+            },
+          },
+        },
+      };
+
+      const code = generator.generate(spec);
+      // Should fallback to unknown for invalid schemas
+      expect(code).toContain('z.unknown()');
+    });
+
+    it('should handle integer type in logical operators', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            IntOrString: {
+              anyOf: [{type: 'integer'}, {type: 'string'}],
+            },
+          },
+        },
+      };
+
+      const code = generator.generate(spec);
+      expect(code).toContain('z.number().int()');
+      expect(code).toContain('z.string()');
+    });
+
+    it('should handle boolean type in logical operators', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            BoolOrString: {
+              anyOf: [{type: 'boolean'}, {type: 'string'}],
+            },
+          },
+        },
+      };
+
+      const code = generator.generate(spec);
+      expect(code).toContain('z.boolean()');
+      expect(code).toContain('z.string()');
+    });
+
+    it('should handle object type with properties in logical operators', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            ObjectVariant: {
+              anyOf: [
+                {
+                  type: 'object',
+                  properties: {
+                    name: {type: 'string'},
+                    age: {type: 'number'},
+                  },
+                },
+              ],
+            },
+          },
+        },
+      };
+
+      const code = generator.generate(spec);
+      expect(code).toContain('z.union');
+      expect(code).toContain('name');
+      expect(code).toContain('age');
+    });
+
+    it('should handle array type with items in logical operators', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            ArrayVariant: {
+              anyOf: [
+                {
+                  type: 'array',
+                  items: {type: 'string'},
+                },
+              ],
+            },
+          },
+        },
+      };
+
+      const code = generator.generate(spec);
+      expect(code).toContain('z.union');
+      expect(code).toContain('z.array');
+      expect(code).toContain('z.string()');
+    });
+
+    it('should handle schema without type property in logical operators', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            InvalidSchema: {
+              anyOf: [{} as any],
+            },
+          },
+        },
+      };
+
+      const code = generator.generate(spec);
+      // Should fallback to unknown for schemas without type
+      expect(code).toContain('z.unknown()');
+    });
+  });
+
+  describe('server variables', () => {
+    it('should generate server configuration with variables', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        servers: [
+          {
+            url: 'https://{environment}.example.com:{port}/v{version}',
+            variables: {
+              environment: {
+                default: 'api',
+                enum: ['api', 'api.staging', 'api.prod'],
+              },
+              port: {
+                default: '443',
+              },
+              version: {
+                default: '1',
+              },
+            },
+          },
+        ],
+        paths: {},
+      };
+
+      const code = generator.generate(spec);
+      expect(code).toContain('serverConfigurations');
+      expect(code).toContain('serverVariables');
+      expect(code).toContain('resolveServerUrl');
+      expect(code).toContain('environment');
+      expect(code).toContain('port');
+      expect(code).toContain('version');
+    });
+
+    it('should handle server variables with enum values', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        servers: [
+          {
+            url: 'https://{env}.example.com',
+            variables: {
+              env: {
+                default: 'prod',
+                enum: ['dev', 'staging', 'prod'],
+                description: 'Environment',
+              },
+            },
+          },
+        ],
+        paths: {},
+      };
+
+      const code = generator.generate(spec);
+      expect(code).toContain('enum');
+      expect(code).toContain('dev');
+      expect(code).toContain('staging');
+      expect(code).toContain('prod');
+    });
+
+    it('should handle multiple servers with different variables', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        servers: [
+          {
+            url: 'https://api.example.com',
+          },
+          {
+            url: 'https://{env}.example.com',
+            variables: {
+              env: {
+                default: 'staging',
+              },
+            },
+          },
+        ],
+        paths: {},
+      };
+
+      const code = generator.generate(spec);
+      expect(code).toContain('serverConfigurations');
+      // Should have both servers
+      expect(code).toContain('https://api.example.com');
+      expect(code).toContain('https://{env}.example.com');
     });
   });
 });

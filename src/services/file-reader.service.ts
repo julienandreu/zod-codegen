@@ -1,8 +1,8 @@
 import {readFileSync} from 'node:fs';
 import {load} from 'js-yaml';
-import type {OpenApiFileParser, OpenApiFileReader} from '../interfaces/file-reader.js';
-import type {OpenApiSpecType} from '../types/openapi.js';
-import {OpenApiSpec} from '../types/openapi.js';
+import type {OpenApiFileParser, OpenApiFileReader} from '../interfaces/file-reader';
+import type {OpenApiSpecType} from '../types/openapi';
+import {OpenApiSpec} from '../types/openapi';
 
 export class SyncFileReaderService implements OpenApiFileReader {
   async readFile(path: string): Promise<string> {

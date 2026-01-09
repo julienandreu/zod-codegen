@@ -1,6 +1,6 @@
 import * as ts from 'typescript';
 import {z} from 'zod';
-import type {ImportBuilder} from '../interfaces/code-generator.js';
+import type {ImportBuilder} from '../interfaces/code-generator';
 
 const IsTypeImport = z.boolean();
 const ImportedElement = z.record(z.string(), IsTypeImport);
