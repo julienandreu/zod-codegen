@@ -336,7 +336,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       ]),
       ts.factory.createBlock(
         [
-          // Build URL with query parameters
+          // Create initial URL object that we will use to build the final URL
           ts.factory.createVariableStatement(
             undefined,
             ts.factory.createVariableDeclarationList(
@@ -345,17 +345,11 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
                   ts.factory.createIdentifier('baseUrl'),
                   undefined,
                   undefined,
-                  ts.factory.createTemplateExpression(ts.factory.createTemplateHead('', ''), [
-                    ts.factory.createTemplateSpan(
-                      ts.factory.createPropertyAccessExpression(
-                        ts.factory.createThis(),
-                        ts.factory.createPrivateIdentifier('#baseUrl'),
-                      ),
-                      ts.factory.createTemplateMiddle('', ''),
-                    ),
-                    ts.factory.createTemplateSpan(
-                      ts.factory.createIdentifier('path'),
-                      ts.factory.createTemplateTail('', ''),
+                  ts.factory.createNewExpression(ts.factory.createIdentifier('URL'), undefined, [
+                    ts.factory.createIdentifier('path'),
+                    ts.factory.createPropertyAccessExpression(
+                      ts.factory.createThis(),
+                      ts.factory.createPrivateIdentifier('#baseUrl'),
                     ),
                   ]),
                 ),
@@ -400,121 +394,155 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
                       ),
                     ),
                     undefined,
-                    (() => {
-                      const urlObj = ts.factory.createNewExpression(ts.factory.createIdentifier('URL'), undefined, [
-                        ts.factory.createIdentifier('baseUrl'),
-                      ]);
-                      const forEachCall = ts.factory.createCallExpression(
-                        ts.factory.createPropertyAccessExpression(
-                          ts.factory.createCallExpression(
-                            ts.factory.createPropertyAccessExpression(
-                              ts.factory.createIdentifier('Object'),
-                              ts.factory.createIdentifier('entries'),
-                            ),
-                            undefined,
+                    ts.factory.createCallExpression(
+                      ts.factory.createParenthesizedExpression(
+                        ts.factory.createArrowFunction(
+                          undefined,
+                          undefined,
+                          [],
+                          undefined,
+                          ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+                          ts.factory.createBlock(
                             [
-                              ts.factory.createPropertyAccessExpression(
-                                ts.factory.createIdentifier('options'),
-                                ts.factory.createIdentifier('params'),
-                              ),
-                            ],
-                          ),
-                          ts.factory.createIdentifier('forEach'),
-                        ),
-                        undefined,
-                        [
-                          ts.factory.createArrowFunction(
-                            undefined,
-                            undefined,
-                            [
-                              ts.factory.createParameterDeclaration(
-                                undefined,
-                                undefined,
-                                ts.factory.createArrayBindingPattern([
-                                  ts.factory.createBindingElement(
-                                    undefined,
-                                    undefined,
-                                    ts.factory.createIdentifier('key'),
-                                    undefined,
-                                  ),
-                                  ts.factory.createBindingElement(
-                                    undefined,
-                                    undefined,
-                                    ts.factory.createIdentifier('value'),
-                                    undefined,
-                                  ),
-                                ]),
-                                undefined,
-                                undefined,
-                              ),
-                            ],
-                            undefined,
-                            ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
-                            ts.factory.createBlock(
-                              [
-                                ts.factory.createExpressionStatement(
-                                  ts.factory.createCallExpression(
-                                    ts.factory.createPropertyAccessExpression(
+                              ts.factory.createExpressionStatement(
+                                ts.factory.createCallExpression(
+                                  ts.factory.createPropertyAccessExpression(
+                                    ts.factory.createCallExpression(
                                       ts.factory.createPropertyAccessExpression(
-                                        urlObj,
-                                        ts.factory.createIdentifier('searchParams'),
+                                        ts.factory.createCallExpression(
+                                          ts.factory.createPropertyAccessExpression(
+                                            ts.factory.createIdentifier('Object'),
+                                            ts.factory.createIdentifier('entries'),
+                                          ),
+                                          undefined,
+                                          [
+                                            ts.factory.createPropertyAccessExpression(
+                                              ts.factory.createIdentifier('options'),
+                                              ts.factory.createIdentifier('params'),
+                                            ),
+                                          ],
+                                        ),
+                                        ts.factory.createIdentifier('filter'),
                                       ),
-                                      ts.factory.createIdentifier('set'),
+                                      undefined,
+                                      [
+                                        ts.factory.createArrowFunction(
+                                          undefined,
+                                          undefined,
+                                          [
+                                            ts.factory.createParameterDeclaration(
+                                              undefined,
+                                              undefined,
+                                              ts.factory.createArrayBindingPattern([
+                                                ts.factory.createBindingElement(
+                                                  undefined,
+                                                  undefined,
+                                                  ts.factory.createIdentifier(''),
+                                                  undefined,
+                                                ),
+                                                ts.factory.createBindingElement(
+                                                  undefined,
+                                                  undefined,
+                                                  ts.factory.createIdentifier('value'),
+                                                  undefined,
+                                                ),
+                                              ]),
+                                              undefined,
+                                              undefined,
+                                            ),
+                                          ],
+                                          undefined,
+                                          ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+                                          ts.factory.createBinaryExpression(
+                                            ts.factory.createIdentifier('value'),
+                                            ts.SyntaxKind.ExclamationEqualsEqualsToken,
+                                            ts.factory.createIdentifier('undefined'),
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    undefined,
-                                    [
-                                      ts.factory.createIdentifier('key'),
-                                      ts.factory.createCallExpression(
-                                        ts.factory.createIdentifier('String'),
-                                        undefined,
-                                        [ts.factory.createIdentifier('value')],
+                                    ts.factory.createIdentifier('forEach'),
+                                  ),
+                                  undefined,
+                                  [
+                                    ts.factory.createArrowFunction(
+                                      undefined,
+                                      undefined,
+                                      [
+                                        ts.factory.createParameterDeclaration(
+                                          undefined,
+                                          undefined,
+                                          ts.factory.createArrayBindingPattern([
+                                            ts.factory.createBindingElement(
+                                              undefined,
+                                              undefined,
+                                              ts.factory.createIdentifier('key'),
+                                              undefined,
+                                            ),
+                                            ts.factory.createBindingElement(
+                                              undefined,
+                                              undefined,
+                                              ts.factory.createIdentifier('value'),
+                                              undefined,
+                                            ),
+                                          ]),
+                                          undefined,
+                                          undefined,
+                                        ),
+                                      ],
+                                      undefined,
+                                      ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+                                      ts.factory.createBlock(
+                                        [
+                                          ts.factory.createExpressionStatement(
+                                            ts.factory.createCallExpression(
+                                              ts.factory.createPropertyAccessExpression(
+                                                ts.factory.createPropertyAccessExpression(
+                                                  ts.factory.createIdentifier('baseUrl'),
+                                                  ts.factory.createIdentifier('searchParams'),
+                                                ),
+                                                ts.factory.createIdentifier('set'),
+                                              ),
+                                              undefined,
+                                              [
+                                                ts.factory.createIdentifier('key'),
+                                                ts.factory.createCallExpression(
+                                                  ts.factory.createIdentifier('String'),
+                                                  undefined,
+                                                  [ts.factory.createIdentifier('value')],
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                        false,
                                       ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                              false,
-                            ),
-                          ),
-                        ],
-                      );
-                      // Use IIFE to execute forEach and return URL string
-                      return ts.factory.createCallExpression(
-                        ts.factory.createParenthesizedExpression(
-                          ts.factory.createArrowFunction(
-                            undefined,
-                            undefined,
-                            [],
-                            undefined,
-                            ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
-                            ts.factory.createBlock(
-                              [
-                                ts.factory.createExpressionStatement(forEachCall),
-                                ts.factory.createReturnStatement(
-                                  ts.factory.createCallExpression(
-                                    ts.factory.createPropertyAccessExpression(
-                                      urlObj,
-                                      ts.factory.createIdentifier('toString'),
                                     ),
-                                    undefined,
-                                    [],
-                                  ),
+                                  ],
                                 ),
-                              ],
-                              false,
-                            ),
+                              ),
+                              ts.factory.createReturnStatement(
+                                ts.factory.createCallExpression(
+                                  ts.factory.createPropertyAccessExpression(
+                                    ts.factory.createIdentifier('baseUrl'),
+                                    ts.factory.createIdentifier('toString'),
+                                  ),
+                                  undefined,
+                                  [],
+                                ),
+                              ),
+                            ],
+                            true,
                           ),
                         ),
-                        undefined,
-                        [],
-                      );
-                    })(),
+                      ),
+                      undefined,
+                      [],
+                    ),
                     undefined,
                     ts.factory.createCallExpression(
                       ts.factory.createPropertyAccessExpression(
-                        ts.factory.createNewExpression(ts.factory.createIdentifier('URL'), undefined, [
-                          ts.factory.createIdentifier('baseUrl'),
-                        ]),
+                        ts.factory.createIdentifier('baseUrl'),
                         ts.factory.createIdentifier('toString'),
                       ),
                       undefined,
