@@ -1,3 +1,8 @@
+## <small>1.6.2 (2026-01-19)</small>
+
+- fix: improve URL construction and filter undefined query params (#58) ([b9c3d32](https://github.com/julienandreu/zod-codegen/commit/b9c3d32)), closes [#58](https://github.com/julienandreu/zod-codegen/issues/58)
+- chore(deps): bump the dev-dependencies group across 1 directory with 5 updates (#57) ([30110fd](https://github.com/julienandreu/zod-codegen/commit/30110fd)), closes [#57](https://github.com/julienandreu/zod-codegen/issues/57)
+
 ## <small>1.6.1 (2026-01-09)</small>
 
 - Merge pull request #55 from julienandreu/fix/integration-tests-timeout ([1e48796](https://github.com/julienandreu/zod-codegen/commit/1e48796)), closes [#55](https://github.com/julienandreu/zod-codegen/issues/55)
