@@ -57,4 +57,34 @@ export interface GeneratorOptions {
    * ```
    */
   operationNameTransformer?: OperationNameTransformer;
+
+  /**
+   * Generate explicit TypeScript interfaces alongside Zod schemas.
+   *
+   * When enabled, this generates explicit TypeScript interfaces for each schema
+   * and adds type annotations to Zod schemas (e.g., `z.ZodType<Order>`).
+   * This helps avoid TypeScript error ts(7056) for extremely complex schemas
+   * where type inference exceeds the compiler's limits.
+   *
+   * When enabled:
+   * - Generates explicit interface/type declarations before schemas
+   * - Annotates Zod schemas with explicit types: `const Order: z.ZodType<Order> = ...`
+   * - Removes `z.infer<typeof>` type exports (replaced by explicit types)
+   *
+   * @default false
+   *
+   * @example
+   * ```typescript
+   * // With explicitTypes: true
+   * export interface Order {
+   *   id: number;
+   *   items: Item[];
+   * }
+   * export const Order: z.ZodType<Order> = z.object({
+   *   id: z.number(),
+   *   items: z.array(Item),
+   * });
+   * ```
+   */
+  explicitTypes?: boolean;
 }

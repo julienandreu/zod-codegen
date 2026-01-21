@@ -1085,4 +1085,369 @@ describe('TypeScriptCodeGeneratorService', () => {
       expect(code).toContain('https://{env}.example.com');
     });
   });
+
+  describe('explicit types', () => {
+    it('should generate explicit interface for object schema when explicitTypes is enabled', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            Order: {
+              type: 'object',
+              properties: {
+                id: {type: 'integer'},
+                name: {type: 'string'},
+              },
+              required: ['id', 'name'],
+            },
+          },
+        },
+      };
+
+      const generatorWithExplicitTypes = new TypeScriptCodeGeneratorService({
+        explicitTypes: true,
+      });
+      const code = generatorWithExplicitTypes.generate(spec);
+
+      // Should generate explicit interface
+      expect(code).toContain('export interface Order');
+      expect(code).toContain('id: number');
+      expect(code).toContain('name: string');
+
+      // Should add type annotation to schema
+      expect(code).toContain('export const Order: z.ZodType<Order>');
+
+      // Should NOT generate z.infer type export
+      expect(code).not.toContain('z.infer<typeof Order>');
+    });
+
+    it('should not generate explicit types when explicitTypes is disabled (default)', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            Order: {
+              type: 'object',
+              properties: {
+                id: {type: 'integer'},
+              },
+              required: ['id'],
+            },
+          },
+        },
+      };
+
+      const code = generator.generate(spec);
+
+      // Should NOT generate explicit interface
+      expect(code).not.toContain('export interface Order');
+
+      // Should generate z.infer type export
+      expect(code).toContain('z.infer<typeof Order>');
+
+      // Should NOT have type annotation on schema
+      expect(code).not.toContain('z.ZodType<Order>');
+    });
+
+    it('should generate type alias for enum schema', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            Status: {
+              type: 'string',
+              enum: ['active', 'inactive', 'pending'],
+            },
+          },
+        },
+      };
+
+      const generatorWithExplicitTypes = new TypeScriptCodeGeneratorService({
+        explicitTypes: true,
+      });
+      const code = generatorWithExplicitTypes.generate(spec);
+
+      // Should generate type alias (not interface) for enum
+      expect(code).toContain('export type Status');
+      expect(code).toContain("'active'");
+      expect(code).toContain("'inactive'");
+      expect(code).toContain("'pending'");
+
+      // Should add type annotation to schema
+      expect(code).toContain('export const Status: z.ZodType<Status>');
+    });
+
+    it('should generate type alias for array schema', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            Tags: {
+              type: 'array',
+              items: {type: 'string'},
+            },
+          },
+        },
+      };
+
+      const generatorWithExplicitTypes = new TypeScriptCodeGeneratorService({
+        explicitTypes: true,
+      });
+      const code = generatorWithExplicitTypes.generate(spec);
+
+      // Should generate type alias for array
+      expect(code).toContain('export type Tags = string[]');
+
+      // Should add type annotation to schema
+      expect(code).toContain('export const Tags: z.ZodType<Tags>');
+    });
+
+    it('should handle nested objects with references', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            User: {
+              type: 'object',
+              properties: {
+                id: {type: 'integer'},
+                profile: {$ref: '#/components/schemas/Profile'},
+              },
+              required: ['id'],
+            },
+            Profile: {
+              type: 'object',
+              properties: {
+                name: {type: 'string'},
+              },
+              required: ['name'],
+            },
+          },
+        },
+      };
+
+      const generatorWithExplicitTypes = new TypeScriptCodeGeneratorService({
+        explicitTypes: true,
+      });
+      const code = generatorWithExplicitTypes.generate(spec);
+
+      // Should generate interfaces for both
+      expect(code).toContain('export interface User');
+      expect(code).toContain('export interface Profile');
+
+      // User should reference Profile type
+      expect(code).toContain('profile?: Profile');
+
+      // Both should have type annotations
+      expect(code).toContain('export const User: z.ZodType<User>');
+      expect(code).toContain('export const Profile: z.ZodType<Profile>');
+    });
+
+    it('should handle union types (anyOf)', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            StringOrNumber: {
+              anyOf: [{type: 'string'}, {type: 'number'}],
+            },
+          },
+        },
+      };
+
+      const generatorWithExplicitTypes = new TypeScriptCodeGeneratorService({
+        explicitTypes: true,
+      });
+      const code = generatorWithExplicitTypes.generate(spec);
+
+      // Should generate type alias for union
+      expect(code).toContain('export type StringOrNumber = string | number');
+
+      // Should add type annotation to schema
+      expect(code).toContain('export const StringOrNumber: z.ZodType<StringOrNumber>');
+    });
+
+    it('should handle intersection types (allOf)', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            Base: {
+              type: 'object',
+              properties: {
+                id: {type: 'integer'},
+              },
+              required: ['id'],
+            },
+            Extended: {
+              allOf: [
+                {$ref: '#/components/schemas/Base'},
+                {
+                  type: 'object',
+                  properties: {
+                    name: {type: 'string'},
+                  },
+                },
+              ],
+            },
+          },
+        },
+      };
+
+      const generatorWithExplicitTypes = new TypeScriptCodeGeneratorService({
+        explicitTypes: true,
+      });
+      const code = generatorWithExplicitTypes.generate(spec);
+
+      // Should generate interface for Base
+      expect(code).toContain('export interface Base');
+
+      // Should generate type alias for Extended (intersection)
+      expect(code).toContain('export type Extended = Base &');
+
+      // Should add type annotations to schemas
+      expect(code).toContain('export const Base: z.ZodType<Base>');
+      expect(code).toContain('export const Extended: z.ZodType<Extended>');
+    });
+
+    it('should handle optional properties', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            User: {
+              type: 'object',
+              properties: {
+                id: {type: 'integer'},
+                email: {type: 'string'},
+              },
+              required: ['id'],
+            },
+          },
+        },
+      };
+
+      const generatorWithExplicitTypes = new TypeScriptCodeGeneratorService({
+        explicitTypes: true,
+      });
+      const code = generatorWithExplicitTypes.generate(spec);
+
+      // id should be required (no ?)
+      expect(code).toContain('id: number');
+      // email should be optional (with ?)
+      expect(code).toContain('email?: string');
+    });
+
+    it('should handle circular dependencies', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            Node: {
+              type: 'object',
+              properties: {
+                id: {type: 'integer'},
+                children: {
+                  type: 'array',
+                  items: {$ref: '#/components/schemas/Node'},
+                },
+              },
+              required: ['id'],
+            },
+          },
+        },
+      };
+
+      const generatorWithExplicitTypes = new TypeScriptCodeGeneratorService({
+        explicitTypes: true,
+      });
+      const code = generatorWithExplicitTypes.generate(spec);
+
+      // Should generate interface with self-reference
+      expect(code).toContain('export interface Node');
+      expect(code).toContain('children?: Node[]');
+
+      // Should add type annotation to schema
+      expect(code).toContain('export const Node: z.ZodType<Node>');
+
+      // Zod schema should use z.lazy for circular reference
+      expect(code).toContain('z.lazy');
+    });
+
+    it('should handle numeric enum types', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0',
+        },
+        paths: {},
+        components: {
+          schemas: {
+            Priority: {
+              type: 'integer',
+              enum: [0, 1, 2],
+            },
+          },
+        },
+      };
+
+      const generatorWithExplicitTypes = new TypeScriptCodeGeneratorService({
+        explicitTypes: true,
+      });
+      const code = generatorWithExplicitTypes.generate(spec);
+
+      // Should generate type alias for numeric enum
+      expect(code).toContain('export type Priority');
+      expect(code).toMatch(/0\s*\|\s*1\s*\|\s*2/);
+
+      // Should add type annotation to schema
+      expect(code).toContain('export const Priority: z.ZodType<Priority>');
+    });
+  });
 });
