@@ -1,3 +1,7 @@
+## <small>1.6.3 (2026-01-22)</small>
+
+- fix: do not depend on inference anymore and build strict types all ar… (#60) ([b0b663e](https://github.com/julienandreu/zod-codegen/commit/b0b663e)), closes [#60](https://github.com/julienandreu/zod-codegen/issues/60)
+
 ## <small>1.6.2 (2026-01-19)</small>
 
 - fix: improve URL construction and filter undefined query params (#58) ([b9c3d32](https://github.com/julienandreu/zod-codegen/commit/b9c3d32)), closes [#58](https://github.com/julienandreu/zod-codegen/issues/58)
