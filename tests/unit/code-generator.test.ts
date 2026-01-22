@@ -1087,7 +1087,7 @@ describe('TypeScriptCodeGeneratorService', () => {
   });
 
   describe('explicit types', () => {
-    it('should generate explicit interface for object schema when explicitTypes is enabled', () => {
+    it('should generate explicit interface for object schema', () => {
       const spec: OpenApiSpecType = {
         openapi: '3.0.0',
         info: {
@@ -1109,10 +1109,7 @@ describe('TypeScriptCodeGeneratorService', () => {
         },
       };
 
-      const generatorWithExplicitTypes = new TypeScriptCodeGeneratorService({
-        explicitTypes: true,
-      });
-      const code = generatorWithExplicitTypes.generate(spec);
+      const code = generator.generate(spec);
 
       // Should generate explicit interface
       expect(code).toContain('export interface Order');
@@ -1124,39 +1121,6 @@ describe('TypeScriptCodeGeneratorService', () => {
 
       // Should NOT generate z.infer type export
       expect(code).not.toContain('z.infer<typeof Order>');
-    });
-
-    it('should not generate explicit types when explicitTypes is disabled (default)', () => {
-      const spec: OpenApiSpecType = {
-        openapi: '3.0.0',
-        info: {
-          title: 'Test API',
-          version: '1.0.0',
-        },
-        paths: {},
-        components: {
-          schemas: {
-            Order: {
-              type: 'object',
-              properties: {
-                id: {type: 'integer'},
-              },
-              required: ['id'],
-            },
-          },
-        },
-      };
-
-      const code = generator.generate(spec);
-
-      // Should NOT generate explicit interface
-      expect(code).not.toContain('export interface Order');
-
-      // Should generate z.infer type export
-      expect(code).toContain('z.infer<typeof Order>');
-
-      // Should NOT have type annotation on schema
-      expect(code).not.toContain('z.ZodType<Order>');
     });
 
     it('should generate type alias for enum schema', () => {
@@ -1177,10 +1141,7 @@ describe('TypeScriptCodeGeneratorService', () => {
         },
       };
 
-      const generatorWithExplicitTypes = new TypeScriptCodeGeneratorService({
-        explicitTypes: true,
-      });
-      const code = generatorWithExplicitTypes.generate(spec);
+      const code = generator.generate(spec);
 
       // Should generate type alias (not interface) for enum
       expect(code).toContain('export type Status');
@@ -1210,10 +1171,7 @@ describe('TypeScriptCodeGeneratorService', () => {
         },
       };
 
-      const generatorWithExplicitTypes = new TypeScriptCodeGeneratorService({
-        explicitTypes: true,
-      });
-      const code = generatorWithExplicitTypes.generate(spec);
+      const code = generator.generate(spec);
 
       // Should generate type alias for array
       expect(code).toContain('export type Tags = string[]');
@@ -1251,10 +1209,7 @@ describe('TypeScriptCodeGeneratorService', () => {
         },
       };
 
-      const generatorWithExplicitTypes = new TypeScriptCodeGeneratorService({
-        explicitTypes: true,
-      });
-      const code = generatorWithExplicitTypes.generate(spec);
+      const code = generator.generate(spec);
 
       // Should generate interfaces for both
       expect(code).toContain('export interface User');
@@ -1285,10 +1240,7 @@ describe('TypeScriptCodeGeneratorService', () => {
         },
       };
 
-      const generatorWithExplicitTypes = new TypeScriptCodeGeneratorService({
-        explicitTypes: true,
-      });
-      const code = generatorWithExplicitTypes.generate(spec);
+      const code = generator.generate(spec);
 
       // Should generate type alias for union
       expect(code).toContain('export type StringOrNumber = string | number');
@@ -1329,10 +1281,7 @@ describe('TypeScriptCodeGeneratorService', () => {
         },
       };
 
-      const generatorWithExplicitTypes = new TypeScriptCodeGeneratorService({
-        explicitTypes: true,
-      });
-      const code = generatorWithExplicitTypes.generate(spec);
+      const code = generator.generate(spec);
 
       // Should generate interface for Base
       expect(code).toContain('export interface Base');
@@ -1367,10 +1316,7 @@ describe('TypeScriptCodeGeneratorService', () => {
         },
       };
 
-      const generatorWithExplicitTypes = new TypeScriptCodeGeneratorService({
-        explicitTypes: true,
-      });
-      const code = generatorWithExplicitTypes.generate(spec);
+      const code = generator.generate(spec);
 
       // id should be required (no ?)
       expect(code).toContain('id: number');
@@ -1403,10 +1349,7 @@ describe('TypeScriptCodeGeneratorService', () => {
         },
       };
 
-      const generatorWithExplicitTypes = new TypeScriptCodeGeneratorService({
-        explicitTypes: true,
-      });
-      const code = generatorWithExplicitTypes.generate(spec);
+      const code = generator.generate(spec);
 
       // Should generate interface with self-reference
       expect(code).toContain('export interface Node');
@@ -1437,10 +1380,7 @@ describe('TypeScriptCodeGeneratorService', () => {
         },
       };
 
-      const generatorWithExplicitTypes = new TypeScriptCodeGeneratorService({
-        explicitTypes: true,
-      });
-      const code = generatorWithExplicitTypes.generate(spec);
+      const code = generator.generate(spec);
 
       // Should generate type alias for numeric enum
       expect(code).toContain('export type Priority');

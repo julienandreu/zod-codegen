@@ -20,7 +20,6 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
   private readonly printer = ts.createPrinter({newLine: ts.NewLineKind.LineFeed});
   private readonly namingConvention: NamingConvention | undefined;
   private readonly operationNameTransformer: OperationNameTransformer | undefined;
-  private readonly explicitTypes: boolean;
 
   // Track circular dependencies for z.lazy() wrapping
   private circularSchemas = new Set<string>();
@@ -29,7 +28,6 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
   constructor(options: GeneratorOptions = {}) {
     this.namingConvention = options.namingConvention;
     this.operationNameTransformer = options.operationNameTransformer;
-    this.explicitTypes = options.explicitTypes ?? false;
   }
 
   private readonly ZodAST = z.object({
@@ -77,13 +75,12 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     const serverConfig = this.buildServerConfiguration(openapi);
     const clientClass = this.buildClientClass(openapi, schemas);
 
-    // When explicitTypes is enabled, generate explicit type declarations before schemas
-    const explicitTypeDeclarations = this.explicitTypes ? this.buildExplicitTypeDeclarations(openapi) : [];
+    const explicitTypeDeclarations = this.buildExplicitTypeDeclarations(openapi);
 
     return [
       this.createComment('Imports'),
       ...imports,
-      ...(this.explicitTypes ? [this.createComment('Explicit type declarations')] : []),
+      this.createComment('Explicit type declarations'),
       ...explicitTypeDeclarations,
       this.createComment('Components schemas'),
       ...Object.values(schemas),
@@ -117,13 +114,11 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
       const sanitizedName = this.typeBuilder.sanitizeIdentifier(name);
 
-      // When explicitTypes is enabled, add type annotation: z.ZodType<Name>
-      const typeAnnotation = this.explicitTypes
-        ? ts.factory.createTypeReferenceNode(
-            ts.factory.createQualifiedName(ts.factory.createIdentifier('z'), ts.factory.createIdentifier('ZodType')),
-            [ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(sanitizedName), undefined)],
-          )
-        : undefined;
+      // Add type annotation: z.ZodType<Name>
+      const typeAnnotation = ts.factory.createTypeReferenceNode(
+        ts.factory.createQualifiedName(ts.factory.createIdentifier('z'), ts.factory.createIdentifier('ZodType')),
+        [ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(sanitizedName), undefined)],
+      );
 
       const variableStatement = ts.factory.createVariableStatement(
         [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
@@ -147,25 +142,9 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     }, {});
   }
 
-  private buildSchemaTypeAliases(schemas: Record<string, ts.VariableStatement>): ts.TypeAliasDeclaration[] {
-    // When explicitTypes is enabled, skip generating z.infer type exports
-    // (they're replaced by explicit interface/type declarations)
-    if (this.explicitTypes) {
-      return [];
-    }
-
-    return Object.keys(schemas).map((name) => {
-      const sanitizedName = this.typeBuilder.sanitizeIdentifier(name);
-      return ts.factory.createTypeAliasDeclaration(
-        [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
-        ts.factory.createIdentifier(sanitizedName),
-        undefined,
-        ts.factory.createTypeReferenceNode(
-          ts.factory.createQualifiedName(ts.factory.createIdentifier('z'), ts.factory.createIdentifier('infer')),
-          [ts.factory.createTypeQueryNode(ts.factory.createIdentifier(sanitizedName), undefined)],
-        ),
-      );
-    });
+  private buildSchemaTypeAliases(_schemas: Record<string, ts.VariableStatement>): ts.TypeAliasDeclaration[] {
+    // Explicit type declarations are used instead of z.infer type exports
+    return [];
   }
 
   /**

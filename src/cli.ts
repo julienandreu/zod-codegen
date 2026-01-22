@@ -79,17 +79,11 @@ const argv = yargs(hideBin(process.argv))
     choices: ['camelCase', 'PascalCase', 'snake_case', 'kebab-case', 'SCREAMING_SNAKE_CASE', 'SCREAMING-KEBAB-CASE'],
     default: undefined,
   })
-  .option('explicit-types', {
-    alias: 'e',
-    type: 'boolean',
-    description: 'Generate explicit TypeScript interfaces alongside Zod schemas to avoid ts(7056) errors',
-    default: false,
-  })
   .strict()
   .help()
   .parseSync();
 
-const {input, output, namingConvention, explicitTypes} = argv;
+const {input, output, namingConvention} = argv;
 
 /**
  * Type guard to validate that a string is a valid naming convention.
@@ -115,10 +109,7 @@ function isValidNamingConvention(value: string | undefined): value is NamingConv
 
 void (async () => {
   try {
-    const options: GeneratorOptions = {
-      ...(isValidNamingConvention(namingConvention) ? {namingConvention} : {}),
-      ...(explicitTypes ? {explicitTypes} : {}),
-    };
+    const options: GeneratorOptions = isValidNamingConvention(namingConvention) ? {namingConvention} : {};
 
     const generator = new Generator(name, version, reporter, input, output, options);
     const exitCode = await generator.run();
