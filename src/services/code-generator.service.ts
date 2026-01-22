@@ -75,9 +75,13 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     const serverConfig = this.buildServerConfiguration(openapi);
     const clientClass = this.buildClientClass(openapi, schemas);
 
+    const explicitTypeDeclarations = this.buildExplicitTypeDeclarations(openapi);
+
     return [
       this.createComment('Imports'),
       ...imports,
+      this.createComment('Explicit type declarations'),
+      ...explicitTypeDeclarations,
       this.createComment('Components schemas'),
       ...Object.values(schemas),
       ...schemaTypeAliases,
@@ -108,14 +112,22 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       // Clear context
       this.currentSchemaName = null;
 
+      const sanitizedName = this.typeBuilder.sanitizeIdentifier(name);
+
+      // Add type annotation: z.ZodType<Name>
+      const typeAnnotation = ts.factory.createTypeReferenceNode(
+        ts.factory.createQualifiedName(ts.factory.createIdentifier('z'), ts.factory.createIdentifier('ZodType')),
+        [ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(sanitizedName), undefined)],
+      );
+
       const variableStatement = ts.factory.createVariableStatement(
         [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
         ts.factory.createVariableDeclarationList(
           [
             ts.factory.createVariableDeclaration(
-              ts.factory.createIdentifier(this.typeBuilder.sanitizeIdentifier(name)),
+              ts.factory.createIdentifier(sanitizedName),
               undefined,
-              undefined,
+              typeAnnotation,
               schemaExpression,
             ),
           ],
@@ -130,19 +142,218 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     }, {});
   }
 
-  private buildSchemaTypeAliases(schemas: Record<string, ts.VariableStatement>): ts.TypeAliasDeclaration[] {
-    return Object.keys(schemas).map((name) => {
+  private buildSchemaTypeAliases(_schemas: Record<string, ts.VariableStatement>): ts.TypeAliasDeclaration[] {
+    // Explicit type declarations are used instead of z.infer type exports
+    return [];
+  }
+
+  /**
+   * Builds explicit TypeScript type declarations for all schemas.
+   * Returns interface declarations for object types and type aliases for other types.
+   */
+  private buildExplicitTypeDeclarations(openapi: OpenApiSpecType): ts.Statement[] {
+    const schemasEntries = Object.entries(openapi.components?.schemas ?? {});
+    const schemasMap = Object.fromEntries(schemasEntries);
+    const sortedSchemaNames = this.topologicalSort(schemasMap);
+
+    const statements: ts.Statement[] = [];
+
+    for (const name of sortedSchemaNames) {
+      const schema = openapi.components?.schemas?.[name];
+      if (!schema) continue;
+
       const sanitizedName = this.typeBuilder.sanitizeIdentifier(name);
-      return ts.factory.createTypeAliasDeclaration(
-        [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
-        ts.factory.createIdentifier(sanitizedName),
-        undefined,
-        ts.factory.createTypeReferenceNode(
-          ts.factory.createQualifiedName(ts.factory.createIdentifier('z'), ts.factory.createIdentifier('infer')),
-          [ts.factory.createTypeQueryNode(ts.factory.createIdentifier(sanitizedName), undefined)],
+      const safeSchema = SchemaProperties.safeParse(schema);
+
+      if (!safeSchema.success) {
+        // Unknown schema type, create a type alias to unknown
+        statements.push(
+          ts.factory.createTypeAliasDeclaration(
+            [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
+            ts.factory.createIdentifier(sanitizedName),
+            undefined,
+            ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
+          ),
+        );
+        continue;
+      }
+
+      const schemaData = safeSchema.data;
+      const typeNode = this.buildTypeNode(schemaData);
+
+      // For object types with properties, create an interface
+      if (schemaData['type'] === 'object' && schemaData['properties']) {
+        statements.push(this.buildInterfaceDeclaration(sanitizedName, schemaData));
+        continue;
+      }
+
+      // For all other types (enums, arrays, unions, etc.), create a type alias
+      statements.push(
+        ts.factory.createTypeAliasDeclaration(
+          [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
+          ts.factory.createIdentifier(sanitizedName),
+          undefined,
+          typeNode,
         ),
       );
+    }
+
+    return statements;
+  }
+
+  /**
+   * Converts an OpenAPI schema to a TypeScript type node.
+   */
+  private buildTypeNode(schema: unknown): ts.TypeNode {
+    const safeSchema = SchemaProperties.safeParse(schema);
+    if (!safeSchema.success) {
+      return ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword);
+    }
+
+    const prop = safeSchema.data;
+
+    // Handle $ref
+    if (this.isReference(prop)) {
+      const {$ref = ''} = Reference.parse(prop);
+      const refName = $ref.split('/').pop() ?? 'never';
+      const sanitizedRefName = this.typeBuilder.sanitizeIdentifier(refName);
+      return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(sanitizedRefName), undefined);
+    }
+
+    // Handle nullable
+    const isNullable = prop['nullable'] === true;
+    const baseTypeNode = this.buildBaseTypeNode(prop);
+
+    if (isNullable) {
+      return ts.factory.createUnionTypeNode([baseTypeNode, ts.factory.createLiteralTypeNode(ts.factory.createNull())]);
+    }
+
+    return baseTypeNode;
+  }
+
+  /**
+   * Builds the base type node without nullable handling.
+   */
+  private buildBaseTypeNode(prop: Record<string, unknown>): ts.TypeNode {
+    // Handle anyOf/oneOf (union types)
+    if (prop['anyOf'] && Array.isArray(prop['anyOf']) && prop['anyOf'].length > 0) {
+      const types = prop['anyOf'].map((s: unknown) => this.buildTypeNode(s));
+      return ts.factory.createUnionTypeNode(types);
+    }
+
+    if (prop['oneOf'] && Array.isArray(prop['oneOf']) && prop['oneOf'].length > 0) {
+      const types = prop['oneOf'].map((s: unknown) => this.buildTypeNode(s));
+      return ts.factory.createUnionTypeNode(types);
+    }
+
+    // Handle allOf (intersection types)
+    if (prop['allOf'] && Array.isArray(prop['allOf']) && prop['allOf'].length > 0) {
+      const types = prop['allOf'].map((s: unknown) => this.buildTypeNode(s));
+      return ts.factory.createIntersectionTypeNode(types);
+    }
+
+    // Handle enum
+    if (prop['enum'] && Array.isArray(prop['enum']) && prop['enum'].length > 0) {
+      const literalTypes = prop['enum'].map((val: unknown) => {
+        if (typeof val === 'string') {
+          return ts.factory.createLiteralTypeNode(ts.factory.createStringLiteral(val, true));
+        } else if (typeof val === 'number') {
+          if (val < 0) {
+            return ts.factory.createLiteralTypeNode(
+              ts.factory.createPrefixUnaryExpression(
+                ts.SyntaxKind.MinusToken,
+                ts.factory.createNumericLiteral(String(Math.abs(val))),
+              ),
+            );
+          }
+          return ts.factory.createLiteralTypeNode(ts.factory.createNumericLiteral(String(val)));
+        } else if (typeof val === 'boolean') {
+          return ts.factory.createLiteralTypeNode(val ? ts.factory.createTrue() : ts.factory.createFalse());
+        }
+        return ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword);
+      });
+      return ts.factory.createUnionTypeNode(literalTypes);
+    }
+
+    // Handle type-specific schemas
+    switch (prop['type']) {
+      case 'string':
+        return ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword);
+      case 'number':
+      case 'integer':
+        return ts.factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword);
+      case 'boolean':
+        return ts.factory.createKeywordTypeNode(ts.SyntaxKind.BooleanKeyword);
+      case 'array': {
+        const itemsType = prop['items']
+          ? this.buildTypeNode(prop['items'])
+          : ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword);
+        return ts.factory.createArrayTypeNode(itemsType);
+      }
+      case 'object': {
+        const properties = (prop['properties'] ?? {}) as Record<string, unknown>;
+        const requiredProps = (prop['required'] ?? []) as string[];
+
+        if (Object.keys(properties).length > 0) {
+          return this.buildObjectTypeLiteral(properties, requiredProps);
+        }
+
+        // Empty object or additionalProperties - use Record<string, unknown>
+        return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Record'), [
+          ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+          ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
+        ]);
+      }
+      default:
+        return ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword);
+    }
+  }
+
+  /**
+   * Builds a TypeScript type literal for an object schema.
+   */
+  private buildObjectTypeLiteral(properties: Record<string, unknown>, requiredProps: string[]): ts.TypeLiteralNode {
+    const members = Object.entries(properties).map(([name, propSchema]) => {
+      const isRequired = requiredProps.includes(name);
+      const typeNode = this.buildTypeNode(propSchema);
+
+      return ts.factory.createPropertySignature(
+        undefined,
+        ts.factory.createIdentifier(name),
+        isRequired ? undefined : ts.factory.createToken(ts.SyntaxKind.QuestionToken),
+        typeNode,
+      );
     });
+
+    return ts.factory.createTypeLiteralNode(members);
+  }
+
+  /**
+   * Builds a TypeScript interface declaration for an object schema.
+   */
+  private buildInterfaceDeclaration(name: string, schema: Record<string, unknown>): ts.InterfaceDeclaration {
+    const properties = (schema['properties'] ?? {}) as Record<string, unknown>;
+    const requiredProps = (schema['required'] ?? []) as string[];
+
+    const members = Object.entries(properties).map(([propName, propSchema]) => {
+      const isRequired = requiredProps.includes(propName);
+      const typeNode = this.buildTypeNode(propSchema);
+
+      return ts.factory.createPropertySignature(
+        undefined,
+        ts.factory.createIdentifier(propName),
+        isRequired ? undefined : ts.factory.createToken(ts.SyntaxKind.QuestionToken),
+        typeNode,
+      );
+    });
+
+    return ts.factory.createInterfaceDeclaration(
+      [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
+      ts.factory.createIdentifier(name),
+      undefined,
+      undefined,
+      members,
+    );
   }
 
   private buildClientClass(
