@@ -4,7 +4,7 @@
  * Run with: npx ts-node examples/petstore/basic-usage.ts
  */
 
-import {SwaggerPetstoreOpenAPI30} from './api';
+import { SwaggerPetstoreOpenAPI30 } from './api';
 
 async function main() {
   // Use default server (first server from OpenAPI spec)
@@ -26,7 +26,7 @@ async function main() {
     try {
       const taggedPets = await client.findPetsByTags(['friendly']);
       console.log(`\n🏷️  Found ${taggedPets.length} pets with tags`);
-    } catch (error) {
+    } catch {
       console.log('\n⚠️  Tags endpoint may not be available');
     }
 
@@ -35,7 +35,7 @@ async function main() {
       const inventory = await client.getInventory();
       console.log('\n📦 Store inventory:');
       console.log(JSON.stringify(inventory, null, 2));
-    } catch (error) {
+    } catch {
       console.log('\n⚠️  Inventory endpoint may require authentication');
     }
   } catch (error) {
@@ -44,6 +44,7 @@ async function main() {
     } else {
       console.error('❌ Unknown error:', error);
     }
+
     process.exit(1);
   }
 }

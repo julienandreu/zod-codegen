@@ -4,7 +4,7 @@
  * Run with: npx ts-node examples/petstore/authenticated-usage.ts
  */
 
-import {ClientOptions, SwaggerPetstoreOpenAPI30} from './api';
+import { ClientOptions, SwaggerPetstoreOpenAPI30 } from './api';
 
 class AuthenticatedPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
   private apiKey: string | null = null;
@@ -19,9 +19,9 @@ class AuthenticatedPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
       ...options,
       headers: {
         ...((options.headers as Record<string, string>) || {}),
-        ...(this.apiKey ? {api_key: this.apiKey} : {}),
-        'User-Agent': 'PetstoreClient/1.0.0',
-      },
+        ...(this.apiKey ? { api_key: this.apiKey } : {}),
+        'User-Agent': 'PetstoreClient/1.0.0'
+      }
     };
   }
 
@@ -53,6 +53,7 @@ async function main() {
     } else {
       console.error('❌ Unknown error:', error);
     }
+
     process.exit(1);
   }
 }

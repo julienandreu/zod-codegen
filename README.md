@@ -20,7 +20,7 @@ A powerful TypeScript code generator that creates **Zod schemas** and **type-saf
 - **🛡️ Runtime Validation**: Built-in Zod validation for request/response data
 - **🌍 Form Support**: Supports both JSON and form-urlencoded request bodies
 - **🔐 Extensible**: Override `getBaseRequestOptions()` to add authentication, custom headers, CORS, and other fetch options
-- **🔄 Response Handling**: Override `handleResponse()` to implement custom retry logic, logging, and error handling
+- **🔄 Response Handling**: Override `handleResponse()` to implement custom retry logic, logging, error handling, and catch 4xx/5xx with custom errors
 - **🌐 Server Configuration**: Full support for OpenAPI server variables and templating (e.g., `{environment}.example.com`)
 - **⚙️ Flexible Client Options**: Options-based constructor supporting server selection, variable overrides, and custom base URLs
 
@@ -89,13 +89,13 @@ This is particularly useful when OpenAPI specs have inconsistent or poorly named
 ### Programmatic Usage
 
 ```typescript
-import {Generator} from 'zod-codegen';
-import type {GeneratorOptions} from 'zod-codegen';
+import { Generator } from 'zod-codegen';
+import type { GeneratorOptions } from 'zod-codegen';
 
 // Create a simple reporter object
 const reporter = {
   log: (...args: unknown[]) => console.log(...args),
-  error: (...args: unknown[]) => console.error(...args),
+  error: (...args: unknown[]) => console.error(...args)
 };
 
 // Create generator instance with naming convention
@@ -106,8 +106,8 @@ const generator = new Generator(
   './openapi.json', // Input path or URL
   './generated', // Output directory
   {
-    namingConvention: 'camelCase', // Transform operation IDs to camelCase
-  },
+    namingConvention: 'camelCase' // Transform operation IDs to camelCase
+  }
 );
 
 // Run the generator
@@ -119,12 +119,12 @@ const exitCode = await generator.run();
 For more advanced use cases, you can provide a custom transformer function that receives full operation details:
 
 ```typescript
-import {Generator} from 'zod-codegen';
-import type {GeneratorOptions, OperationDetails} from 'zod-codegen';
+import { Generator } from 'zod-codegen';
+import type { GeneratorOptions, OperationDetails } from 'zod-codegen';
 
 const customTransformer: GeneratorOptions['operationNameTransformer'] = (details: OperationDetails) => {
   // details includes: operationId, method, path, tags, summary, description
-  const {operationId, method, tags} = details;
+  const { operationId, method, tags } = details;
 
   // Example: Prefix with HTTP method and tag
   const tag = tags?.[0] || 'default';
@@ -132,7 +132,7 @@ const customTransformer: GeneratorOptions['operationNameTransformer'] = (details
 };
 
 const generator = new Generator('my-app', '1.0.0', reporter, './openapi.json', './generated', {
-  operationNameTransformer: customTransformer,
+  operationNameTransformer: customTransformer
 });
 ```
 
@@ -250,20 +250,20 @@ components:
 **Generated Output** (`generated/api.ts`):
 
 ```typescript
-import {z} from 'zod';
+import { z } from 'zod';
 
 // Components schemas
 export const User = z.object({
   id: z.number().int(),
   name: z.string(),
-  email: z.string().email(),
+  email: z.string().email()
 });
 
 // Server configuration (when servers are defined in OpenAPI spec)
 export const serverConfigurations = [
   {
-    url: 'https://api.example.com',
-  },
+    url: 'https://api.example.com'
+  }
 ];
 export const defaultBaseUrl = 'https://api.example.com';
 export type ClientOptions = {
@@ -295,7 +295,7 @@ export class UserAPI {
 **Usage:**
 
 ```typescript
-import {UserAPI, User} from './generated/api';
+import { UserAPI, User } from './generated/api';
 
 // Use default server from OpenAPI spec
 const client = new UserAPI({});
@@ -316,7 +316,7 @@ The generated client includes a protected `getBaseRequestOptions()` method that 
 #### Basic Authentication Example
 
 ```typescript
-import {UserAPI, ClientOptions} from './generated/api';
+import { UserAPI, ClientOptions } from './generated/api';
 
 class AuthenticatedUserAPI extends UserAPI {
   private accessToken: string | null = null;
@@ -331,8 +331,8 @@ class AuthenticatedUserAPI extends UserAPI {
       ...options,
       headers: {
         ...((options.headers as Record<string, string>) || {}),
-        ...(this.accessToken ? {Authorization: `Bearer ${this.accessToken}`} : {}),
-      },
+        ...(this.accessToken ? { Authorization: `Bearer ${this.accessToken}` } : {})
+      }
     };
   }
 
@@ -350,7 +350,7 @@ const user = await client.getUserById(123); // Includes Authorization header
 #### Complete Configuration Example
 
 ```typescript
-import {UserAPI, ClientOptions} from './generated/api';
+import { UserAPI, ClientOptions } from './generated/api';
 
 class FullyConfiguredAPI extends UserAPI {
   private accessToken: string | null = null;
@@ -366,11 +366,11 @@ class FullyConfiguredAPI extends UserAPI {
       headers: {
         ...((options.headers as Record<string, string>) || {}),
         'User-Agent': 'MyApp/1.0.0',
-        ...(this.accessToken ? {Authorization: `Bearer ${this.accessToken}`} : {}),
+        ...(this.accessToken ? { Authorization: `Bearer ${this.accessToken}` } : {})
       },
       mode: 'cors',
       credentials: 'include',
-      cache: 'no-cache',
+      cache: 'no-cache'
     };
   }
 
@@ -409,7 +409,7 @@ See [EXAMPLES.md](EXAMPLES.md) for comprehensive examples including:
 - CORS configuration
 - Request cancellation with AbortController
 - Environment-specific configurations
-- Response handling with custom retry logic and error handling
+- Response handling with custom retry logic, [4xx/5xx error handling](EXAMPLES.md#handling-4xx5xx-in-handleresponse), and error transformation
 
 ## 📖 Examples
 

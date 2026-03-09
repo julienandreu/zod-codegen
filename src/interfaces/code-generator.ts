@@ -1,4 +1,4 @@
-import type {OpenApiSpecType} from '../types/openapi';
+import type { OpenApiSpecType } from '../types/openapi';
 
 export interface CodeGenerator {
   generate(spec: OpenApiSpecType): string;

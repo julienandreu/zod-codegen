@@ -83,8 +83,8 @@
   },
   "scripts": {
     "audit:fix": "npm audit fix",
-    "build": "NODE_OPTIONS='--no-deprecation' sh -c 'rm -rf dist && tsc --project tsconfig.json && ts-node scripts/add-js-extensions.ts && mkdir -p dist/src/assets && cp -r src/assets/. dist/src/assets/ && chmod +x ./dist/src/cli.js'",
-    "build:native": "rm -rf dist && NODE_OPTIONS='--no-deprecation' npx tsgo --project tsconfig.json && ts-node scripts/add-js-extensions.ts && cp -r src/assets dist/src/ && chmod +x ./dist/src/cli.js",
+    "build": "NODE_OPTIONS='--no-deprecation' sh -c 'rm -rf dist && tsc --project tsconfig.json && ts-node scripts/add-js-extensions.ts && chmod +x ./dist/src/cli.js'",
+    "build:native": "rm -rf dist && NODE_OPTIONS='--no-deprecation' npx tsgo --project tsconfig.json && ts-node scripts/add-js-extensions.ts && chmod +x ./dist/src/cli.js",
     "build:watch": "tsc --project tsconfig.json --watch",
     "dev": "npm run build && node ./dist/src/cli.js --input ./samples/swagger-petstore.yaml --output ./examples/petstore && npm run format && npm run lint",
     "lint": "eslint src --fix",
@@ -96,7 +96,6 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
-    "manifest:update": "ts-node scripts/update-manifest.ts",
     "prepare": "husky",
     "prepublishOnly": "npm run build && npm run test && npm run lint:check && npm run type-check",
     "clean": "rm -rf dist coverage node_modules/.cache",

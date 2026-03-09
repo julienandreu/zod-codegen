@@ -5,7 +5,7 @@
  * Run with: npx ts-node examples/petstore/retry-handler-usage.ts
  */
 
-import {SwaggerPetstoreOpenAPI30} from './api';
+import { SwaggerPetstoreOpenAPI30 } from './api';
 
 class PetstoreClientWithRetry extends SwaggerPetstoreOpenAPI30 {
   private maxRetries = 3;
@@ -19,7 +19,7 @@ class PetstoreClientWithRetry extends SwaggerPetstoreOpenAPI30 {
    * - Modify responses before they're processed
    * - Implement custom error handling logic
    */
-  protected async handleResponse<T>(
+  protected async handleResponse<_T>(
     response: Response,
     method: string,
     path: string,
@@ -28,7 +28,7 @@ class PetstoreClientWithRetry extends SwaggerPetstoreOpenAPI30 {
       data?: unknown;
       contentType?: string;
       headers?: Record<string, string>;
-    },
+    }
   ): Promise<Response> {
     // Skip retry logic if we're already retrying to avoid infinite loops
     if (this.retrying) {
@@ -41,9 +41,7 @@ class PetstoreClientWithRetry extends SwaggerPetstoreOpenAPI30 {
       const delay = retryAfter ? parseInt(retryAfter, 10) * 1000 : this.retryDelay;
 
       for (let attempt = 0; attempt < this.maxRetries; attempt++) {
-        console.log(
-          `⚠️  Rate limited (429). Retrying in ${delay * (attempt + 1)}ms... (Attempt ${attempt + 1}/${this.maxRetries})`,
-        );
+        console.log(`⚠️  Rate limited (429). Retrying in ${delay * (attempt + 1)}ms... (Attempt ${attempt + 1}/${this.maxRetries})`);
 
         // Wait before retrying with exponential backoff
         await new Promise((resolve) => setTimeout(resolve, delay * (attempt + 1)));
@@ -62,10 +60,12 @@ class PetstoreClientWithRetry extends SwaggerPetstoreOpenAPI30 {
             console.log(`✅ Retry successful after ${attempt + 1} attempt(s)`);
             return retryResponse;
           }
+
           // If still rate limited, continue to next retry
           if (retryResponse.status === 429 && attempt < this.maxRetries - 1) {
             continue;
           }
+
           // Return the response even if it's an error (will be handled by normal error flow)
           return retryResponse;
         } catch (error) {
@@ -101,7 +101,7 @@ class PetstoreClientWithRetry extends SwaggerPetstoreOpenAPI30 {
       data?: unknown;
       contentType?: string;
       headers?: Record<string, string>;
-    },
+    }
   ): Promise<Response> {
     // Reconstruct the request - this duplicates logic from makeRequest
     // but allows us to retry without going through handleResponse again
@@ -118,17 +118,9 @@ class PetstoreClientWithRetry extends SwaggerPetstoreOpenAPI30 {
         : baseUrl;
 
     const baseOptions = this.getBaseRequestOptions();
-    const contentType =
-      options.contentType === 'application/x-www-form-urlencoded'
-        ? 'application/x-www-form-urlencoded'
-        : 'application/json';
+    const contentType = options.contentType === 'application/x-www-form-urlencoded' ? 'application/x-www-form-urlencoded' : 'application/json';
     const baseHeaders = baseOptions.headers !== undefined ? baseOptions.headers : {};
-    const headers = Object.assign(
-      {},
-      baseHeaders,
-      {'Content-Type': contentType},
-      options.headers !== undefined ? options.headers : {},
-    );
+    const headers = Object.assign({}, baseHeaders, { 'Content-Type': contentType }, options.headers !== undefined ? options.headers : {});
     const body =
       options.data !== undefined
         ? options.contentType === 'application/x-www-form-urlencoded'
@@ -142,7 +134,7 @@ class PetstoreClientWithRetry extends SwaggerPetstoreOpenAPI30 {
           : JSON.stringify(options.data)
         : null;
 
-    return await fetch(url, Object.assign({}, baseOptions, {method, headers: headers, body: body}));
+    return await fetch(url, Object.assign({}, baseOptions, { method, headers: headers, body: body }));
   }
 }
 
@@ -166,6 +158,7 @@ async function main() {
     } else {
       console.error('❌ Unknown error:', error);
     }
+
     process.exit(1);
   }
 }

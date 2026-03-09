@@ -1,6 +1,6 @@
-import {beforeEach, describe, expect, it} from 'vitest';
-import {TypeScriptCodeGeneratorService} from '../../src/services/code-generator.service';
-import type {OpenApiSpecType} from '../../src/types/openapi';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { TypeScriptCodeGeneratorService } from '../../src/services/code-generator.service';
+import type { OpenApiSpecType } from '../../src/types/openapi';
 
 describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
   let generator: TypeScriptCodeGeneratorService;
@@ -15,16 +15,16 @@ describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
           schemas: {
             UnknownType: {
-              anyOf: [{type: 'custom' as any}],
-            },
-          },
-        },
+              anyOf: [{ type: 'custom' as any }]
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -36,16 +36,16 @@ describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
           schemas: {
             DirectUnknownType: {
-              type: 'custom' as any,
-            },
-          },
-        },
+              type: 'custom' as any
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -63,7 +63,7 @@ describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
@@ -75,7 +75,7 @@ describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
                 // by having invalid nested structure that causes parse to fail
                 // but still has the type property accessible
                 (() => {
-                  const obj: any = {type: 'object', properties: {name: {type: 'string'}}};
+                  const obj: any = { type: 'object', properties: { name: { type: 'string' } } };
                   // Make it fail parse by adding circular reference or invalid structure
                   // Actually, let's try making properties invalid in a way that causes top-level parse to fail
                   obj.properties = new Proxy(
@@ -83,15 +83,15 @@ describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
                     {
                       get() {
                         throw new Error('Proxy error');
-                      },
-                    },
+                      }
+                    }
                   );
                   return obj;
-                })(),
-              ],
-            },
-          },
-        },
+                })()
+              ]
+            }
+          }
+        }
       };
 
       // This might throw, but let's see
@@ -108,16 +108,16 @@ describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
           schemas: {
             NoType: {
-              anyOf: [{} as any],
-            },
-          },
-        },
+              anyOf: [{} as any]
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -129,16 +129,16 @@ describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
           schemas: {
             NullSchema: {
-              anyOf: [null as any],
-            },
-          },
-        },
+              anyOf: [null as any]
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -153,16 +153,16 @@ describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
           schemas: {
             EmptyObject: {
-              anyOf: [{type: 'object', properties: {}}],
-            },
-          },
-        },
+              anyOf: [{ type: 'object', properties: {} }]
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -175,7 +175,7 @@ describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
@@ -185,14 +185,14 @@ describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
                 {
                   type: 'object',
                   properties: {
-                    name: {type: 'string'},
-                    age: {type: 'number'},
-                  },
-                },
-              ],
-            },
-          },
-        },
+                    name: { type: 'string' },
+                    age: { type: 'number' }
+                  }
+                }
+              ]
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -205,7 +205,7 @@ describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
@@ -213,12 +213,12 @@ describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
             DirectObject: {
               type: 'object',
               properties: {
-                name: {type: 'string'},
-                age: {type: 'number'},
-              },
-            },
-          },
-        },
+                name: { type: 'string' },
+                age: { type: 'number' }
+              }
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -232,17 +232,17 @@ describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
           schemas: {
             EmptyDirectObject: {
               type: 'object',
-              properties: {},
-            },
-          },
-        },
+              properties: {}
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -257,16 +257,16 @@ describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
           schemas: {
             ArrayNoItems: {
-              anyOf: [{type: 'array'}],
-            },
-          },
-        },
+              anyOf: [{ type: 'array' }]
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -279,7 +279,7 @@ describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
@@ -288,12 +288,12 @@ describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
               anyOf: [
                 {
                   type: 'array',
-                  items: {type: 'string'},
-                },
-              ],
-            },
-          },
-        },
+                  items: { type: 'string' }
+                }
+              ]
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -306,17 +306,17 @@ describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
           schemas: {
             DirectArray: {
               type: 'array',
-              items: {type: 'string'},
-            },
-          },
-        },
+              items: { type: 'string' }
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -330,16 +330,16 @@ describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
           schemas: {
             DirectArrayNoItems: {
-              type: 'array',
-            },
-          },
-        },
+              type: 'array'
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -354,7 +354,7 @@ describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
@@ -362,18 +362,18 @@ describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
             NestedLogical: {
               allOf: [
                 {
-                  anyOf: [{type: 'string'}, {type: 'number'}],
+                  anyOf: [{ type: 'string' }, { type: 'number' }]
                 },
                 {
                   type: 'object',
                   properties: {
-                    id: {type: 'string'},
-                  },
-                },
-              ],
-            },
-          },
-        },
+                    id: { type: 'string' }
+                  }
+                }
+              ]
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -386,7 +386,7 @@ describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
@@ -395,12 +395,12 @@ describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
               not: {
                 type: 'object',
                 properties: {
-                  forbidden: {type: 'string'},
-                },
-              },
-            },
-          },
-        },
+                  forbidden: { type: 'string' }
+                }
+              }
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -417,7 +417,7 @@ describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
@@ -425,12 +425,12 @@ describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
             UnknownTypeInLogical: {
               anyOf: [
                 {
-                  type: 'custom' as any, // Unknown type that hits default case
-                },
-              ],
-            },
-          },
-        },
+                  type: 'custom' as any // Unknown type that hits default case
+                }
+              ]
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -442,7 +442,7 @@ describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
@@ -451,12 +451,12 @@ describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
               anyOf: [
                 {
                   type: 'object',
-                  properties: {},
-                },
-              ],
-            },
-          },
-        },
+                  properties: {}
+                }
+              ]
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -469,7 +469,7 @@ describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
@@ -479,14 +479,14 @@ describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
                 {
                   type: 'object',
                   properties: {
-                    name: {type: 'string'},
-                    value: {type: 'number'},
-                  },
-                },
-              ],
-            },
-          },
-        },
+                    name: { type: 'string' },
+                    value: { type: 'number' }
+                  }
+                }
+              ]
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -500,7 +500,7 @@ describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
@@ -508,13 +508,13 @@ describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
             ArrayNoItemsInLogical: {
               anyOf: [
                 {
-                  type: 'array',
+                  type: 'array'
                   // No items property
-                },
-              ],
-            },
-          },
-        },
+                }
+              ]
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -526,7 +526,7 @@ describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
@@ -535,12 +535,12 @@ describe('TypeScriptCodeGeneratorService - Edge Cases', () => {
               anyOf: [
                 {
                   type: 'array',
-                  items: {type: 'string'},
-                },
-              ],
-            },
-          },
-        },
+                  items: { type: 'string' }
+                }
+              ]
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);

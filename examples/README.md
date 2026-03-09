@@ -26,12 +26,14 @@ npx ts-node examples/petstore/basic-usage.ts
 npx ts-node examples/petstore/authenticated-usage.ts
 npx ts-node examples/petstore/server-variables-usage.ts
 npx ts-node examples/petstore/retry-handler-usage.ts
+npx ts-node examples/petstore/error-handling-usage.ts
 ```
 
 **Additional examples:**
 
 - `server-variables-usage.ts` - Using server variables for different environments
 - `retry-handler-usage.ts` - Custom retry handler implementation
+- `error-handling-usage.ts` - Handling 4xx/5xx with custom HttpError
 
 ### ⚡ [PokéAPI](./pokeapi/)
 

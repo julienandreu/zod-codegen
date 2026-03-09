@@ -1,9 +1,9 @@
-import {existsSync, mkdirSync, readFileSync, rmSync} from 'node:fs';
-import {dirname, join} from 'node:path';
-import {fileURLToPath} from 'node:url';
-import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import {Generator} from '../../src/generator';
-import {Reporter} from '../../src/utils/reporter';
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Generator } from '../../src/generator';
+import { Reporter } from '../../src/utils/reporter';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const testOutputDir = join(__dirname, '../../test-output');
@@ -15,21 +15,22 @@ describe('Generator', () => {
   beforeEach(() => {
     // Clean up test output directory
     if (existsSync(testOutputDir)) {
-      rmSync(testOutputDir, {recursive: true, force: true});
+      rmSync(testOutputDir, { recursive: true, force: true });
     }
-    mkdirSync(testOutputDir, {recursive: true});
+
+    mkdirSync(testOutputDir, { recursive: true });
 
     // Create a mock reporter
     mockReporter = {
       log: vi.fn(),
-      error: vi.fn(),
+      error: vi.fn()
     } as unknown as Reporter;
   });
 
   afterEach(() => {
     // Clean up test output directory
     if (existsSync(testOutputDir)) {
-      rmSync(testOutputDir, {recursive: true, force: true});
+      rmSync(testOutputDir, { recursive: true, force: true });
     }
   });
 
@@ -83,9 +84,8 @@ describe('Generator', () => {
     it('should handle invalid OpenAPI specifications', async () => {
       // Create a temporary invalid OpenAPI file
       const invalidFile = join(testOutputDir, 'invalid.yaml');
-      mkdirSync(testOutputDir, {recursive: true});
-      readFileSync; // Ensure we can write
-      const {writeFileSync} = await import('node:fs');
+      mkdirSync(testOutputDir, { recursive: true });
+      const { writeFileSync } = await import('node:fs');
       writeFileSync(invalidFile, 'invalid: yaml: content: [unclosed');
 
       generator = new Generator('test-app', '1.0.0', mockReporter, invalidFile, testOutputDir);
@@ -141,7 +141,7 @@ describe('Generator', () => {
       generator = new Generator('test-app', '1.0.0', mockReporter, './samples/swagger-petstore.yaml', testOutputDir);
 
       // Mock the fileReader to throw a non-Error object
-      const {SyncFileReaderService} = await import('../../src/services/file-reader.service');
+      const { SyncFileReaderService } = await import('../../src/services/file-reader.service');
       const originalReadFile = SyncFileReaderService.prototype.readFile;
       SyncFileReaderService.prototype.readFile = vi.fn().mockRejectedValue('string error');
 

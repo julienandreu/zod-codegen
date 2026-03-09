@@ -1,17 +1,17 @@
 #!/usr/bin/env node
 
-import {readFileSync} from 'node:fs';
-import {dirname, join} from 'node:path';
-import {fileURLToPath} from 'node:url';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import yargs from 'yargs';
-import {hideBin} from 'yargs/helpers';
-import {Generator, type GeneratorOptions, type NamingConvention} from './generator';
+import { hideBin } from 'yargs/helpers';
+import { Generator, type GeneratorOptions, type NamingConvention } from './generator';
 
 import debug from 'debug';
 import loudRejection from 'loud-rejection';
-import {handleErrors} from './utils/error-handler';
-import {Reporter} from './utils/reporter';
-import {handleSignals} from './utils/signal-handler';
+import { handleErrors } from './utils/error-handler';
+import { Reporter } from './utils/reporter';
+import { handleSignals } from './utils/signal-handler';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Read package.json from the project root
@@ -22,7 +22,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // Try multiple paths to ensure we find package.json
 const possiblePaths = [
   join(__dirname, '..', '..', 'package.json'), // dist/src/cli.js or node_modules/pkg/dist/src/cli.js
-  join(__dirname, '..', 'package.json'), // src/cli.ts
+  join(__dirname, '..', 'package.json') // src/cli.ts
 ];
 
 let packageJsonPath: string | undefined;
@@ -46,7 +46,7 @@ const packageData = JSON.parse(readFileSync(packageJsonPath, 'utf-8')) as {
   description: string;
 };
 
-const {name, description, version} = packageData;
+const { name, description, version } = packageData;
 const reporter = new Reporter(process.stdout, process.stderr);
 const startTime = process.hrtime.bigint();
 
@@ -64,27 +64,26 @@ const argv = yargs(hideBin(process.argv))
     alias: 'i',
     type: 'string',
     description: 'Path or URL to OpenAPI file',
-    demandOption: true,
+    demandOption: true
   })
   .option('output', {
     alias: 'o',
     type: 'string',
-    description:
-      'Output directory (writes to <output>/api.ts) or path to the generated file (e.g. ./dist/api.ts). Default: generated',
-    default: 'api.ts',
+    description: 'Output directory (writes to <output>/api.ts) or path to the generated file (e.g. ./dist/api.ts). Default: generated',
+    default: 'api.ts'
   })
   .option('naming-convention', {
     alias: 'n',
     type: 'string',
     description: 'Naming convention to apply to operation IDs',
     choices: ['camelCase', 'PascalCase', 'snake_case', 'kebab-case', 'SCREAMING_SNAKE_CASE', 'SCREAMING-KEBAB-CASE'],
-    default: undefined,
+    default: undefined
   })
   .strict()
   .help()
   .parseSync();
 
-const {input, output, namingConvention} = argv;
+const { input, output, namingConvention } = argv;
 
 /**
  * Type guard to validate that a string is a valid naming convention.
@@ -97,20 +96,14 @@ function isValidNamingConvention(value: string | undefined): value is NamingConv
   if (value === undefined) {
     return false;
   }
-  const validConventions: readonly NamingConvention[] = [
-    'camelCase',
-    'PascalCase',
-    'snake_case',
-    'kebab-case',
-    'SCREAMING_SNAKE_CASE',
-    'SCREAMING-KEBAB-CASE',
-  ] as const;
+
+  const validConventions: readonly NamingConvention[] = ['camelCase', 'PascalCase', 'snake_case', 'kebab-case', 'SCREAMING_SNAKE_CASE', 'SCREAMING-KEBAB-CASE'] as const;
   return validConventions.includes(value as NamingConvention);
 }
 
 void (async () => {
   try {
-    const options: GeneratorOptions = isValidNamingConvention(namingConvention) ? {namingConvention} : {};
+    const options: GeneratorOptions = isValidNamingConvention(namingConvention) ? { namingConvention } : {};
 
     const generator = new Generator(name, version, reporter, input, output, options);
     const exitCode = await generator.run();
@@ -121,6 +114,7 @@ void (async () => {
     } else {
       reporter.error('An unknown fatal error occurred');
     }
+
     process.exit(1);
   }
 })();

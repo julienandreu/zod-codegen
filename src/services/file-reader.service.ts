@@ -1,8 +1,8 @@
-import {readFileSync} from 'node:fs';
-import {load} from 'js-yaml';
-import type {OpenApiFileParser, OpenApiFileReader} from '../interfaces/file-reader';
-import type {OpenApiSpecType} from '../types/openapi';
-import {OpenApiSpec} from '../types/openapi';
+import { load } from 'js-yaml';
+import { readFileSync } from 'node:fs';
+import type { OpenApiFileParser, OpenApiFileReader } from '../interfaces/file-reader';
+import type { OpenApiSpecType } from '../types/openapi';
+import { OpenApiSpec } from '../types/openapi';
 
 export class SyncFileReaderService implements OpenApiFileReader {
   async readFile(path: string): Promise<string> {
@@ -14,6 +14,7 @@ export class SyncFileReaderService implements OpenApiFileReader {
       if (!response.ok) {
         throw new Error(`Failed to fetch ${path}: ${String(response.status)} ${response.statusText}`);
       }
+
       return await response.text();
     } catch {
       // If URL parsing fails, treat it as a local file path

@@ -1,7 +1,7 @@
-import {execSync} from 'node:child_process';
-import {existsSync, readFileSync, rmSync} from 'node:fs';
-import {resolve} from 'node:path';
-import {describe, expect, it} from 'vitest';
+import { execSync } from 'node:child_process';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
 
 describe('CLI Comprehensive Integration', () => {
   const cwd = resolve(__dirname, '../..');
@@ -9,13 +9,13 @@ describe('CLI Comprehensive Integration', () => {
 
   beforeEach(() => {
     if (existsSync(testOutputDir)) {
-      rmSync(testOutputDir, {recursive: true, force: true});
+      rmSync(testOutputDir, { recursive: true, force: true });
     }
   });
 
   afterEach(() => {
     if (existsSync(testOutputDir)) {
-      rmSync(testOutputDir, {recursive: true, force: true});
+      rmSync(testOutputDir, { recursive: true, force: true });
     }
   });
 
@@ -23,7 +23,7 @@ describe('CLI Comprehensive Integration', () => {
     it('should generate code with default output directory', () => {
       execSync('node ./dist/src/cli.js --input ./samples/swagger-petstore.yaml --output generated', {
         encoding: 'utf-8',
-        cwd,
+        cwd
       });
 
       const outputFile = resolve(cwd, 'generated/api.ts');
@@ -36,7 +36,7 @@ describe('CLI Comprehensive Integration', () => {
     it('should generate code with custom output directory', () => {
       execSync(`node ./dist/src/cli.js --input ./samples/swagger-petstore.yaml --output ${testOutputDir}`, {
         encoding: 'utf-8',
-        cwd,
+        cwd
       });
 
       const outputFile = resolve(testOutputDir, 'api.ts');
@@ -44,13 +44,10 @@ describe('CLI Comprehensive Integration', () => {
     });
 
     it('should accept naming convention option', () => {
-      execSync(
-        `node ./dist/src/cli.js --input ./samples/swagger-petstore.yaml --output ${testOutputDir} --naming-convention camelCase`,
-        {
-          encoding: 'utf-8',
-          cwd,
-        },
-      );
+      execSync(`node ./dist/src/cli.js --input ./samples/swagger-petstore.yaml --output ${testOutputDir} --naming-convention camelCase`, {
+        encoding: 'utf-8',
+        cwd
+      });
 
       const outputFile = resolve(testOutputDir, 'api.ts');
       const content = readFileSync(outputFile, 'utf-8');
@@ -61,14 +58,11 @@ describe('CLI Comprehensive Integration', () => {
 
     it('should reject invalid naming convention', () => {
       expect(() => {
-        execSync(
-          `node ./dist/src/cli.js --input ./samples/swagger-petstore.yaml --output ${testOutputDir} --naming-convention invalid`,
-          {
-            encoding: 'utf-8',
-            cwd,
-            stdio: 'pipe',
-          },
-        );
+        execSync(`node ./dist/src/cli.js --input ./samples/swagger-petstore.yaml --output ${testOutputDir} --naming-convention invalid`, {
+          encoding: 'utf-8',
+          cwd,
+          stdio: 'pipe'
+        });
       }).toThrow();
     });
 
@@ -76,7 +70,7 @@ describe('CLI Comprehensive Integration', () => {
       const outputFile = resolve(testOutputDir, 'client.ts');
       execSync(`node ./dist/src/cli.js --input ./samples/swagger-petstore.yaml --output "${outputFile}"`, {
         encoding: 'utf-8',
-        cwd,
+        cwd
       });
 
       expect(existsSync(outputFile)).toBe(true);
@@ -91,7 +85,7 @@ describe('CLI Comprehensive Integration', () => {
         execSync('node ./dist/src/cli.js --input ./nonexistent.yaml --output generated', {
           encoding: 'utf-8',
           cwd,
-          stdio: 'pipe',
+          stdio: 'pipe'
         });
         expect.fail('Should have thrown an error');
       } catch (error: unknown) {
@@ -105,7 +99,7 @@ describe('CLI Comprehensive Integration', () => {
         execSync('node ./dist/src/cli.js --output generated', {
           encoding: 'utf-8',
           cwd,
-          stdio: 'pipe',
+          stdio: 'pipe'
         });
       }).toThrow();
     });
@@ -115,7 +109,7 @@ describe('CLI Comprehensive Integration', () => {
     it('should handle JSON format', () => {
       execSync(`node ./dist/src/cli.js --input ./samples/pokeapi-openapi.json --output ${testOutputDir}`, {
         encoding: 'utf-8',
-        cwd,
+        cwd
       });
 
       const outputFile = resolve(testOutputDir, 'api.ts');
@@ -125,7 +119,7 @@ describe('CLI Comprehensive Integration', () => {
     it('should handle YAML format', () => {
       execSync(`node ./dist/src/cli.js --input ./samples/swagger-petstore.yaml --output ${testOutputDir}`, {
         encoding: 'utf-8',
-        cwd,
+        cwd
       });
 
       const outputFile = resolve(testOutputDir, 'api.ts');

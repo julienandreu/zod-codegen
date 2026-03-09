@@ -13,7 +13,7 @@ All examples below demonstrate how to extend the generated client class to add t
 ### Example: Adding Bearer Token Authentication
 
 ```typescript
-import {SwaggerPetstoreOpenAPI30, ClientOptions} from './generated/api';
+import { SwaggerPetstoreOpenAPI30, ClientOptions } from './generated/api';
 
 class AuthenticatedPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
   private accessToken: string | null = null;
@@ -29,8 +29,8 @@ class AuthenticatedPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
       ...options,
       headers: {
         ...((options.headers as Record<string, string>) || {}),
-        ...(this.accessToken ? {Authorization: `Bearer ${this.accessToken}`} : {}),
-      },
+        ...(this.accessToken ? { Authorization: `Bearer ${this.accessToken}` } : {})
+      }
     };
   }
 
@@ -69,7 +69,7 @@ void main();
 ### Example: Session Management with Token Refresh
 
 ```typescript
-import {SwaggerPetstoreOpenAPI30} from './generated/api';
+import { SwaggerPetstoreOpenAPI30 } from './generated/api';
 
 class SessionManagedPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
   private accessToken: string | null = null;
@@ -88,8 +88,8 @@ class SessionManagedPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
       ...options,
       headers: {
         ...((options.headers as Record<string, string>) || {}),
-        ...(this.accessToken ? {Authorization: `Bearer ${this.accessToken}`} : {}),
-      },
+        ...(this.accessToken ? { Authorization: `Bearer ${this.accessToken}` } : {})
+      }
     };
   }
 
@@ -132,7 +132,7 @@ class SessionManagedPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
 If you need to pass custom headers for specific requests, you can extend the client and add helper methods:
 
 ```typescript
-import {SwaggerPetstoreOpenAPI30, ClientOptions} from './generated/api';
+import { SwaggerPetstoreOpenAPI30, ClientOptions } from './generated/api';
 
 class CustomHeadersPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
   constructor(options: ClientOptions = {}) {
@@ -145,8 +145,8 @@ class CustomHeadersPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
       headers: {
         ...((options.headers as Record<string, string>) || {}),
         'X-Custom-Header': 'custom-value',
-        'X-Request-ID': this.generateRequestId(),
-      },
+        'X-Request-ID': this.generateRequestId()
+      }
     };
   }
 
@@ -159,10 +159,10 @@ class CustomHeadersPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
 ### Example: API Key Authentication
 
 ```typescript
-import {SwaggerPetstoreOpenAPI30, ClientOptions} from './generated/api';
+import { SwaggerPetstoreOpenAPI30, ClientOptions } from './generated/api';
 
 class ApiKeyAuthenticatedPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
-  constructor(options: ClientOptions & {apiKey: string}) {
+  constructor(options: ClientOptions & { apiKey: string }) {
     super(options);
     this.apiKey = options.apiKey;
   }
@@ -175,8 +175,8 @@ class ApiKeyAuthenticatedPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
       ...options,
       headers: {
         ...((options.headers as Record<string, string>) || {}),
-        'X-API-Key': this.apiKey,
-      },
+        'X-API-Key': this.apiKey
+      }
     };
   }
 }
@@ -185,7 +185,7 @@ class ApiKeyAuthenticatedPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
 ### Example: Using AbortController for Request Cancellation
 
 ```typescript
-import {SwaggerPetstoreOpenAPI30, ClientOptions} from './generated/api';
+import { SwaggerPetstoreOpenAPI30, ClientOptions } from './generated/api';
 
 class CancellablePetstoreAPI extends SwaggerPetstoreOpenAPI30 {
   constructor(options: ClientOptions = {}) {
@@ -198,7 +198,7 @@ class CancellablePetstoreAPI extends SwaggerPetstoreOpenAPI30 {
     this.abortController = new AbortController();
     return {
       ...options,
-      signal: this.abortController.signal,
+      signal: this.abortController.signal
     };
   }
 
@@ -220,7 +220,7 @@ client.cancelRequests();
 ### Example: Custom Credentials and CORS Mode
 
 ```typescript
-import {SwaggerPetstoreOpenAPI30, ClientOptions} from './generated/api';
+import { SwaggerPetstoreOpenAPI30, ClientOptions } from './generated/api';
 
 class CustomCorsPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
   constructor(options: ClientOptions = {}) {
@@ -232,7 +232,7 @@ class CustomCorsPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
     return {
       ...options,
       credentials: 'include', // Include cookies in CORS requests
-      mode: 'cors', // Enable CORS
+      mode: 'cors' // Enable CORS
     };
   }
 }
@@ -249,13 +249,13 @@ grep
 Here's a comprehensive example showing how to combine CORS settings, custom User-Agent, and authentication:
 
 ```typescript
-import {SwaggerPetstoreOpenAPI30, ClientOptions} from './generated/api';
+import { SwaggerPetstoreOpenAPI30, ClientOptions } from './generated/api';
 
 class FullyConfiguredPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
   private accessToken: string | null = null;
   private readonly userAgent: string;
 
-  constructor(options: ClientOptions & {userAgent?: string} = {}) {
+  constructor(options: ClientOptions & { userAgent?: string } = {}) {
     super(options);
     this.userAgent = options.userAgent || 'MyApp/1.0.0 (https://myapp.com)';
   }
@@ -267,7 +267,7 @@ class FullyConfiguredPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
     const headers: Record<string, string> = {
       ...((options.headers as Record<string, string>) || {}),
       'User-Agent': this.userAgent,
-      ...(this.accessToken ? {Authorization: `Bearer ${this.accessToken}`} : {}),
+      ...(this.accessToken ? { Authorization: `Bearer ${this.accessToken}` } : {})
     };
 
     return {
@@ -279,7 +279,7 @@ class FullyConfiguredPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
       // Cache control
       cache: 'no-cache', // Don't cache requests
       // Redirect handling
-      redirect: 'follow', // Follow redirects automatically
+      redirect: 'follow' // Follow redirects automatically
     };
   }
 
@@ -294,7 +294,7 @@ class FullyConfiguredPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
 
 // Usage
 const client = new FullyConfiguredPetstoreAPI({
-  userAgent: 'MyCustomApp/2.0.0 (Custom User Agent)',
+  userAgent: 'MyCustomApp/2.0.0 (Custom User Agent)'
 });
 
 // Set authentication token
@@ -315,7 +315,7 @@ const pets = await client.findPetsByStatus('available');
 You can also create different configurations for different environments:
 
 ```typescript
-import {SwaggerPetstoreOpenAPI30, ClientOptions} from './generated/api';
+import { SwaggerPetstoreOpenAPI30, ClientOptions } from './generated/api';
 
 interface ClientConfig {
   userAgent?: string;
@@ -328,14 +328,14 @@ class ConfigurablePetstoreAPI extends SwaggerPetstoreOpenAPI30 {
   private accessToken: string | null = null;
   private readonly config: Required<ClientConfig>;
 
-  constructor(options: ClientOptions & {config?: ClientConfig} = {}) {
+  constructor(options: ClientOptions & { config?: ClientConfig } = {}) {
     super(options);
     const config = options.config || {};
     this.config = {
       userAgent: config.userAgent || 'PetstoreAPIClient/1.0.0',
       enableCors: config.enableCors ?? true,
       includeCredentials: config.includeCredentials ?? true,
-      cachePolicy: config.cachePolicy || 'no-cache',
+      cachePolicy: config.cachePolicy || 'no-cache'
     };
   }
 
@@ -345,13 +345,13 @@ class ConfigurablePetstoreAPI extends SwaggerPetstoreOpenAPI30 {
     const headers: Record<string, string> = {
       ...((options.headers as Record<string, string>) || {}),
       'User-Agent': this.config.userAgent,
-      ...(this.accessToken ? {Authorization: `Bearer ${this.accessToken}`} : {}),
+      ...(this.accessToken ? { Authorization: `Bearer ${this.accessToken}` } : {})
     };
 
     const requestOptions: Partial<Omit<RequestInit, 'method' | 'body'>> = {
       ...options,
       headers,
-      cache: this.config.cachePolicy,
+      cache: this.config.cachePolicy
     };
 
     // Conditionally add CORS options
@@ -376,8 +376,8 @@ const productionClient = new ConfigurablePetstoreAPI({
     userAgent: 'MyApp/1.0.0 Production',
     enableCors: true,
     includeCredentials: true,
-    cachePolicy: 'default',
-  },
+    cachePolicy: 'default'
+  }
 });
 
 // Usage for development
@@ -386,8 +386,8 @@ const devClient = new ConfigurablePetstoreAPI({
     userAgent: 'MyApp/1.0.0 Development',
     enableCors: true,
     includeCredentials: false, // Don't send credentials in dev
-    cachePolicy: 'no-cache',
-  },
+    cachePolicy: 'no-cache'
+  }
 });
 ```
 
@@ -435,8 +435,8 @@ The final fetch request uses `Object.assign()` to merge options:
 const finalHeaders = Object.assign(
   {}, // Start with empty object
   baseOptions.headers || {}, // 1. Base headers from getBaseRequestOptions()
-  {'Content-Type': contentType}, // 2. Content-Type (may override base)
-  options.headers || {}, // 3. Request-specific headers (highest priority)
+  { 'Content-Type': contentType }, // 2. Content-Type (may override base)
+  options.headers || {} // 3. Request-specific headers (highest priority)
 );
 
 // Then all options are merged:
@@ -447,8 +447,8 @@ const finalOptions = Object.assign(
     // 2. Request-specific options (override base)
     method, // Always from endpoint
     headers: finalHeaders, // Merged headers
-    body, // Always from request data
-  },
+    body // Always from request data
+  }
 );
 
 fetch(url, finalOptions);
@@ -531,7 +531,7 @@ protected getBaseRequestOptions() {
 class UserFriendlyAPI extends YourAPI {
   // ✅ Provide convenient methods
   async login(username: string, password: string) {
-    const response = await this.auth_login_post({username, password});
+    const response = await this.auth_login_post({ username, password });
     this.setAccessToken(response.token);
   }
 
@@ -547,7 +547,7 @@ class UserFriendlyAPI extends YourAPI {
 // ✅ Type your headers explicitly
 const headers: Record<string, string> = {
   'User-Agent': this.userAgent,
-  ...(this.token ? {Authorization: `Bearer ${this.token}`} : {}),
+  ...(this.token ? { Authorization: `Bearer ${this.token}` } : {})
 };
 ```
 
@@ -558,15 +558,15 @@ const headers: Record<string, string> = {
 const prodClient = new ConfigurableAPI({
   config: {
     userAgent: 'MyApp/1.0.0 Production',
-    enableCors: true,
-  },
+    enableCors: true
+  }
 });
 
 const devClient = new ConfigurableAPI({
   config: {
     userAgent: 'MyApp/1.0.0 Development',
-    enableCors: false,
-  },
+    enableCors: false
+  }
 });
 ```
 
@@ -578,7 +578,7 @@ class RobustAPI extends YourAPI {
     const options = super.getBaseRequestOptions();
     return {
       ...options,
-      signal: this.createAbortSignal(), // ✅ Handle cancellation
+      signal: this.createAbortSignal() // ✅ Handle cancellation
     };
   }
 
@@ -595,7 +595,7 @@ class RobustAPI extends YourAPI {
 ### Pattern 1: Simple Authentication
 
 ```typescript
-import {YourAPI, ClientOptions} from './generated/api';
+import { YourAPI, ClientOptions } from './generated/api';
 
 class SimpleAuthAPI extends YourAPI {
   private token: string | null = null;
@@ -610,8 +610,8 @@ class SimpleAuthAPI extends YourAPI {
       ...options,
       headers: {
         ...((options.headers as Record<string, string>) || {}),
-        ...(this.token ? {Authorization: `Bearer ${this.token}`} : {}),
-      },
+        ...(this.token ? { Authorization: `Bearer ${this.token}` } : {})
+      }
     };
   }
 }
@@ -620,7 +620,7 @@ class SimpleAuthAPI extends YourAPI {
 ### Pattern 2: Multiple Headers
 
 ```typescript
-import {YourAPI, ClientOptions} from './generated/api';
+import { YourAPI, ClientOptions } from './generated/api';
 
 class MultiHeaderAPI extends YourAPI {
   constructor(options: ClientOptions = {}) {
@@ -635,8 +635,8 @@ class MultiHeaderAPI extends YourAPI {
         ...((options.headers as Record<string, string>) || {}),
         'User-Agent': 'MyApp/1.0.0',
         'X-API-Version': 'v2',
-        'X-Request-ID': this.generateId(),
-      },
+        'X-Request-ID': this.generateId()
+      }
     };
   }
 }
@@ -645,7 +645,7 @@ class MultiHeaderAPI extends YourAPI {
 ### Pattern 3: Conditional Options
 
 ```typescript
-import {YourAPI, ClientOptions} from './generated/api';
+import { YourAPI, ClientOptions } from './generated/api';
 
 class ConditionalAPI extends YourAPI {
   constructor(options: ClientOptions = {}) {
@@ -654,7 +654,7 @@ class ConditionalAPI extends YourAPI {
 
   protected getBaseRequestOptions() {
     const options = super.getBaseRequestOptions();
-    const config: Partial<Omit<RequestInit, 'method' | 'body'>> = {...options};
+    const config: Partial<Omit<RequestInit, 'method' | 'body'>> = { ...options };
 
     if (this.needsCors) {
       config.mode = 'cors';
@@ -691,7 +691,7 @@ headers: {
 return {
   ...options,
   mode: 'cors',
-  credentials: 'include', // If needed
+  credentials: 'include' // If needed
 };
 ```
 
@@ -702,7 +702,7 @@ return {
 **Solution**: Store token as instance property:
 
 ```typescript
-import {YourAPI, ClientOptions} from './generated/api';
+import { YourAPI, ClientOptions } from './generated/api';
 
 class MyAPI extends YourAPI {
   private token: string | null = null; // ✅ Instance property
@@ -757,6 +757,76 @@ protected async handleResponse<T>(
   },
 ): Promise<Response>
 ```
+
+### Handling 4xx/5xx in handleResponse
+
+Because `handleResponse` runs **before** the `!response.ok` check in the generated client, you can override it to catch 4xx/5xx responses and throw custom errors with status, statusText, and optionally the response body. This lets you use `catch (e) { if (e instanceof HttpError && e.status === 404) ... }` for type-safe error handling.
+
+**Example override with optional HttpError class:**
+
+```typescript
+import { SwaggerPetstoreOpenAPI30 } from './generated/api';
+
+/** Custom error for HTTP 4xx/5xx with status, statusText, and optional body */
+export class HttpError extends Error {
+  readonly status: number;
+  readonly statusText: string;
+  readonly body?: unknown;
+
+  constructor(message: string, status: number, statusText: string, body?: unknown) {
+    super(message);
+    this.name = 'HttpError';
+    this.status = status;
+    this.statusText = statusText;
+    this.body = body;
+    Object.setPrototypeOf(this, HttpError.prototype);
+  }
+}
+
+class PetstoreClientWithCustomErrors extends SwaggerPetstoreOpenAPI30 {
+  protected async handleResponse<T>(
+    response: Response,
+    _method: string,
+    _path: string,
+    _options: { params?: Record<string, string | number | boolean>; data?: unknown; contentType?: string; headers?: Record<string, string> }
+  ): Promise<Response> {
+    if (response.ok) {
+      return response;
+    }
+
+    // Optionally read body for error details (with try/catch for non-JSON responses)
+    let body: unknown;
+    try {
+      const contentType = response.headers.get('Content-Type') ?? '';
+      body = contentType.includes('application/json') ? await response.json() : await response.text();
+    } catch {
+      body = undefined;
+    }
+
+    throw new HttpError(`HTTP ${response.status}: ${response.statusText}`, response.status, response.statusText, body);
+  }
+}
+
+// Usage with type-safe error handling
+async function main() {
+  const client = new PetstoreClientWithCustomErrors({});
+  try {
+    const pet = await client.getPetById(99999); // May 404
+    console.log(pet);
+  } catch (e) {
+    if (e instanceof HttpError) {
+      if (e.status === 404) {
+        console.error('Pet not found:', e.body);
+      } else if (e.status >= 500) {
+        console.error('Server error:', e.status, e.body);
+      }
+    }
+    throw e;
+  }
+}
+```
+
+See [examples/petstore/error-handling-usage.ts](./examples/petstore/error-handling-usage.ts) for a complete runnable example.
 
 ### Example: Basic Retry Handler
 

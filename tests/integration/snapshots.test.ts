@@ -1,9 +1,9 @@
-import {existsSync, mkdirSync, readFileSync, rmSync} from 'node:fs';
-import {dirname, join} from 'node:path';
-import {fileURLToPath} from 'node:url';
-import {describe, expect, it} from 'vitest';
-import {Generator} from '../../src/generator';
-import {Reporter} from '../../src/utils/reporter';
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { describe, expect, it } from 'vitest';
+import { Generator } from '../../src/generator';
+import { Reporter } from '../../src/utils/reporter';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const testOutputDir = join(__dirname, '../../test-output-snapshots');
@@ -14,14 +14,15 @@ describe('Generated Code Snapshots', () => {
 
   beforeEach(() => {
     if (existsSync(testOutputDir)) {
-      rmSync(testOutputDir, {recursive: true, force: true});
+      rmSync(testOutputDir, { recursive: true, force: true });
     }
-    mkdirSync(testOutputDir, {recursive: true});
+
+    mkdirSync(testOutputDir, { recursive: true });
   });
 
   afterEach(() => {
     if (existsSync(testOutputDir)) {
-      rmSync(testOutputDir, {recursive: true, force: true});
+      rmSync(testOutputDir, { recursive: true, force: true });
     }
   });
 
@@ -91,13 +92,7 @@ describe('Generated Code Snapshots', () => {
 
   describe('server-variables-example.yaml', () => {
     it('should generate server configuration with variables', async () => {
-      generator = new Generator(
-        'test-app',
-        '1.0.0',
-        reporter,
-        './samples/server-variables-example.yaml',
-        testOutputDir,
-      );
+      generator = new Generator('test-app', '1.0.0', reporter, './samples/server-variables-example.yaml', testOutputDir);
 
       await generator.run();
 

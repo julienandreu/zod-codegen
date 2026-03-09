@@ -1,12 +1,12 @@
-import {existsSync, mkdirSync, writeFileSync} from 'node:fs';
-import {dirname, resolve} from 'node:path';
-import type {FileWriter} from '../interfaces/code-generator';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import type { FileWriter } from '../interfaces/code-generator';
 
 export class SyncFileWriterService implements FileWriter {
   constructor(
     private readonly name: string,
     private readonly version: string,
-    private readonly inputPath: string,
+    private readonly inputPath: string
   ) {}
 
   writeFile(filePath: string, content: string): void {
@@ -18,13 +18,13 @@ export class SyncFileWriterService implements FileWriter {
       '/* eslint-disable */',
       '// @ts-nocheck',
       '',
-      content,
+      content
     ].join('\n');
 
     const dirPath = dirname(filePath);
 
     if (!existsSync(dirPath)) {
-      mkdirSync(dirPath, {recursive: true});
+      mkdirSync(dirPath, { recursive: true });
     }
 
     writeFileSync(filePath, generatedContent);

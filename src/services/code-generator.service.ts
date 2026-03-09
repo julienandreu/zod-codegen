@@ -1,22 +1,17 @@
 import * as ts from 'typescript';
-import {z} from 'zod';
-import type {CodeGenerator, SchemaBuilder} from '../interfaces/code-generator';
-import type {GeneratorOptions} from '../types/generator-options';
-import type {MethodSchemaType, OpenApiSpecType, ReferenceType} from '../types/openapi';
-import {MethodSchema, Reference, SchemaProperties} from '../types/openapi';
-import {
-  type NamingConvention,
-  type OperationDetails,
-  type OperationNameTransformer,
-  transformNamingConvention,
-} from '../utils/naming-convention';
-import {TypeScriptImportBuilderService} from './import-builder.service';
-import {TypeScriptTypeBuilderService} from './type-builder.service';
+import { z } from 'zod';
+import type { CodeGenerator, SchemaBuilder } from '../interfaces/code-generator';
+import type { GeneratorOptions } from '../types/generator-options';
+import type { MethodSchemaType, OpenApiSpecType, ReferenceType } from '../types/openapi';
+import { MethodSchema, Reference, SchemaProperties } from '../types/openapi';
+import { type NamingConvention, type OperationDetails, type OperationNameTransformer, transformNamingConvention } from '../utils/naming-convention';
+import { TypeScriptImportBuilderService } from './import-builder.service';
+import { TypeScriptTypeBuilderService } from './type-builder.service';
 
 export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuilder {
   private readonly typeBuilder = new TypeScriptTypeBuilderService();
   private readonly importBuilder = new TypeScriptImportBuilderService();
-  private readonly printer = ts.createPrinter({newLine: ts.NewLineKind.LineFeed});
+  private readonly printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed });
   private readonly namingConvention: NamingConvention | undefined;
   private readonly operationNameTransformer: OperationNameTransformer | undefined;
 
@@ -31,7 +26,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
   private readonly ZodAST = z.object({
     type: z.enum(['string', 'number', 'boolean', 'object', 'array', 'unknown', 'record']),
-    args: z.array(z.unknown()).optional(),
+    args: z.array(z.unknown()).optional()
   });
 
   private extractSchemaReferences(schema: unknown): string[] {
@@ -115,7 +110,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       ...schemaTypeAliases,
       ...serverConfig,
       this.createComment('Client class'),
-      clientClass,
+      clientClass
     ];
   }
 
@@ -130,7 +125,9 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
     return sortedSchemaNames.reduce<Record<string, ts.VariableStatement>>((schemaRegistered, name) => {
       const schema = openapi.components?.schemas?.[name];
-      if (!schema) return schemaRegistered;
+      if (!schema) {
+        return schemaRegistered;
+      }
 
       // Set context for current schema being built
       this.currentSchemaName = name;
@@ -143,29 +140,21 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       const sanitizedName = this.typeBuilder.sanitizeIdentifier(name);
 
       // Add type annotation: z.ZodType<Name>
-      const typeAnnotation = ts.factory.createTypeReferenceNode(
-        ts.factory.createQualifiedName(ts.factory.createIdentifier('z'), ts.factory.createIdentifier('ZodType')),
-        [ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(sanitizedName), undefined)],
-      );
+      const typeAnnotation = ts.factory.createTypeReferenceNode(ts.factory.createQualifiedName(ts.factory.createIdentifier('z'), ts.factory.createIdentifier('ZodType')), [
+        ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(sanitizedName), undefined)
+      ]);
 
       const variableStatement = ts.factory.createVariableStatement(
         [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
         ts.factory.createVariableDeclarationList(
-          [
-            ts.factory.createVariableDeclaration(
-              ts.factory.createIdentifier(sanitizedName),
-              undefined,
-              typeAnnotation,
-              schemaExpression,
-            ),
-          ],
-          ts.NodeFlags.Const,
-        ),
+          [ts.factory.createVariableDeclaration(ts.factory.createIdentifier(sanitizedName), undefined, typeAnnotation, schemaExpression)],
+          ts.NodeFlags.Const
+        )
       );
 
       return {
         ...schemaRegistered,
-        [name]: variableStatement,
+        [name]: variableStatement
       };
     }, {});
   }
@@ -188,7 +177,9 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
     for (const name of sortedSchemaNames) {
       const schema = openapi.components?.schemas?.[name];
-      if (!schema) continue;
+      if (!schema) {
+        continue;
+      }
 
       const sanitizedName = this.typeBuilder.sanitizeIdentifier(name);
       const safeSchema = SchemaProperties.safeParse(schema);
@@ -200,8 +191,8 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
             [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
             ts.factory.createIdentifier(sanitizedName),
             undefined,
-            ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
-          ),
+            ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
+          )
         );
         continue;
       }
@@ -217,12 +208,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
       // For all other types (enums, arrays, unions, etc.), create a type alias
       statements.push(
-        ts.factory.createTypeAliasDeclaration(
-          [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
-          ts.factory.createIdentifier(sanitizedName),
-          undefined,
-          typeNode,
-        ),
+        ts.factory.createTypeAliasDeclaration([ts.factory.createToken(ts.SyntaxKind.ExportKeyword)], ts.factory.createIdentifier(sanitizedName), undefined, typeNode)
       );
     }
 
@@ -242,7 +228,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
     // Handle $ref
     if (this.isReference(prop)) {
-      const {$ref = ''} = Reference.parse(prop);
+      const { $ref = '' } = Reference.parse(prop);
       const refName = $ref.split('/').pop() ?? 'never';
       const sanitizedRefName = this.typeBuilder.sanitizeIdentifier(refName);
       return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(sanitizedRefName), undefined);
@@ -287,17 +273,14 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
           return ts.factory.createLiteralTypeNode(ts.factory.createStringLiteral(val, true));
         } else if (typeof val === 'number') {
           if (val < 0) {
-            return ts.factory.createLiteralTypeNode(
-              ts.factory.createPrefixUnaryExpression(
-                ts.SyntaxKind.MinusToken,
-                ts.factory.createNumericLiteral(String(Math.abs(val))),
-              ),
-            );
+            return ts.factory.createLiteralTypeNode(ts.factory.createPrefixUnaryExpression(ts.SyntaxKind.MinusToken, ts.factory.createNumericLiteral(String(Math.abs(val)))));
           }
+
           return ts.factory.createLiteralTypeNode(ts.factory.createNumericLiteral(String(val)));
         } else if (typeof val === 'boolean') {
           return ts.factory.createLiteralTypeNode(val ? ts.factory.createTrue() : ts.factory.createFalse());
         }
+
         return ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword);
       });
       return ts.factory.createUnionTypeNode(literalTypes);
@@ -313,9 +296,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       case 'boolean':
         return ts.factory.createKeywordTypeNode(ts.SyntaxKind.BooleanKeyword);
       case 'array': {
-        const itemsType = prop['items']
-          ? this.buildTypeNode(prop['items'])
-          : ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword);
+        const itemsType = prop['items'] ? this.buildTypeNode(prop['items']) : ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword);
         return ts.factory.createArrayTypeNode(itemsType);
       }
       case 'object': {
@@ -329,7 +310,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
         // Empty object or additionalProperties - use Record<string, unknown>
         return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Record'), [
           ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-          ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
+          ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
         ]);
       }
       default:
@@ -349,7 +330,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
         undefined,
         ts.factory.createIdentifier(name),
         isRequired ? undefined : ts.factory.createToken(ts.SyntaxKind.QuestionToken),
-        typeNode,
+        typeNode
       );
     });
 
@@ -371,23 +352,14 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
         undefined,
         ts.factory.createIdentifier(propName),
         isRequired ? undefined : ts.factory.createToken(ts.SyntaxKind.QuestionToken),
-        typeNode,
+        typeNode
       );
     });
 
-    return ts.factory.createInterfaceDeclaration(
-      [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
-      ts.factory.createIdentifier(name),
-      undefined,
-      undefined,
-      members,
-    );
+    return ts.factory.createInterfaceDeclaration([ts.factory.createToken(ts.SyntaxKind.ExportKeyword)], ts.factory.createIdentifier(name), undefined, undefined, members);
   }
 
-  private buildClientClass(
-    openapi: OpenApiSpecType,
-    schemas: Record<string, ts.VariableStatement>,
-  ): ts.ClassDeclaration {
+  private buildClientClass(openapi: OpenApiSpecType, schemas: Record<string, ts.VariableStatement>): ts.ClassDeclaration {
     const clientName = this.generateClientName(openapi.info.title);
     const methods = this.buildClientMethods(openapi, schemas);
 
@@ -402,8 +374,8 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
         this.buildGetBaseRequestOptionsMethod(),
         this.buildHandleResponseMethod(),
         this.buildHttpRequestMethod(),
-        ...methods,
-      ],
+        ...methods
+      ]
     );
   }
 
@@ -421,8 +393,8 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
             ts.factory.createIdentifier('options'),
             undefined,
             ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('ClientOptions'), undefined),
-            undefined,
-          ),
+            undefined
+          )
         ],
         ts.factory.createBlock(
           [
@@ -436,72 +408,51 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
                     undefined,
                     ts.factory.createConditionalExpression(
                       ts.factory.createBinaryExpression(
-                        ts.factory.createPropertyAccessExpression(
-                          ts.factory.createIdentifier('options'),
-                          ts.factory.createIdentifier('baseUrl'),
-                        ),
+                        ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('baseUrl')),
                         ts.factory.createToken(ts.SyntaxKind.ExclamationEqualsEqualsToken),
-                        ts.factory.createNull(),
+                        ts.factory.createNull()
                       ),
                       ts.factory.createToken(ts.SyntaxKind.QuestionToken),
-                      ts.factory.createPropertyAccessExpression(
-                        ts.factory.createIdentifier('options'),
-                        ts.factory.createIdentifier('baseUrl'),
-                      ),
+                      ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('baseUrl')),
                       ts.factory.createToken(ts.SyntaxKind.ColonToken),
                       ts.factory.createCallExpression(ts.factory.createIdentifier('resolveServerUrl'), undefined, [
-                        ts.factory.createPropertyAccessExpression(
-                          ts.factory.createIdentifier('options'),
-                          ts.factory.createIdentifier('serverIndex'),
-                        ),
-                        ts.factory.createPropertyAccessExpression(
-                          ts.factory.createIdentifier('options'),
-                          ts.factory.createIdentifier('serverVariables'),
-                        ),
-                      ]),
-                    ),
-                  ),
+                        ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('serverIndex')),
+                        ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('serverVariables'))
+                      ])
+                    )
+                  )
                 ],
-                ts.NodeFlags.Const,
-              ),
+                ts.NodeFlags.Const
+              )
             ),
             ts.factory.createExpressionStatement(
               ts.factory.createBinaryExpression(
-                ts.factory.createPropertyAccessExpression(
-                  ts.factory.createThis(),
-                  ts.factory.createPrivateIdentifier('#baseUrl'),
-                ),
+                ts.factory.createPropertyAccessExpression(ts.factory.createThis(), ts.factory.createPrivateIdentifier('#baseUrl')),
                 ts.factory.createToken(ts.SyntaxKind.EqualsToken),
-                ts.factory.createIdentifier('resolvedUrl'),
-              ),
-            ),
+                ts.factory.createIdentifier('resolvedUrl')
+              )
+            )
           ],
-          true,
-        ),
+          true
+        )
       );
     } else {
       // Fallback: simple baseUrl parameter
       return ts.factory.createConstructorDeclaration(
         undefined,
-        [
-          this.typeBuilder.createParameter('baseUrl', 'string', ts.factory.createStringLiteral('/', true)),
-          this.typeBuilder.createParameter('_', 'unknown', undefined, true),
-        ],
+        [this.typeBuilder.createParameter('baseUrl', 'string', ts.factory.createStringLiteral('/', true)), this.typeBuilder.createParameter('_', 'unknown', undefined, true)],
         ts.factory.createBlock(
           [
             ts.factory.createExpressionStatement(
               ts.factory.createBinaryExpression(
-                ts.factory.createPropertyAccessExpression(
-                  ts.factory.createThis(),
-                  ts.factory.createPrivateIdentifier('#baseUrl'),
-                ),
+                ts.factory.createPropertyAccessExpression(ts.factory.createThis(), ts.factory.createPrivateIdentifier('#baseUrl')),
                 ts.factory.createToken(ts.SyntaxKind.EqualsToken),
-                ts.factory.createIdentifier('baseUrl'),
-              ),
-            ),
+                ts.factory.createIdentifier('baseUrl')
+              )
+            )
           ],
-          true,
-        ),
+          true
+        )
       );
     }
   }
@@ -519,14 +470,11 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
           ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('RequestInit'), undefined),
           ts.factory.createUnionTypeNode([
             ts.factory.createLiteralTypeNode(ts.factory.createStringLiteral('method', true)),
-            ts.factory.createLiteralTypeNode(ts.factory.createStringLiteral('body', true)),
-          ]),
-        ]),
+            ts.factory.createLiteralTypeNode(ts.factory.createStringLiteral('body', true))
+          ])
+        ])
       ]),
-      ts.factory.createBlock(
-        [ts.factory.createReturnStatement(ts.factory.createObjectLiteralExpression([], false))],
-        true,
-      ),
+      ts.factory.createBlock([ts.factory.createReturnStatement(ts.factory.createObjectLiteralExpression([], false))], true)
     );
   }
 
@@ -541,15 +489,10 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
         this.typeBuilder.createParameter('response', 'Response'),
         this.typeBuilder.createParameter('method', 'string'),
         this.typeBuilder.createParameter('path', 'string'),
-        this.typeBuilder.createParameter(
-          'options',
-          '{params?: Record<string, string | number | boolean>; data?: unknown; contentType?: string; headers?: Record<string, string>}',
-        ),
+        this.typeBuilder.createParameter('options', '{params?: Record<string, string | number | boolean>; data?: unknown; contentType?: string; headers?: Record<string, string>}')
       ],
-      ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [
-        ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Response'), undefined),
-      ]),
-      ts.factory.createBlock([ts.factory.createReturnStatement(ts.factory.createIdentifier('response'))], true),
+      ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Response'), undefined)]),
+      ts.factory.createBlock([ts.factory.createReturnStatement(ts.factory.createIdentifier('response'))], true)
     );
   }
 
@@ -567,12 +510,10 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
           'options',
           '{params?: Record<string, string | number | boolean>; data?: unknown; contentType?: string; headers?: Record<string, string>}',
           ts.factory.createObjectLiteralExpression([], false),
-          false,
-        ),
+          false
+        )
       ],
-      ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [
-        ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('T'), undefined),
-      ]),
+      ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('T'), undefined)]),
       ts.factory.createBlock(
         [
           // Create initial URL object that we will use to build the final URL
@@ -586,15 +527,12 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
                   undefined,
                   ts.factory.createNewExpression(ts.factory.createIdentifier('URL'), undefined, [
                     ts.factory.createIdentifier('path'),
-                    ts.factory.createPropertyAccessExpression(
-                      ts.factory.createThis(),
-                      ts.factory.createPrivateIdentifier('#baseUrl'),
-                    ),
-                  ]),
-                ),
+                    ts.factory.createPropertyAccessExpression(ts.factory.createThis(), ts.factory.createPrivateIdentifier('#baseUrl'))
+                  ])
+                )
               ],
-              ts.NodeFlags.Const,
-            ),
+              ts.NodeFlags.Const
+            )
           ),
           ts.factory.createVariableStatement(
             undefined,
@@ -606,31 +544,20 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
                   undefined,
                   ts.factory.createConditionalExpression(
                     ts.factory.createBinaryExpression(
-                      ts.factory.createPropertyAccessExpression(
-                        ts.factory.createIdentifier('options'),
-                        ts.factory.createIdentifier('params'),
-                      ),
+                      ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('params')),
                       ts.factory.createToken(ts.SyntaxKind.AmpersandAmpersandToken),
                       ts.factory.createBinaryExpression(
                         ts.factory.createPropertyAccessExpression(
                           ts.factory.createCallExpression(
-                            ts.factory.createPropertyAccessExpression(
-                              ts.factory.createIdentifier('Object'),
-                              ts.factory.createIdentifier('keys'),
-                            ),
+                            ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('Object'), ts.factory.createIdentifier('keys')),
                             undefined,
-                            [
-                              ts.factory.createPropertyAccessExpression(
-                                ts.factory.createIdentifier('options'),
-                                ts.factory.createIdentifier('params'),
-                              ),
-                            ],
+                            [ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('params'))]
                           ),
-                          ts.factory.createIdentifier('length'),
+                          ts.factory.createIdentifier('length')
                         ),
                         ts.factory.createToken(ts.SyntaxKind.GreaterThanToken),
-                        ts.factory.createNumericLiteral('0'),
-                      ),
+                        ts.factory.createNumericLiteral('0')
+                      )
                     ),
                     undefined,
                     ts.factory.createCallExpression(
@@ -649,19 +576,11 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
                                     ts.factory.createCallExpression(
                                       ts.factory.createPropertyAccessExpression(
                                         ts.factory.createCallExpression(
-                                          ts.factory.createPropertyAccessExpression(
-                                            ts.factory.createIdentifier('Object'),
-                                            ts.factory.createIdentifier('entries'),
-                                          ),
+                                          ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('Object'), ts.factory.createIdentifier('entries')),
                                           undefined,
-                                          [
-                                            ts.factory.createPropertyAccessExpression(
-                                              ts.factory.createIdentifier('options'),
-                                              ts.factory.createIdentifier('params'),
-                                            ),
-                                          ],
+                                          [ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('params'))]
                                         ),
-                                        ts.factory.createIdentifier('filter'),
+                                        ts.factory.createIdentifier('filter')
                                       ),
                                       undefined,
                                       [
@@ -673,34 +592,24 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
                                               undefined,
                                               undefined,
                                               ts.factory.createArrayBindingPattern([
-                                                ts.factory.createBindingElement(
-                                                  undefined,
-                                                  undefined,
-                                                  ts.factory.createIdentifier(''),
-                                                  undefined,
-                                                ),
-                                                ts.factory.createBindingElement(
-                                                  undefined,
-                                                  undefined,
-                                                  ts.factory.createIdentifier('value'),
-                                                  undefined,
-                                                ),
+                                                ts.factory.createBindingElement(undefined, undefined, ts.factory.createIdentifier(''), undefined),
+                                                ts.factory.createBindingElement(undefined, undefined, ts.factory.createIdentifier('value'), undefined)
                                               ]),
                                               undefined,
-                                              undefined,
-                                            ),
+                                              undefined
+                                            )
                                           ],
                                           undefined,
                                           ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
                                           ts.factory.createBinaryExpression(
                                             ts.factory.createIdentifier('value'),
                                             ts.SyntaxKind.ExclamationEqualsEqualsToken,
-                                            ts.factory.createIdentifier('undefined'),
-                                          ),
-                                        ),
-                                      ],
+                                            ts.factory.createIdentifier('undefined')
+                                          )
+                                        )
+                                      ]
                                     ),
-                                    ts.factory.createIdentifier('forEach'),
+                                    ts.factory.createIdentifier('forEach')
                                   ),
                                   undefined,
                                   [
@@ -712,22 +621,12 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
                                           undefined,
                                           undefined,
                                           ts.factory.createArrayBindingPattern([
-                                            ts.factory.createBindingElement(
-                                              undefined,
-                                              undefined,
-                                              ts.factory.createIdentifier('key'),
-                                              undefined,
-                                            ),
-                                            ts.factory.createBindingElement(
-                                              undefined,
-                                              undefined,
-                                              ts.factory.createIdentifier('value'),
-                                              undefined,
-                                            ),
+                                            ts.factory.createBindingElement(undefined, undefined, ts.factory.createIdentifier('key'), undefined),
+                                            ts.factory.createBindingElement(undefined, undefined, ts.factory.createIdentifier('value'), undefined)
                                           ]),
                                           undefined,
-                                          undefined,
-                                        ),
+                                          undefined
+                                        )
                                       ],
                                       undefined,
                                       ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
@@ -736,62 +635,49 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
                                           ts.factory.createExpressionStatement(
                                             ts.factory.createCallExpression(
                                               ts.factory.createPropertyAccessExpression(
-                                                ts.factory.createPropertyAccessExpression(
-                                                  ts.factory.createIdentifier('baseUrl'),
-                                                  ts.factory.createIdentifier('searchParams'),
-                                                ),
-                                                ts.factory.createIdentifier('set'),
+                                                ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('baseUrl'), ts.factory.createIdentifier('searchParams')),
+                                                ts.factory.createIdentifier('set')
                                               ),
                                               undefined,
                                               [
                                                 ts.factory.createIdentifier('key'),
-                                                ts.factory.createCallExpression(
-                                                  ts.factory.createIdentifier('String'),
-                                                  undefined,
-                                                  [ts.factory.createIdentifier('value')],
-                                                ),
-                                              ],
-                                            ),
-                                          ),
+                                                ts.factory.createCallExpression(ts.factory.createIdentifier('String'), undefined, [ts.factory.createIdentifier('value')])
+                                              ]
+                                            )
+                                          )
                                         ],
-                                        false,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                        false
+                                      )
+                                    )
+                                  ]
+                                )
                               ),
                               ts.factory.createReturnStatement(
                                 ts.factory.createCallExpression(
-                                  ts.factory.createPropertyAccessExpression(
-                                    ts.factory.createIdentifier('baseUrl'),
-                                    ts.factory.createIdentifier('toString'),
-                                  ),
+                                  ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('baseUrl'), ts.factory.createIdentifier('toString')),
                                   undefined,
-                                  [],
-                                ),
-                              ),
+                                  []
+                                )
+                              )
                             ],
-                            true,
-                          ),
-                        ),
+                            true
+                          )
+                        )
                       ),
                       undefined,
-                      [],
+                      []
                     ),
                     undefined,
                     ts.factory.createCallExpression(
-                      ts.factory.createPropertyAccessExpression(
-                        ts.factory.createIdentifier('baseUrl'),
-                        ts.factory.createIdentifier('toString'),
-                      ),
+                      ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('baseUrl'), ts.factory.createIdentifier('toString')),
                       undefined,
-                      [],
-                    ),
-                  ),
-                ),
+                      []
+                    )
+                  )
+                )
               ],
-              ts.NodeFlags.Const,
-            ),
+              ts.NodeFlags.Const
+            )
           ),
           // Get base request options (headers, signal, credentials, etc.)
           ts.factory.createVariableStatement(
@@ -803,17 +689,14 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
                   undefined,
                   undefined,
                   ts.factory.createCallExpression(
-                    ts.factory.createPropertyAccessExpression(
-                      ts.factory.createThis(),
-                      ts.factory.createIdentifier('getBaseRequestOptions'),
-                    ),
+                    ts.factory.createPropertyAccessExpression(ts.factory.createThis(), ts.factory.createIdentifier('getBaseRequestOptions')),
                     undefined,
-                    [],
-                  ),
-                ),
+                    []
+                  )
+                )
               ],
-              ts.NodeFlags.Const,
-            ),
+              ts.NodeFlags.Const
+            )
           ),
           // Build Content-Type header
           ts.factory.createVariableStatement(
@@ -826,22 +709,19 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
                   undefined,
                   ts.factory.createConditionalExpression(
                     ts.factory.createBinaryExpression(
-                      ts.factory.createPropertyAccessExpression(
-                        ts.factory.createIdentifier('options'),
-                        ts.factory.createIdentifier('contentType'),
-                      ),
+                      ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('contentType')),
                       ts.factory.createToken(ts.SyntaxKind.EqualsEqualsEqualsToken),
-                      ts.factory.createStringLiteral('application/x-www-form-urlencoded', true),
+                      ts.factory.createStringLiteral('application/x-www-form-urlencoded', true)
                     ),
                     undefined,
                     ts.factory.createStringLiteral('application/x-www-form-urlencoded', true),
                     undefined,
-                    ts.factory.createStringLiteral('application/json', true),
-                  ),
-                ),
+                    ts.factory.createStringLiteral('application/json', true)
+                  )
+                )
               ],
-              ts.NodeFlags.Const,
-            ),
+              ts.NodeFlags.Const
+            )
           ),
           // Merge headers: base headers, Content-Type, and request-specific headers
           ts.factory.createVariableStatement(
@@ -854,25 +734,19 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
                   undefined,
                   ts.factory.createConditionalExpression(
                     ts.factory.createBinaryExpression(
-                      ts.factory.createPropertyAccessExpression(
-                        ts.factory.createIdentifier('baseOptions'),
-                        ts.factory.createIdentifier('headers'),
-                      ),
+                      ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('baseOptions'), ts.factory.createIdentifier('headers')),
                       ts.factory.createToken(ts.SyntaxKind.ExclamationEqualsEqualsToken),
-                      ts.factory.createIdentifier('undefined'),
+                      ts.factory.createIdentifier('undefined')
                     ),
                     undefined,
-                    ts.factory.createPropertyAccessExpression(
-                      ts.factory.createIdentifier('baseOptions'),
-                      ts.factory.createIdentifier('headers'),
-                    ),
+                    ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('baseOptions'), ts.factory.createIdentifier('headers')),
                     undefined,
-                    ts.factory.createObjectLiteralExpression([], false),
-                  ),
-                ),
+                    ts.factory.createObjectLiteralExpression([], false)
+                  )
+                )
               ],
-              ts.NodeFlags.Const,
-            ),
+              ts.NodeFlags.Const
+            )
           ),
           ts.factory.createVariableStatement(
             undefined,
@@ -883,46 +757,32 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
                   undefined,
                   undefined,
                   ts.factory.createCallExpression(
-                    ts.factory.createPropertyAccessExpression(
-                      ts.factory.createIdentifier('Object'),
-                      ts.factory.createIdentifier('assign'),
-                    ),
+                    ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('Object'), ts.factory.createIdentifier('assign')),
                     undefined,
                     [
                       ts.factory.createObjectLiteralExpression([], false),
                       ts.factory.createIdentifier('baseHeaders'),
                       ts.factory.createObjectLiteralExpression(
-                        [
-                          ts.factory.createPropertyAssignment(
-                            ts.factory.createStringLiteral('Content-Type', true),
-                            ts.factory.createIdentifier('contentType'),
-                          ),
-                        ],
-                        false,
+                        [ts.factory.createPropertyAssignment(ts.factory.createStringLiteral('Content-Type', true), ts.factory.createIdentifier('contentType'))],
+                        false
                       ),
                       ts.factory.createConditionalExpression(
                         ts.factory.createBinaryExpression(
-                          ts.factory.createPropertyAccessExpression(
-                            ts.factory.createIdentifier('options'),
-                            ts.factory.createIdentifier('headers'),
-                          ),
+                          ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('headers')),
                           ts.factory.createToken(ts.SyntaxKind.ExclamationEqualsEqualsToken),
-                          ts.factory.createIdentifier('undefined'),
+                          ts.factory.createIdentifier('undefined')
                         ),
                         undefined,
-                        ts.factory.createPropertyAccessExpression(
-                          ts.factory.createIdentifier('options'),
-                          ts.factory.createIdentifier('headers'),
-                        ),
+                        ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('headers')),
                         undefined,
-                        ts.factory.createObjectLiteralExpression([], false),
-                      ),
-                    ],
-                  ),
-                ),
+                        ts.factory.createObjectLiteralExpression([], false)
+                      )
+                    ]
+                  )
+                )
               ],
-              ts.NodeFlags.Const,
-            ),
+              ts.NodeFlags.Const
+            )
           ),
           // Build body with form-urlencoded support
           ts.factory.createVariableStatement(
@@ -935,22 +795,16 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
                   undefined,
                   ts.factory.createConditionalExpression(
                     ts.factory.createBinaryExpression(
-                      ts.factory.createPropertyAccessExpression(
-                        ts.factory.createIdentifier('options'),
-                        ts.factory.createIdentifier('data'),
-                      ),
+                      ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('data')),
                       ts.factory.createToken(ts.SyntaxKind.ExclamationEqualsEqualsToken),
-                      ts.factory.createIdentifier('undefined'),
+                      ts.factory.createIdentifier('undefined')
                     ),
                     undefined,
                     ts.factory.createConditionalExpression(
                       ts.factory.createBinaryExpression(
-                        ts.factory.createPropertyAccessExpression(
-                          ts.factory.createIdentifier('options'),
-                          ts.factory.createIdentifier('contentType'),
-                        ),
+                        ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('contentType')),
                         ts.factory.createToken(ts.SyntaxKind.EqualsEqualsEqualsToken),
-                        ts.factory.createStringLiteral('application/x-www-form-urlencoded', true),
+                        ts.factory.createStringLiteral('application/x-www-form-urlencoded', true)
                       ),
                       undefined,
                       // Form-urlencoded: convert object to URLSearchParams
@@ -972,33 +826,21 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
                                         ts.factory.createIdentifier('params'),
                                         undefined,
                                         undefined,
-                                        ts.factory.createNewExpression(
-                                          ts.factory.createIdentifier('URLSearchParams'),
-                                          undefined,
-                                          [],
-                                        ),
-                                      ),
+                                        ts.factory.createNewExpression(ts.factory.createIdentifier('URLSearchParams'), undefined, [])
+                                      )
                                     ],
-                                    ts.NodeFlags.Const,
-                                  ),
+                                    ts.NodeFlags.Const
+                                  )
                                 ),
                                 ts.factory.createExpressionStatement(
                                   ts.factory.createCallExpression(
                                     ts.factory.createPropertyAccessExpression(
                                       ts.factory.createCallExpression(
-                                        ts.factory.createPropertyAccessExpression(
-                                          ts.factory.createIdentifier('Object'),
-                                          ts.factory.createIdentifier('entries'),
-                                        ),
+                                        ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('Object'), ts.factory.createIdentifier('entries')),
                                         undefined,
-                                        [
-                                          ts.factory.createPropertyAccessExpression(
-                                            ts.factory.createIdentifier('options'),
-                                            ts.factory.createIdentifier('data'),
-                                          ),
-                                        ],
+                                        [ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('data'))]
                                       ),
-                                      ts.factory.createIdentifier('forEach'),
+                                      ts.factory.createIdentifier('forEach')
                                     ),
                                     undefined,
                                     [
@@ -1010,22 +852,12 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
                                             undefined,
                                             undefined,
                                             ts.factory.createArrayBindingPattern([
-                                              ts.factory.createBindingElement(
-                                                undefined,
-                                                undefined,
-                                                ts.factory.createIdentifier('key'),
-                                                undefined,
-                                              ),
-                                              ts.factory.createBindingElement(
-                                                undefined,
-                                                undefined,
-                                                ts.factory.createIdentifier('value'),
-                                                undefined,
-                                              ),
+                                              ts.factory.createBindingElement(undefined, undefined, ts.factory.createIdentifier('key'), undefined),
+                                              ts.factory.createBindingElement(undefined, undefined, ts.factory.createIdentifier('value'), undefined)
                                             ]),
                                             undefined,
-                                            undefined,
-                                          ),
+                                            undefined
+                                          )
                                         ],
                                         undefined,
                                         ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
@@ -1033,69 +865,51 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
                                           [
                                             ts.factory.createExpressionStatement(
                                               ts.factory.createCallExpression(
-                                                ts.factory.createPropertyAccessExpression(
-                                                  ts.factory.createIdentifier('params'),
-                                                  ts.factory.createIdentifier('set'),
-                                                ),
+                                                ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('params'), ts.factory.createIdentifier('set')),
                                                 undefined,
                                                 [
                                                   ts.factory.createIdentifier('key'),
-                                                  ts.factory.createCallExpression(
-                                                    ts.factory.createIdentifier('String'),
-                                                    undefined,
-                                                    [ts.factory.createIdentifier('value')],
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
+                                                  ts.factory.createCallExpression(ts.factory.createIdentifier('String'), undefined, [ts.factory.createIdentifier('value')])
+                                                ]
+                                              )
+                                            )
                                           ],
-                                          false,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                          false
+                                        )
+                                      )
+                                    ]
+                                  )
                                 ),
                                 ts.factory.createReturnStatement(
                                   ts.factory.createCallExpression(
-                                    ts.factory.createPropertyAccessExpression(
-                                      ts.factory.createIdentifier('params'),
-                                      ts.factory.createIdentifier('toString'),
-                                    ),
+                                    ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('params'), ts.factory.createIdentifier('toString')),
                                     undefined,
-                                    [],
-                                  ),
-                                ),
+                                    []
+                                  )
+                                )
                               ],
-                              false,
-                            ),
-                          ),
+                              false
+                            )
+                          )
                         ),
                         undefined,
-                        [],
+                        []
                       ),
                       undefined,
                       // JSON: stringify the data
                       ts.factory.createCallExpression(
-                        ts.factory.createPropertyAccessExpression(
-                          ts.factory.createIdentifier('JSON'),
-                          ts.factory.createIdentifier('stringify'),
-                        ),
+                        ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('JSON'), ts.factory.createIdentifier('stringify')),
                         undefined,
-                        [
-                          ts.factory.createPropertyAccessExpression(
-                            ts.factory.createIdentifier('options'),
-                            ts.factory.createIdentifier('data'),
-                          ),
-                        ],
-                      ),
+                        [ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('data'))]
+                      )
                     ),
                     undefined,
-                    ts.factory.createNull(),
-                  ),
-                ),
+                    ts.factory.createNull()
+                  )
+                )
               ],
-              ts.NodeFlags.Const,
-            ),
+              ts.NodeFlags.Const
+            )
           ),
           // Make fetch request: merge base options with method, headers, and body
           ts.factory.createVariableStatement(
@@ -1110,39 +924,27 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
                     ts.factory.createCallExpression(ts.factory.createIdentifier('fetch'), undefined, [
                       ts.factory.createIdentifier('url'),
                       ts.factory.createCallExpression(
-                        ts.factory.createPropertyAccessExpression(
-                          ts.factory.createIdentifier('Object'),
-                          ts.factory.createIdentifier('assign'),
-                        ),
+                        ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('Object'), ts.factory.createIdentifier('assign')),
                         undefined,
                         [
                           ts.factory.createObjectLiteralExpression([], false),
                           ts.factory.createIdentifier('baseOptions'),
                           ts.factory.createObjectLiteralExpression(
                             [
-                              ts.factory.createShorthandPropertyAssignment(
-                                ts.factory.createIdentifier('method'),
-                                undefined,
-                              ),
-                              ts.factory.createPropertyAssignment(
-                                ts.factory.createIdentifier('headers'),
-                                ts.factory.createIdentifier('headers'),
-                              ),
-                              ts.factory.createPropertyAssignment(
-                                ts.factory.createIdentifier('body'),
-                                ts.factory.createIdentifier('body'),
-                              ),
+                              ts.factory.createShorthandPropertyAssignment(ts.factory.createIdentifier('method'), undefined),
+                              ts.factory.createPropertyAssignment(ts.factory.createIdentifier('headers'), ts.factory.createIdentifier('headers')),
+                              ts.factory.createPropertyAssignment(ts.factory.createIdentifier('body'), ts.factory.createIdentifier('body'))
                             ],
-                            false,
-                          ),
-                        ],
-                      ),
-                    ]),
-                  ),
-                ),
+                            false
+                          )
+                        ]
+                      )
+                    ])
+                  )
+                )
               ],
-              ts.NodeFlags.Const,
-            ),
+              ts.NodeFlags.Const
+            )
           ),
           // Handle response through hook (allows subclasses to intercept and modify response)
           ts.factory.createVariableStatement(
@@ -1155,80 +957,62 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
                   undefined,
                   ts.factory.createAwaitExpression(
                     ts.factory.createCallExpression(
-                      ts.factory.createPropertyAccessExpression(
-                        ts.factory.createThis(),
-                        ts.factory.createIdentifier('handleResponse'),
-                      ),
+                      ts.factory.createPropertyAccessExpression(ts.factory.createThis(), ts.factory.createIdentifier('handleResponse')),
                       [ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('T'), undefined)],
                       [
                         ts.factory.createIdentifier('rawResponse'),
                         ts.factory.createIdentifier('method'),
                         ts.factory.createIdentifier('path'),
-                        ts.factory.createIdentifier('options'),
-                      ],
-                    ),
-                  ),
-                ),
+                        ts.factory.createIdentifier('options')
+                      ]
+                    )
+                  )
+                )
               ],
-              ts.NodeFlags.Const,
-            ),
+              ts.NodeFlags.Const
+            )
           ),
           // Check response status
           ts.factory.createIfStatement(
             ts.factory.createPrefixUnaryExpression(
               ts.SyntaxKind.ExclamationToken,
-              ts.factory.createPropertyAccessExpression(
-                ts.factory.createIdentifier('response'),
-                ts.factory.createIdentifier('ok'),
-              ),
+              ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('response'), ts.factory.createIdentifier('ok'))
             ),
             ts.factory.createThrowStatement(
               ts.factory.createNewExpression(ts.factory.createIdentifier('Error'), undefined, [
                 ts.factory.createTemplateExpression(ts.factory.createTemplateHead('HTTP ', 'HTTP '), [
                   ts.factory.createTemplateSpan(
-                    ts.factory.createPropertyAccessExpression(
-                      ts.factory.createIdentifier('response'),
-                      ts.factory.createIdentifier('status'),
-                    ),
-                    ts.factory.createTemplateMiddle(': ', ': '),
+                    ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('response'), ts.factory.createIdentifier('status')),
+                    ts.factory.createTemplateMiddle(': ', ': ')
                   ),
                   ts.factory.createTemplateSpan(
-                    ts.factory.createPropertyAccessExpression(
-                      ts.factory.createIdentifier('response'),
-                      ts.factory.createIdentifier('statusText'),
-                    ),
-                    ts.factory.createTemplateTail('', ''),
-                  ),
-                ]),
-              ]),
+                    ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('response'), ts.factory.createIdentifier('statusText')),
+                    ts.factory.createTemplateTail('', '')
+                  )
+                ])
+              ])
             ),
-            undefined,
+            undefined
           ),
           // Return parsed JSON
           ts.factory.createReturnStatement(
             ts.factory.createAwaitExpression(
               ts.factory.createCallExpression(
-                ts.factory.createPropertyAccessExpression(
-                  ts.factory.createIdentifier('response'),
-                  ts.factory.createIdentifier('json'),
-                ),
+                ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('response'), ts.factory.createIdentifier('json')),
                 undefined,
-                [],
-              ),
-            ),
-          ),
+                []
+              )
+            )
+          )
         ],
-        true,
-      ),
+        true
+      )
     );
   }
 
-  private buildClientMethods(
-    openapi: OpenApiSpecType,
-    schemas: Record<string, ts.VariableStatement>,
-  ): ts.MethodDeclaration[] {
+  private buildClientMethods(openapi: OpenApiSpecType, schemas: Record<string, ts.VariableStatement>): ts.MethodDeclaration[] {
     // Track operation IDs to detect duplicates
-    const operationIdMap = new Map<string, {method: string; path: string}[]>();
+    const operationIdMap = new Map<string, { method: string; path: string }[]>();
 
     // First pass: collect all operation IDs and their methods/paths
     Object.entries(openapi.paths).forEach(([path, pathItem]) => {
@@ -1240,9 +1024,9 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
             const operationId = safeMethodSchema.operationId;
             const existing = operationIdMap.get(operationId);
             if (existing) {
-              existing.push({method, path});
+              existing.push({ method, path });
             } else {
-              operationIdMap.set(operationId, [{method, path}]);
+              operationIdMap.set(operationId, [{ method, path }]);
             }
           }
         });
@@ -1274,7 +1058,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
             // This will be handled in transformOperationName
             const modifiedSchema = {
               ...safeMethodSchema,
-              operationId: `${operationId}_${methodLower}`,
+              operationId: `${operationId}_${methodLower}`
             };
             return this.buildEndpointMethod(method, path, modifiedSchema, schemas);
           }
@@ -1301,9 +1085,9 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
         operationId,
         method,
         path,
-        ...(schema.tags !== undefined && {tags: schema.tags}),
-        ...(schema.summary !== undefined && {summary: schema.summary}),
-        ...(schema.description !== undefined && {description: schema.description}),
+        ...(schema.tags !== undefined && { tags: schema.tags }),
+        ...(schema.summary !== undefined && { summary: schema.summary }),
+        ...(schema.description !== undefined && { description: schema.description })
       };
       transformed = this.operationNameTransformer(details);
     } else if (this.namingConvention) {
@@ -1328,16 +1112,8 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     return this.typeBuilder.sanitizeIdentifier(transformed);
   }
 
-  private buildEndpointMethod(
-    method: string,
-    path: string,
-    schema: MethodSchemaType,
-    schemas: Record<string, ts.VariableStatement>,
-  ): ts.MethodDeclaration {
-    const {parameters, pathParams, queryParams, hasRequestBody, contentType} = this.buildMethodParameters(
-      schema,
-      schemas,
-    );
+  private buildEndpointMethod(method: string, path: string, schema: MethodSchemaType, schemas: Record<string, ts.VariableStatement>): ts.MethodDeclaration {
+    const { parameters, pathParams, queryParams, hasRequestBody, contentType } = this.buildMethodParameters(schema, schemas);
     const responseType = this.getResponseType(schema, schemas);
     const responseSchema = this.getResponseSchema(schema, schemas);
 
@@ -1352,40 +1128,28 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
         ? ts.factory.createObjectLiteralExpression(
             queryParams.map((param) => {
               const paramName = this.typeBuilder.sanitizeIdentifier(param.name);
-              return ts.factory.createPropertyAssignment(
-                ts.factory.createStringLiteral(param.name, true),
-                ts.factory.createIdentifier(paramName),
-              );
+              return ts.factory.createPropertyAssignment(ts.factory.createStringLiteral(param.name, true), ts.factory.createIdentifier(paramName));
             }),
-            false,
+            false
           )
         : undefined;
 
     // Build request body
-    const requestBodyExpression: ts.Expression | undefined = hasRequestBody
-      ? ts.factory.createIdentifier('body')
-      : undefined;
+    const requestBodyExpression: ts.Expression | undefined = hasRequestBody ? ts.factory.createIdentifier('body') : undefined;
 
     // Build options object for makeRequest
     const optionsProps: ts.ObjectLiteralElementLike[] = [];
     if (queryParamsExpression) {
-      optionsProps.push(
-        ts.factory.createPropertyAssignment(ts.factory.createIdentifier('params'), queryParamsExpression),
-      );
+      optionsProps.push(ts.factory.createPropertyAssignment(ts.factory.createIdentifier('params'), queryParamsExpression));
     }
+
     if (requestBodyExpression) {
-      optionsProps.push(
-        ts.factory.createPropertyAssignment(ts.factory.createIdentifier('data'), requestBodyExpression),
-      );
+      optionsProps.push(ts.factory.createPropertyAssignment(ts.factory.createIdentifier('data'), requestBodyExpression));
     }
+
     // Add content type if it's form-urlencoded
     if (hasRequestBody && contentType === 'application/x-www-form-urlencoded') {
-      optionsProps.push(
-        ts.factory.createPropertyAssignment(
-          ts.factory.createIdentifier('contentType'),
-          ts.factory.createStringLiteral('application/x-www-form-urlencoded', true),
-        ),
-      );
+      optionsProps.push(ts.factory.createPropertyAssignment(ts.factory.createIdentifier('contentType'), ts.factory.createStringLiteral('application/x-www-form-urlencoded', true)));
     }
 
     const optionsExpression = ts.factory.createObjectLiteralExpression(optionsProps, false);
@@ -1394,16 +1158,14 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     const makeRequestCall = ts.factory.createCallExpression(
       ts.factory.createPropertyAccessExpression(ts.factory.createThis(), ts.factory.createIdentifier('makeRequest')),
       undefined,
-      [ts.factory.createStringLiteral(method.toUpperCase(), true), pathExpression, optionsExpression],
+      [ts.factory.createStringLiteral(method.toUpperCase(), true), pathExpression, optionsExpression]
     );
 
     // Add Zod validation if we have a response schema
     if (responseSchema) {
-      const validateCall = ts.factory.createCallExpression(
-        ts.factory.createPropertyAccessExpression(responseSchema, ts.factory.createIdentifier('parse')),
-        undefined,
-        [ts.factory.createAwaitExpression(makeRequestCall)],
-      );
+      const validateCall = ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(responseSchema, ts.factory.createIdentifier('parse')), undefined, [
+        ts.factory.createAwaitExpression(makeRequestCall)
+      ]);
 
       statements.push(ts.factory.createReturnStatement(validateCall));
     } else {
@@ -1420,7 +1182,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       undefined,
       parameters,
       responseType,
-      ts.factory.createBlock(statements, true),
+      ts.factory.createBlock(statements, true)
     );
 
     // Add JSDoc comment if summary or description exists
@@ -1429,22 +1191,17 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     if (jsdocComment) {
       // addSyntheticLeadingComment expects the comment content without delimiters
       // and will wrap it in /** */ for JSDoc-style comments
-      ts.addSyntheticLeadingComment(
-        methodDeclaration,
-        ts.SyntaxKind.MultiLineCommentTrivia,
-        `*\n${jsdocComment}\n `,
-        true,
-      );
+      ts.addSyntheticLeadingComment(methodDeclaration, ts.SyntaxKind.MultiLineCommentTrivia, `*\n${jsdocComment}\n `, true);
     }
 
     return methodDeclaration;
   }
 
-  private buildPathExpression(path: string, pathParams: {name: string; type: string}[]): ts.Expression {
+  private buildPathExpression(path: string, pathParams: { name: string; type: string }[]): ts.Expression {
     // Replace {param} with ${param} for template literal
     const pathParamNames = new Set(pathParams.map((p) => p.name));
     const pathParamRegex = /\{([^}]+)\}/g;
-    const matches: {index: number; length: number; name: string}[] = [];
+    const matches: { index: number; length: number; name: string }[] = [];
 
     // Find all path parameters
     for (const match of path.matchAll(pathParamRegex)) {
@@ -1454,7 +1211,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
         matches.push({
           index: match.index,
           length: match[0].length,
-          name: paramName,
+          name: paramName
         });
       }
     }
@@ -1475,19 +1232,9 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       const after = isLast ? path.substring(m.index + m.length) : '';
 
       if (isLast) {
-        templateSpans.push(
-          ts.factory.createTemplateSpan(
-            ts.factory.createIdentifier(sanitizedName),
-            ts.factory.createTemplateTail(after, after),
-          ),
-        );
+        templateSpans.push(ts.factory.createTemplateSpan(ts.factory.createIdentifier(sanitizedName), ts.factory.createTemplateTail(after, after)));
       } else {
-        templateSpans.push(
-          ts.factory.createTemplateSpan(
-            ts.factory.createIdentifier(sanitizedName),
-            ts.factory.createTemplateMiddle(before, before),
-          ),
-        );
+        templateSpans.push(ts.factory.createTemplateSpan(ts.factory.createIdentifier(sanitizedName), ts.factory.createTemplateMiddle(before, before)));
       }
 
       lastIndex = m.index + m.length;
@@ -1497,23 +1244,24 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     if (!firstMatch) {
       return ts.factory.createStringLiteral(path, true);
     }
+
     const head = path.substring(0, firstMatch.index);
     return ts.factory.createTemplateExpression(ts.factory.createTemplateHead(head, head), templateSpans);
   }
 
   private buildMethodParameters(
     schema: MethodSchemaType,
-    schemas: Record<string, ts.VariableStatement>,
+    schemas: Record<string, ts.VariableStatement>
   ): {
     parameters: ts.ParameterDeclaration[];
-    pathParams: {name: string; type: string}[];
-    queryParams: {name: string; type: string; required: boolean}[];
+    pathParams: { name: string; type: string }[];
+    queryParams: { name: string; type: string; required: boolean }[];
     hasRequestBody: boolean;
     contentType: string;
   } {
     const parameters: ts.ParameterDeclaration[] = [];
-    const pathParams: {name: string; type: string}[] = [];
-    const queryParams: {name: string; type: string; required: boolean}[] = [];
+    const pathParams: { name: string; type: string }[] = [];
+    const queryParams: { name: string; type: string; required: boolean }[] = [];
 
     // Extract path and query parameters
     if (schema.parameters) {
@@ -1522,7 +1270,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
         const paramType = this.getParameterType(param.schema);
 
         if (param.in === 'path') {
-          pathParams.push({name: param.name, type: paramType});
+          pathParams.push({ name: param.name, type: paramType });
           parameters.push(this.typeBuilder.createParameter(paramName, paramType, undefined, false));
         } else if (param.in === 'query') {
           // Improve type inference for query parameters
@@ -1530,24 +1278,26 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
             // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
             typeof param.schema === 'object' && param.schema !== null
               ? (() => {
-                  const paramSchema = param.schema as {type?: string; items?: unknown; enum?: unknown[]};
+                  const paramSchema = param.schema as { type?: string; items?: unknown; enum?: unknown[] };
                   // eslint-disable-next-line @typescript-eslint/dot-notation
                   if (paramSchema['type'] === 'array' && paramSchema['items']) {
                     // eslint-disable-next-line @typescript-eslint/dot-notation
-                    const itemSchema = paramSchema['items'] as {type?: string};
+                    const itemSchema = paramSchema['items'] as { type?: string };
                     // eslint-disable-next-line @typescript-eslint/dot-notation
                     if (itemSchema['type'] === 'string') {
                       return 'string[]' as const;
                     }
+
                     // eslint-disable-next-line @typescript-eslint/dot-notation
                     if (itemSchema['type'] === 'number' || itemSchema['type'] === 'integer') {
                       return 'number[]' as const;
                     }
                   }
+
                   return paramType;
                 })()
               : paramType;
-          queryParams.push({name: param.name, type: queryParamType, required: param.required ?? false});
+          queryParams.push({ name: param.name, type: queryParamType, required: param.required ?? false });
           parameters.push(this.typeBuilder.createParameter(paramName, queryParamType, undefined, !param.required));
         }
       }
@@ -1572,6 +1322,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
                 const refName = ref.split('/').pop() ?? 'unknown';
                 return this.typeBuilder.sanitizeIdentifier(refName);
               }
+
               // Fallback to getSchemaTypeName for non-ref schemas
               return this.getSchemaTypeName(requestBodySchema, schemas);
             })()
@@ -1581,12 +1332,9 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     }
 
     // Determine content type for request body
-    const contentType =
-      hasRequestBody && schema.requestBody?.content?.['application/x-www-form-urlencoded']
-        ? 'application/x-www-form-urlencoded'
-        : 'application/json';
+    const contentType = hasRequestBody && schema.requestBody?.content?.['application/x-www-form-urlencoded'] ? 'application/x-www-form-urlencoded' : 'application/json';
 
-    return {parameters, pathParams, queryParams, hasRequestBody, contentType};
+    return { parameters, pathParams, queryParams, hasRequestBody, contentType };
   }
 
   private getParameterType(schema: unknown): string {
@@ -1636,7 +1384,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       return 'unknown';
     }
 
-    const schemaObj = schema as {$ref?: string; type?: string; items?: unknown};
+    const schemaObj = schema as { $ref?: string; type?: string; items?: unknown };
 
     // Check for $ref using both dot notation and bracket notation
     // eslint-disable-next-line @typescript-eslint/dot-notation
@@ -1666,10 +1414,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     }
   }
 
-  private getResponseSchema(
-    schema: MethodSchemaType,
-    _schemas: Record<string, ts.VariableStatement>,
-  ): ts.Identifier | undefined {
+  private getResponseSchema(schema: MethodSchemaType, _schemas: Record<string, ts.VariableStatement>): ts.Identifier | undefined {
     // Try to find a 200 response first, then 201, then default
     const response200 = schema.responses?.['200'];
     const response201 = schema.responses?.['201'];
@@ -1684,7 +1429,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (responseSchema !== null && typeof responseSchema === 'object' && '$ref' in responseSchema) {
       // eslint-disable-next-line @typescript-eslint/dot-notation
-      const ref = (responseSchema as {$ref: string})['$ref'];
+      const ref = (responseSchema as { $ref: string })['$ref'];
       if (typeof ref === 'string') {
         const refName = ref.split('/').pop() ?? 'unknown';
         return ts.factory.createIdentifier(this.typeBuilder.sanitizeIdentifier(refName));
@@ -1696,10 +1441,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     return undefined;
   }
 
-  private getResponseType(
-    schema: MethodSchemaType,
-    schemas: Record<string, ts.VariableStatement>,
-  ): ts.TypeNode | undefined {
+  private getResponseType(schema: MethodSchemaType, schemas: Record<string, ts.VariableStatement>): ts.TypeNode | undefined {
     // Try to find a 200 response first, then 201, then default
     const response200 = schema.responses?.['200'];
     const response201 = schema.responses?.['201'];
@@ -1707,9 +1449,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
     const response = response200 ?? response201 ?? responseDefault;
     if (!response?.content?.['application/json']?.schema) {
-      return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [
-        ts.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword),
-      ]);
+      return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [ts.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword)]);
     }
 
     const responseSchema = response.content['application/json'].schema;
@@ -1724,15 +1464,12 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       if (schemas[sanitizedItemTypeName]) {
         // Use the type alias directly (it already uses z.infer)
         return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [
-          ts.factory.createArrayTypeNode(
-            ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(sanitizedItemTypeName), undefined),
-          ),
+          ts.factory.createArrayTypeNode(ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(sanitizedItemTypeName), undefined))
         ]);
       }
+
       // If it's a primitive array, use the type name as-is
-      return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [
-        ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(typeName), undefined),
-      ]);
+      return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(typeName), undefined)]);
     }
 
     const sanitizedTypeName = this.typeBuilder.sanitizeIdentifier(typeName);
@@ -1741,14 +1478,12 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     if (schemas[sanitizedTypeName]) {
       // Use the type name directly (we have a type alias that already uses z.infer)
       return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [
-        ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(sanitizedTypeName), undefined),
+        ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(sanitizedTypeName), undefined)
       ]);
     }
 
     // For primitive types and Record types, use the type name directly
-    return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [
-      ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(typeName), undefined),
-    ]);
+    return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(typeName), undefined)]);
   }
 
   private buildServerConfiguration(openapi: OpenApiSpecType): ts.Statement[] {
@@ -1762,21 +1497,15 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
     // Build server configuration array
     const serverConfigElements = servers.map((server) => {
-      const properties: ts.PropertyAssignment[] = [
-        ts.factory.createPropertyAssignment('url', ts.factory.createStringLiteral(server.url, true)),
-      ];
+      const properties: ts.PropertyAssignment[] = [ts.factory.createPropertyAssignment('url', ts.factory.createStringLiteral(server.url, true))];
 
       if (server.description) {
-        properties.push(
-          ts.factory.createPropertyAssignment('description', ts.factory.createStringLiteral(server.description, true)),
-        );
+        properties.push(ts.factory.createPropertyAssignment('description', ts.factory.createStringLiteral(server.description, true)));
       }
 
       if (server.variables && Object.keys(server.variables).length > 0) {
         const variableProperties = Object.entries(server.variables).map(([varName, varDef]) => {
-          const varProps: ts.PropertyAssignment[] = [
-            ts.factory.createPropertyAssignment('default', ts.factory.createStringLiteral(varDef.default, true)),
-          ];
+          const varProps: ts.PropertyAssignment[] = [ts.factory.createPropertyAssignment('default', ts.factory.createStringLiteral(varDef.default, true))];
 
           if (varDef.enum && varDef.enum.length > 0) {
             varProps.push(
@@ -1784,30 +1513,20 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
                 'enum',
                 ts.factory.createArrayLiteralExpression(
                   varDef.enum.map((val) => ts.factory.createStringLiteral(val, true)),
-                  false,
-                ),
-              ),
+                  false
+                )
+              )
             );
           }
 
           if (varDef.description) {
-            varProps.push(
-              ts.factory.createPropertyAssignment(
-                'description',
-                ts.factory.createStringLiteral(varDef.description, true),
-              ),
-            );
+            varProps.push(ts.factory.createPropertyAssignment('description', ts.factory.createStringLiteral(varDef.description, true)));
           }
 
           return ts.factory.createPropertyAssignment(varName, ts.factory.createObjectLiteralExpression(varProps, true));
         });
 
-        properties.push(
-          ts.factory.createPropertyAssignment(
-            'variables',
-            ts.factory.createObjectLiteralExpression(variableProperties, true),
-          ),
-        );
+        properties.push(ts.factory.createPropertyAssignment('variables', ts.factory.createObjectLiteralExpression(variableProperties, true)));
       }
 
       return ts.factory.createObjectLiteralExpression(properties, true);
@@ -1823,12 +1542,12 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
               ts.factory.createIdentifier('serverConfigurations'),
               undefined,
               undefined,
-              ts.factory.createArrayLiteralExpression(serverConfigElements, false),
-            ),
+              ts.factory.createArrayLiteralExpression(serverConfigElements, false)
+            )
           ],
-          ts.NodeFlags.Const,
-        ),
-      ),
+          ts.NodeFlags.Const
+        )
+      )
     );
 
     // Export default base URL (first server with default variables)
@@ -1838,17 +1557,10 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       ts.factory.createVariableStatement(
         [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
         ts.factory.createVariableDeclarationList(
-          [
-            ts.factory.createVariableDeclaration(
-              ts.factory.createIdentifier('defaultBaseUrl'),
-              undefined,
-              undefined,
-              ts.factory.createStringLiteral(defaultBaseUrl, true),
-            ),
-          ],
-          ts.NodeFlags.Const,
-        ),
-      ),
+          [ts.factory.createVariableDeclaration(ts.factory.createIdentifier('defaultBaseUrl'), undefined, undefined, ts.factory.createStringLiteral(defaultBaseUrl, true))],
+          ts.NodeFlags.Const
+        )
+      )
     );
 
     // Build ClientOptions type
@@ -1857,13 +1569,13 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
         undefined,
         ts.factory.createIdentifier('baseUrl'),
         ts.factory.createToken(ts.SyntaxKind.QuestionToken),
-        ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+        ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
       ),
       ts.factory.createPropertySignature(
         undefined,
         ts.factory.createIdentifier('serverIndex'),
         ts.factory.createToken(ts.SyntaxKind.QuestionToken),
-        ts.factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword),
+        ts.factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword)
       ),
       ts.factory.createPropertySignature(
         undefined,
@@ -1871,9 +1583,9 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
         ts.factory.createToken(ts.SyntaxKind.QuestionToken),
         ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Record'), [
           ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-          ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-        ]),
-      ),
+          ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
+        ])
+      )
     ];
 
     statements.push(
@@ -1881,8 +1593,8 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
         [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
         ts.factory.createIdentifier('ClientOptions'),
         undefined,
-        ts.factory.createTypeLiteralNode(optionProperties),
-      ),
+        ts.factory.createTypeLiteralNode(optionProperties)
+      )
     );
 
     // Build resolveServerUrl helper function
@@ -1894,11 +1606,9 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
   private resolveServerUrl(
     server: {
       url: string;
-      variables?:
-        | Record<string, {default: string; enum?: string[] | undefined; description?: string | undefined}>
-        | undefined;
+      variables?: Record<string, { default: string; enum?: string[] | undefined; description?: string | undefined }> | undefined;
     },
-    variables: Record<string, string>,
+    variables: Record<string, string>
   ): string {
     let url = server.url;
 
@@ -1916,22 +1626,16 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     servers: {
       url: string;
       description?: string | undefined;
-      variables?:
-        | Record<string, {default: string; enum?: string[] | undefined; description?: string | undefined}>
-        | undefined;
-    }[],
+      variables?: Record<string, { default: string; enum?: string[] | undefined; description?: string | undefined }> | undefined;
+    }[]
   ): ts.FunctionDeclaration {
     // Build server configs array inline
     const serverConfigElements = servers.map((server) => {
-      const properties: ts.PropertyAssignment[] = [
-        ts.factory.createPropertyAssignment('url', ts.factory.createStringLiteral(server.url, true)),
-      ];
+      const properties: ts.PropertyAssignment[] = [ts.factory.createPropertyAssignment('url', ts.factory.createStringLiteral(server.url, true))];
 
       if (server.variables && Object.keys(server.variables).length > 0) {
         const variableProperties = Object.entries(server.variables).map(([varName, varDef]) => {
-          const varProps: ts.PropertyAssignment[] = [
-            ts.factory.createPropertyAssignment('default', ts.factory.createStringLiteral(varDef.default, true)),
-          ];
+          const varProps: ts.PropertyAssignment[] = [ts.factory.createPropertyAssignment('default', ts.factory.createStringLiteral(varDef.default, true))];
 
           if (varDef.enum && varDef.enum.length > 0) {
             varProps.push(
@@ -1939,21 +1643,16 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
                 'enum',
                 ts.factory.createArrayLiteralExpression(
                   varDef.enum.map((val) => ts.factory.createStringLiteral(val, true)),
-                  false,
-                ),
-              ),
+                  false
+                )
+              )
             );
           }
 
           return ts.factory.createPropertyAssignment(varName, ts.factory.createObjectLiteralExpression(varProps, true));
         });
 
-        properties.push(
-          ts.factory.createPropertyAssignment(
-            'variables',
-            ts.factory.createObjectLiteralExpression(variableProperties, true),
-          ),
-        );
+        properties.push(ts.factory.createPropertyAssignment('variables', ts.factory.createObjectLiteralExpression(variableProperties, true)));
       }
 
       return ts.factory.createObjectLiteralExpression(properties, true);
@@ -1972,16 +1671,9 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       ts.factory.createVariableStatement(
         undefined,
         ts.factory.createVariableDeclarationList(
-          [
-            ts.factory.createVariableDeclaration(
-              configs,
-              undefined,
-              undefined,
-              ts.factory.createArrayLiteralExpression(serverConfigElements, false),
-            ),
-          ],
-          ts.NodeFlags.Const,
-        ),
+          [ts.factory.createVariableDeclaration(configs, undefined, undefined, ts.factory.createArrayLiteralExpression(serverConfigElements, false))],
+          ts.NodeFlags.Const
+        )
       ),
       // const idx = serverIndex ?? 0
       ts.factory.createVariableStatement(
@@ -1995,19 +1687,19 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
               ts.factory.createBinaryExpression(
                 ts.factory.createIdentifier('serverIndex'),
                 ts.factory.createToken(ts.SyntaxKind.QuestionQuestionToken),
-                ts.factory.createNumericLiteral('0'),
-              ),
-            ),
+                ts.factory.createNumericLiteral('0')
+              )
+            )
           ],
-          ts.NodeFlags.Const,
-        ),
+          ts.NodeFlags.Const
+        )
       ),
       // if (idx < configs.length) { ... }
       ts.factory.createIfStatement(
         ts.factory.createBinaryExpression(
           idx,
           ts.factory.createToken(ts.SyntaxKind.LessThanToken),
-          ts.factory.createPropertyAccessExpression(configs, ts.factory.createIdentifier('length')),
+          ts.factory.createPropertyAccessExpression(configs, ts.factory.createIdentifier('length'))
         ),
         ts.factory.createBlock(
           [
@@ -2015,37 +1707,23 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
             ts.factory.createVariableStatement(
               undefined,
               ts.factory.createVariableDeclarationList(
-                [
-                  ts.factory.createVariableDeclaration(
-                    config,
-                    undefined,
-                    undefined,
-                    ts.factory.createElementAccessExpression(configs, idx),
-                  ),
-                ],
-                ts.NodeFlags.Const,
-              ),
+                [ts.factory.createVariableDeclaration(config, undefined, undefined, ts.factory.createElementAccessExpression(configs, idx))],
+                ts.NodeFlags.Const
+              )
             ),
             // let url = config.url
             ts.factory.createVariableStatement(
               undefined,
               ts.factory.createVariableDeclarationList(
-                [
-                  ts.factory.createVariableDeclaration(
-                    url,
-                    undefined,
-                    undefined,
-                    ts.factory.createPropertyAccessExpression(config, ts.factory.createIdentifier('url')),
-                  ),
-                ],
-                ts.NodeFlags.Let,
-              ),
+                [ts.factory.createVariableDeclaration(url, undefined, undefined, ts.factory.createPropertyAccessExpression(config, ts.factory.createIdentifier('url')))],
+                ts.NodeFlags.Let
+              )
             ),
             // if (config.variables && serverVariables) { ... }
             ts.factory.createIfStatement(
               ts.factory.createLogicalAnd(
                 ts.factory.createPropertyAccessExpression(config, ts.factory.createIdentifier('variables')),
-                ts.factory.createIdentifier('serverVariables'),
+                ts.factory.createIdentifier('serverVariables')
               ),
               ts.factory.createBlock(
                 [
@@ -2057,21 +1735,18 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
                         ts.factory.createVariableDeclaration(
                           ts.factory.createArrayBindingPattern([
                             ts.factory.createBindingElement(undefined, undefined, key),
-                            ts.factory.createBindingElement(undefined, undefined, value),
+                            ts.factory.createBindingElement(undefined, undefined, value)
                           ]),
                           undefined,
-                          undefined,
-                        ),
+                          undefined
+                        )
                       ],
-                      ts.NodeFlags.Const,
+                      ts.NodeFlags.Const
                     ),
                     ts.factory.createCallExpression(
-                      ts.factory.createPropertyAccessExpression(
-                        ts.factory.createIdentifier('Object'),
-                        ts.factory.createIdentifier('entries'),
-                      ),
+                      ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('Object'), ts.factory.createIdentifier('entries')),
                       undefined,
-                      [ts.factory.createIdentifier('serverVariables')],
+                      [ts.factory.createIdentifier('serverVariables')]
                     ),
                     ts.factory.createBlock(
                       [
@@ -2079,45 +1754,35 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
                           ts.factory.createBinaryExpression(
                             url,
                             ts.factory.createToken(ts.SyntaxKind.EqualsToken),
-                            ts.factory.createCallExpression(
-                              ts.factory.createPropertyAccessExpression(url, ts.factory.createIdentifier('replace')),
-                              undefined,
-                              [
-                                ts.factory.createNewExpression(ts.factory.createIdentifier('RegExp'), undefined, [
-                                  ts.factory.createBinaryExpression(
-                                    ts.factory.createBinaryExpression(
-                                      ts.factory.createStringLiteral('\\{'),
-                                      ts.factory.createToken(ts.SyntaxKind.PlusToken),
-                                      key,
-                                    ),
-                                    ts.factory.createToken(ts.SyntaxKind.PlusToken),
-                                    ts.factory.createStringLiteral('\\}'),
-                                  ),
-                                  ts.factory.createStringLiteral('g'),
-                                ]),
-                                value,
-                              ],
-                            ),
-                          ),
-                        ),
+                            ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(url, ts.factory.createIdentifier('replace')), undefined, [
+                              ts.factory.createNewExpression(ts.factory.createIdentifier('RegExp'), undefined, [
+                                ts.factory.createBinaryExpression(
+                                  ts.factory.createBinaryExpression(ts.factory.createStringLiteral('\\{'), ts.factory.createToken(ts.SyntaxKind.PlusToken), key),
+                                  ts.factory.createToken(ts.SyntaxKind.PlusToken),
+                                  ts.factory.createStringLiteral('\\}')
+                                ),
+                                ts.factory.createStringLiteral('g')
+                              ]),
+                              value
+                            ])
+                          )
+                        )
                       ],
-                      true,
-                    ),
-                  ),
+                      true
+                    )
+                  )
                 ],
-                true,
-              ),
+                true
+              )
             ),
             // return url
-            ts.factory.createReturnStatement(url),
+            ts.factory.createReturnStatement(url)
           ],
-          true,
-        ),
+          true
+        )
       ),
       // return default (first server with defaults)
-      ts.factory.createReturnStatement(
-        ts.factory.createStringLiteral(servers[0] ? this.resolveServerUrl(servers[0], {}) : '/', true),
-      ),
+      ts.factory.createReturnStatement(ts.factory.createStringLiteral(servers[0] ? this.resolveServerUrl(servers[0], {}) : '/', true))
     ];
 
     return ts.factory.createFunctionDeclaration(
@@ -2131,11 +1796,8 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
           undefined,
           ts.factory.createIdentifier('serverIndex'),
           ts.factory.createToken(ts.SyntaxKind.QuestionToken),
-          ts.factory.createUnionTypeNode([
-            ts.factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword),
-            ts.factory.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword),
-          ]),
-          undefined,
+          ts.factory.createUnionTypeNode([ts.factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword), ts.factory.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword)]),
+          undefined
         ),
         ts.factory.createParameterDeclaration(
           undefined,
@@ -2144,13 +1806,13 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
           ts.factory.createToken(ts.SyntaxKind.QuestionToken),
           ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Record'), [
             ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-            ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+            ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
           ]),
-          ts.factory.createObjectLiteralExpression([], false),
-        ),
+          ts.factory.createObjectLiteralExpression([], false)
+        )
       ],
       ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-      ts.factory.createBlock(bodyStatements, true),
+      ts.factory.createBlock(bodyStatements, true)
     );
   }
 
@@ -2170,12 +1832,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
   /**
    * Builds a JSDoc comment string from operation metadata
    */
-  private buildJSDocComment(
-    summary: string | undefined,
-    description: string | undefined,
-    schema: MethodSchemaType,
-    responseType: ts.TypeNode | undefined,
-  ): string {
+  private buildJSDocComment(summary: string | undefined, description: string | undefined, schema: MethodSchemaType, responseType: ts.TypeNode | undefined): string {
     const lines: string[] = [];
 
     // Add summary or description as the main comment
@@ -2196,6 +1853,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
         if (lines.length > 0) {
           lines.push(' *');
         }
+
         descLines.forEach((line) => {
           lines.push(` * ${line.trim() || ''}`);
         });
@@ -2207,6 +1865,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       if (lines.length > 0) {
         lines.push(' *');
       }
+
       for (const param of schema.parameters) {
         const paramName = this.typeBuilder.sanitizeIdentifier(param.name);
         const paramDesc = param.description ? ` ${param.description}` : '';
@@ -2234,18 +1893,11 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       ) {
         // Extract the inner type from Promise<T>
         const innerType = responseType.typeArguments[0];
-        returnTypeText = this.printer.printNode(
-          ts.EmitHint.Unspecified,
-          innerType,
-          ts.createSourceFile('', '', ts.ScriptTarget.Latest),
-        );
+        returnTypeText = this.printer.printNode(ts.EmitHint.Unspecified, innerType, ts.createSourceFile('', '', ts.ScriptTarget.Latest));
       } else {
-        returnTypeText = this.printer.printNode(
-          ts.EmitHint.Unspecified,
-          responseType,
-          ts.createSourceFile('', '', ts.ScriptTarget.Latest),
-        );
+        returnTypeText = this.printer.printNode(ts.EmitHint.Unspecified, responseType, ts.createSourceFile('', '', ts.ScriptTarget.Latest));
       }
+
       lines.push(` * @returns {${returnTypeText}}`);
     }
 
@@ -2264,37 +1916,28 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
     const initialExpression = !safeInitial.success
       ? ts.factory.createCallExpression(
-          ts.factory.createPropertyAccessExpression(
-            ts.factory.createIdentifier('z'),
-            ts.factory.createIdentifier(this.ZodAST.shape.type.parse(initial)),
-          ),
+          ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('z'), ts.factory.createIdentifier(this.ZodAST.shape.type.parse(initial))),
           undefined,
-          [],
+          []
         )
       : ts.factory.createCallExpression(
-          ts.factory.createPropertyAccessExpression(
-            ts.factory.createIdentifier('z'),
-            ts.factory.createIdentifier(safeInitial.data.type),
-          ),
+          ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('z'), ts.factory.createIdentifier(safeInitial.data.type)),
           undefined,
-          (safeInitial.data.args ?? []) as ts.Expression[],
+          (safeInitial.data.args ?? []) as ts.Expression[]
         );
 
     return rest.reduce((expression, exp: unknown) => {
       const safeExp = this.ZodAST.safeParse(exp);
       return !safeExp.success
         ? ts.factory.createCallExpression(
-            ts.factory.createPropertyAccessExpression(
-              expression,
-              ts.factory.createIdentifier(typeof exp === 'string' ? exp : String(exp)),
-            ),
+            ts.factory.createPropertyAccessExpression(expression, ts.factory.createIdentifier(typeof exp === 'string' ? exp : String(exp))),
             undefined,
-            [],
+            []
           )
         : ts.factory.createCallExpression(
             ts.factory.createPropertyAccessExpression(expression, ts.factory.createIdentifier(safeExp.data.type)),
             undefined,
-            (safeExp.data.args ?? []) as ts.Expression[],
+            (safeExp.data.args ?? []) as ts.Expression[]
           );
     }, initialExpression);
   }
@@ -2310,13 +1953,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
     if (this.isReference(prop)) {
       const refSchema = this.buildFromReference(prop);
-      return required
-        ? refSchema
-        : ts.factory.createCallExpression(
-            ts.factory.createPropertyAccessExpression(refSchema, ts.factory.createIdentifier('optional')),
-            undefined,
-            [],
-          );
+      return required ? refSchema : ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(refSchema, ts.factory.createIdentifier('optional')), undefined, []);
     }
 
     if (prop['anyOf'] && Array.isArray(prop['anyOf']) && prop['anyOf'].length > 0) {
@@ -2344,21 +1981,14 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
         // Use z.enum() for string enums
         const enumValues = prop['enum'].map((val) => ts.factory.createStringLiteral(val as string, true));
         const enumExpression = ts.factory.createCallExpression(
-          ts.factory.createPropertyAccessExpression(
-            ts.factory.createIdentifier('z'),
-            ts.factory.createIdentifier('enum'),
-          ),
+          ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('z'), ts.factory.createIdentifier('enum')),
           undefined,
-          [ts.factory.createArrayLiteralExpression(enumValues, false)],
+          [ts.factory.createArrayLiteralExpression(enumValues, false)]
         );
 
         return required
           ? enumExpression
-          : ts.factory.createCallExpression(
-              ts.factory.createPropertyAccessExpression(enumExpression, ts.factory.createIdentifier('optional')),
-              undefined,
-              [],
-            );
+          : ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(enumExpression, ts.factory.createIdentifier('optional')), undefined, []);
       } else {
         // Use z.union([z.literal(...), ...]) for numeric/boolean/mixed enums
         const literalSchemas = prop['enum'].map((val) => {
@@ -2368,10 +1998,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
           } else if (typeof val === 'number') {
             // Handle negative numbers correctly
             if (val < 0) {
-              literalValue = ts.factory.createPrefixUnaryExpression(
-                ts.SyntaxKind.MinusToken,
-                ts.factory.createNumericLiteral(String(Math.abs(val))),
-              );
+              literalValue = ts.factory.createPrefixUnaryExpression(ts.SyntaxKind.MinusToken, ts.factory.createNumericLiteral(String(Math.abs(val))));
             } else {
               literalValue = ts.factory.createNumericLiteral(String(val));
             }
@@ -2381,32 +2008,20 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
             literalValue = ts.factory.createStringLiteral(String(val), true);
           }
 
-          return ts.factory.createCallExpression(
-            ts.factory.createPropertyAccessExpression(
-              ts.factory.createIdentifier('z'),
-              ts.factory.createIdentifier('literal'),
-            ),
-            undefined,
-            [literalValue],
-          );
+          return ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('z'), ts.factory.createIdentifier('literal')), undefined, [
+            literalValue
+          ]);
         });
 
         const unionExpression = ts.factory.createCallExpression(
-          ts.factory.createPropertyAccessExpression(
-            ts.factory.createIdentifier('z'),
-            ts.factory.createIdentifier('union'),
-          ),
+          ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('z'), ts.factory.createIdentifier('union')),
           undefined,
-          [ts.factory.createArrayLiteralExpression(literalSchemas, false)],
+          [ts.factory.createArrayLiteralExpression(literalSchemas, false)]
         );
 
         return required
           ? unionExpression
-          : ts.factory.createCallExpression(
-              ts.factory.createPropertyAccessExpression(unionExpression, ts.factory.createIdentifier('optional')),
-              undefined,
-              [],
-            );
+          : ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(unionExpression, ts.factory.createIdentifier('optional')), undefined, []);
       }
     }
 
@@ -2416,33 +2031,26 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
         let arraySchema = this.buildZodAST([
           {
             type: 'array',
-            args: [itemsSchema],
-          },
+            args: [itemsSchema]
+          }
         ]);
 
         // Apply array constraints
         if (typeof prop['minItems'] === 'number') {
-          arraySchema = ts.factory.createCallExpression(
-            ts.factory.createPropertyAccessExpression(arraySchema, ts.factory.createIdentifier('min')),
-            undefined,
-            [ts.factory.createNumericLiteral(String(prop['minItems']))],
-          );
+          arraySchema = ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(arraySchema, ts.factory.createIdentifier('min')), undefined, [
+            ts.factory.createNumericLiteral(String(prop['minItems']))
+          ]);
         }
+
         if (typeof prop['maxItems'] === 'number') {
-          arraySchema = ts.factory.createCallExpression(
-            ts.factory.createPropertyAccessExpression(arraySchema, ts.factory.createIdentifier('max')),
-            undefined,
-            [ts.factory.createNumericLiteral(String(prop['maxItems']))],
-          );
+          arraySchema = ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(arraySchema, ts.factory.createIdentifier('max')), undefined, [
+            ts.factory.createNumericLiteral(String(prop['maxItems']))
+          ]);
         }
 
         return required
           ? arraySchema
-          : ts.factory.createCallExpression(
-              ts.factory.createPropertyAccessExpression(arraySchema, ts.factory.createIdentifier('optional')),
-              undefined,
-              [],
-            );
+          : ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(arraySchema, ts.factory.createIdentifier('optional')), undefined, []);
       }
       case 'object': {
         const propObj = prop satisfies {
@@ -2461,110 +2069,86 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
               args: [
                 ts.factory.createObjectLiteralExpression(
                   propertiesEntries.map(([name, propValue]): ts.ObjectLiteralElementLike => {
-                    return ts.factory.createPropertyAssignment(
-                      ts.factory.createIdentifier(name),
-                      this.buildProperty(propValue, propRequired.includes(name)),
-                    );
+                    return ts.factory.createPropertyAssignment(ts.factory.createIdentifier(name), this.buildProperty(propValue, propRequired.includes(name)));
                   }),
-                  true,
-                ),
-              ],
-            },
+                  true
+                )
+              ]
+            }
           ]);
 
           // Apply object constraints
           let constrainedSchema = objectSchema;
           if (typeof prop['minProperties'] === 'number') {
-            constrainedSchema = ts.factory.createCallExpression(
-              ts.factory.createPropertyAccessExpression(constrainedSchema, ts.factory.createIdentifier('refine')),
-              undefined,
-              [
-                ts.factory.createArrowFunction(
-                  undefined,
-                  undefined,
-                  [ts.factory.createParameterDeclaration(undefined, undefined, 'obj', undefined, undefined, undefined)],
-                  undefined,
-                  ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
-                  ts.factory.createBinaryExpression(
-                    ts.factory.createPropertyAccessExpression(
-                      ts.factory.createCallExpression(
-                        ts.factory.createPropertyAccessExpression(
-                          ts.factory.createIdentifier('Object'),
-                          ts.factory.createIdentifier('keys'),
-                        ),
-                        undefined,
-                        [ts.factory.createIdentifier('obj')],
-                      ),
-                      ts.factory.createIdentifier('length'),
+            constrainedSchema = ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(constrainedSchema, ts.factory.createIdentifier('refine')), undefined, [
+              ts.factory.createArrowFunction(
+                undefined,
+                undefined,
+                [ts.factory.createParameterDeclaration(undefined, undefined, 'obj', undefined, undefined, undefined)],
+                undefined,
+                ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+                ts.factory.createBinaryExpression(
+                  ts.factory.createPropertyAccessExpression(
+                    ts.factory.createCallExpression(
+                      ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('Object'), ts.factory.createIdentifier('keys')),
+                      undefined,
+                      [ts.factory.createIdentifier('obj')]
                     ),
-                    ts.factory.createToken(ts.SyntaxKind.GreaterThanEqualsToken),
-                    ts.factory.createNumericLiteral(String(prop['minProperties'])),
+                    ts.factory.createIdentifier('length')
                   ),
-                ),
-                ts.factory.createObjectLiteralExpression([
-                  ts.factory.createPropertyAssignment(
-                    ts.factory.createIdentifier('message'),
-                    ts.factory.createStringLiteral(
-                      `Object must have at least ${String(prop['minProperties'])} properties`,
-                    ),
-                  ),
-                ]),
-              ],
-            );
+                  ts.factory.createToken(ts.SyntaxKind.GreaterThanEqualsToken),
+                  ts.factory.createNumericLiteral(String(prop['minProperties']))
+                )
+              ),
+              ts.factory.createObjectLiteralExpression([
+                ts.factory.createPropertyAssignment(
+                  ts.factory.createIdentifier('message'),
+                  ts.factory.createStringLiteral(`Object must have at least ${String(prop['minProperties'])} properties`)
+                )
+              ])
+            ]);
           }
+
           if (typeof prop['maxProperties'] === 'number') {
-            constrainedSchema = ts.factory.createCallExpression(
-              ts.factory.createPropertyAccessExpression(constrainedSchema, ts.factory.createIdentifier('refine')),
-              undefined,
-              [
-                ts.factory.createArrowFunction(
-                  undefined,
-                  undefined,
-                  [ts.factory.createParameterDeclaration(undefined, undefined, 'obj', undefined, undefined, undefined)],
-                  undefined,
-                  ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
-                  ts.factory.createBinaryExpression(
-                    ts.factory.createPropertyAccessExpression(
-                      ts.factory.createCallExpression(
-                        ts.factory.createPropertyAccessExpression(
-                          ts.factory.createIdentifier('Object'),
-                          ts.factory.createIdentifier('keys'),
-                        ),
-                        undefined,
-                        [ts.factory.createIdentifier('obj')],
-                      ),
-                      ts.factory.createIdentifier('length'),
+            constrainedSchema = ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(constrainedSchema, ts.factory.createIdentifier('refine')), undefined, [
+              ts.factory.createArrowFunction(
+                undefined,
+                undefined,
+                [ts.factory.createParameterDeclaration(undefined, undefined, 'obj', undefined, undefined, undefined)],
+                undefined,
+                ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+                ts.factory.createBinaryExpression(
+                  ts.factory.createPropertyAccessExpression(
+                    ts.factory.createCallExpression(
+                      ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('Object'), ts.factory.createIdentifier('keys')),
+                      undefined,
+                      [ts.factory.createIdentifier('obj')]
                     ),
-                    ts.factory.createToken(ts.SyntaxKind.LessThanEqualsToken),
-                    ts.factory.createNumericLiteral(String(prop['maxProperties'])),
+                    ts.factory.createIdentifier('length')
                   ),
-                ),
-                ts.factory.createObjectLiteralExpression([
-                  ts.factory.createPropertyAssignment(
-                    ts.factory.createIdentifier('message'),
-                    ts.factory.createStringLiteral(
-                      `Object must have at most ${String(prop['maxProperties'])} properties`,
-                    ),
-                  ),
-                ]),
-              ],
-            );
+                  ts.factory.createToken(ts.SyntaxKind.LessThanEqualsToken),
+                  ts.factory.createNumericLiteral(String(prop['maxProperties']))
+                )
+              ),
+              ts.factory.createObjectLiteralExpression([
+                ts.factory.createPropertyAssignment(
+                  ts.factory.createIdentifier('message'),
+                  ts.factory.createStringLiteral(`Object must have at most ${String(prop['maxProperties'])} properties`)
+                )
+              ])
+            ]);
           }
 
           return required
             ? constrainedSchema
-            : ts.factory.createCallExpression(
-                ts.factory.createPropertyAccessExpression(constrainedSchema, ts.factory.createIdentifier('optional')),
-                undefined,
-                [],
-              );
+            : ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(constrainedSchema, ts.factory.createIdentifier('optional')), undefined, []);
         }
 
         return this.buildZodAST([
           {
             type: 'record',
-            args: [this.buildZodAST(['string']), this.buildZodAST(['unknown'])],
-          },
+            args: [this.buildZodAST(['string']), this.buildZodAST(['unknown'])]
+          }
         ]);
       }
       case 'integer': {
@@ -2572,35 +2156,26 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
         // Apply number constraints
         if (prop['minimum'] !== undefined && typeof prop['minimum'] === 'number') {
-          const minValue =
-            prop['exclusiveMinimum'] && typeof prop['exclusiveMinimum'] === 'boolean'
-              ? prop['minimum'] + 1
-              : prop['minimum'];
+          const minValue = prop['exclusiveMinimum'] && typeof prop['exclusiveMinimum'] === 'boolean' ? prop['minimum'] + 1 : prop['minimum'];
           numberSchema = ts.factory.createCallExpression(
             ts.factory.createPropertyAccessExpression(
               numberSchema,
-              ts.factory.createIdentifier(
-                prop['exclusiveMinimum'] && typeof prop['exclusiveMinimum'] === 'boolean' ? 'gt' : 'gte',
-              ),
+              ts.factory.createIdentifier(prop['exclusiveMinimum'] && typeof prop['exclusiveMinimum'] === 'boolean' ? 'gt' : 'gte')
             ),
             undefined,
-            [ts.factory.createNumericLiteral(String(minValue))],
+            [ts.factory.createNumericLiteral(String(minValue))]
           );
         }
+
         if (prop['maximum'] !== undefined && typeof prop['maximum'] === 'number') {
-          const maxValue =
-            prop['exclusiveMaximum'] && typeof prop['exclusiveMaximum'] === 'boolean'
-              ? prop['maximum'] - 1
-              : prop['maximum'];
+          const maxValue = prop['exclusiveMaximum'] && typeof prop['exclusiveMaximum'] === 'boolean' ? prop['maximum'] - 1 : prop['maximum'];
           numberSchema = ts.factory.createCallExpression(
-            ts.factory.createPropertyAccessExpression(
-              numberSchema,
-              ts.factory.createIdentifier(prop['exclusiveMaximum'] ? 'lt' : 'lte'),
-            ),
+            ts.factory.createPropertyAccessExpression(numberSchema, ts.factory.createIdentifier(prop['exclusiveMaximum'] ? 'lt' : 'lte')),
             undefined,
-            [ts.factory.createNumericLiteral(String(maxValue))],
+            [ts.factory.createNumericLiteral(String(maxValue))]
           );
         }
+
         if (typeof prop['multipleOf'] === 'number') {
           const refineFunction = ts.factory.createArrowFunction(
             undefined,
@@ -2612,67 +2187,53 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
               ts.factory.createBinaryExpression(
                 ts.factory.createIdentifier('val'),
                 ts.factory.createToken(ts.SyntaxKind.PercentToken),
-                ts.factory.createNumericLiteral(String(prop['multipleOf'])),
+                ts.factory.createNumericLiteral(String(prop['multipleOf']))
               ),
               ts.factory.createToken(ts.SyntaxKind.EqualsEqualsEqualsToken),
-              ts.factory.createNumericLiteral('0'),
-            ),
+              ts.factory.createNumericLiteral('0')
+            )
           );
           const refineOptions = ts.factory.createObjectLiteralExpression([
             ts.factory.createPropertyAssignment(
               ts.factory.createIdentifier('message'),
-              ts.factory.createStringLiteral(`Number must be a multiple of ${String(prop['multipleOf'])}`),
-            ),
+              ts.factory.createStringLiteral(`Number must be a multiple of ${String(prop['multipleOf'])}`)
+            )
           ]);
-          numberSchema = ts.factory.createCallExpression(
-            ts.factory.createPropertyAccessExpression(numberSchema, ts.factory.createIdentifier('refine')),
-            undefined,
-            [refineFunction, refineOptions],
-          );
+          numberSchema = ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(numberSchema, ts.factory.createIdentifier('refine')), undefined, [
+            refineFunction,
+            refineOptions
+          ]);
         }
 
         return required
           ? numberSchema
-          : ts.factory.createCallExpression(
-              ts.factory.createPropertyAccessExpression(numberSchema, ts.factory.createIdentifier('optional')),
-              undefined,
-              [],
-            );
+          : ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(numberSchema, ts.factory.createIdentifier('optional')), undefined, []);
       }
       case 'number': {
         let numberSchema = this.buildZodAST(['number']);
 
         // Apply number constraints
         if (prop['minimum'] !== undefined && typeof prop['minimum'] === 'number') {
-          const minValue =
-            prop['exclusiveMinimum'] && typeof prop['exclusiveMinimum'] === 'boolean'
-              ? prop['minimum'] + 1
-              : prop['minimum'];
+          const minValue = prop['exclusiveMinimum'] && typeof prop['exclusiveMinimum'] === 'boolean' ? prop['minimum'] + 1 : prop['minimum'];
           numberSchema = ts.factory.createCallExpression(
             ts.factory.createPropertyAccessExpression(
               numberSchema,
-              ts.factory.createIdentifier(
-                prop['exclusiveMinimum'] && typeof prop['exclusiveMinimum'] === 'boolean' ? 'gt' : 'gte',
-              ),
+              ts.factory.createIdentifier(prop['exclusiveMinimum'] && typeof prop['exclusiveMinimum'] === 'boolean' ? 'gt' : 'gte')
             ),
             undefined,
-            [ts.factory.createNumericLiteral(String(minValue))],
+            [ts.factory.createNumericLiteral(String(minValue))]
           );
         }
+
         if (prop['maximum'] !== undefined && typeof prop['maximum'] === 'number') {
-          const maxValue =
-            prop['exclusiveMaximum'] && typeof prop['exclusiveMaximum'] === 'boolean'
-              ? prop['maximum'] - 1
-              : prop['maximum'];
+          const maxValue = prop['exclusiveMaximum'] && typeof prop['exclusiveMaximum'] === 'boolean' ? prop['maximum'] - 1 : prop['maximum'];
           numberSchema = ts.factory.createCallExpression(
-            ts.factory.createPropertyAccessExpression(
-              numberSchema,
-              ts.factory.createIdentifier(prop['exclusiveMaximum'] ? 'lt' : 'lte'),
-            ),
+            ts.factory.createPropertyAccessExpression(numberSchema, ts.factory.createIdentifier(prop['exclusiveMaximum'] ? 'lt' : 'lte')),
             undefined,
-            [ts.factory.createNumericLiteral(String(maxValue))],
+            [ts.factory.createNumericLiteral(String(maxValue))]
           );
         }
+
         if (typeof prop['multipleOf'] === 'number') {
           const refineFunction = ts.factory.createArrowFunction(
             undefined,
@@ -2684,32 +2245,27 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
               ts.factory.createBinaryExpression(
                 ts.factory.createIdentifier('val'),
                 ts.factory.createToken(ts.SyntaxKind.PercentToken),
-                ts.factory.createNumericLiteral(String(prop['multipleOf'])),
+                ts.factory.createNumericLiteral(String(prop['multipleOf']))
               ),
               ts.factory.createToken(ts.SyntaxKind.EqualsEqualsEqualsToken),
-              ts.factory.createNumericLiteral('0'),
-            ),
+              ts.factory.createNumericLiteral('0')
+            )
           );
           const refineOptions = ts.factory.createObjectLiteralExpression([
             ts.factory.createPropertyAssignment(
               ts.factory.createIdentifier('message'),
-              ts.factory.createStringLiteral(`Number must be a multiple of ${String(prop['multipleOf'])}`),
-            ),
+              ts.factory.createStringLiteral(`Number must be a multiple of ${String(prop['multipleOf'])}`)
+            )
           ]);
-          numberSchema = ts.factory.createCallExpression(
-            ts.factory.createPropertyAccessExpression(numberSchema, ts.factory.createIdentifier('refine')),
-            undefined,
-            [refineFunction, refineOptions],
-          );
+          numberSchema = ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(numberSchema, ts.factory.createIdentifier('refine')), undefined, [
+            refineFunction,
+            refineOptions
+          ]);
         }
 
         return required
           ? numberSchema
-          : ts.factory.createCallExpression(
-              ts.factory.createPropertyAccessExpression(numberSchema, ts.factory.createIdentifier('optional')),
-              undefined,
-              [],
-            );
+          : ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(numberSchema, ts.factory.createIdentifier('optional')), undefined, []);
       }
       case 'string': {
         let stringSchema = this.buildZodAST(['string']);
@@ -2719,67 +2275,48 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
           switch (prop['format']) {
             case 'email':
               stringSchema = ts.factory.createCallExpression(
-                ts.factory.createPropertyAccessExpression(
-                  ts.factory.createIdentifier('z'),
-                  ts.factory.createIdentifier('email'),
-                ),
+                ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('z'), ts.factory.createIdentifier('email')),
                 undefined,
-                [],
+                []
               );
               break;
             case 'uri':
             case 'url':
               stringSchema = ts.factory.createCallExpression(
-                ts.factory.createPropertyAccessExpression(
-                  ts.factory.createIdentifier('z'),
-                  ts.factory.createIdentifier('url'),
-                ),
+                ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('z'), ts.factory.createIdentifier('url')),
                 undefined,
-                [],
+                []
               );
               break;
             case 'uuid':
               stringSchema = ts.factory.createCallExpression(
-                ts.factory.createPropertyAccessExpression(
-                  ts.factory.createIdentifier('z'),
-                  ts.factory.createIdentifier('uuid'),
-                ),
+                ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('z'), ts.factory.createIdentifier('uuid')),
                 undefined,
-                [],
+                []
               );
               break;
             case 'date-time':
               stringSchema = ts.factory.createCallExpression(
                 ts.factory.createPropertyAccessExpression(
-                  ts.factory.createPropertyAccessExpression(
-                    ts.factory.createIdentifier('z'),
-                    ts.factory.createIdentifier('iso'),
-                  ),
-                  ts.factory.createIdentifier('datetime'),
+                  ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('z'), ts.factory.createIdentifier('iso')),
+                  ts.factory.createIdentifier('datetime')
                 ),
                 undefined,
-                [this.buildDefaultValue({local: true})],
+                [this.buildDefaultValue({ local: true })]
               );
               break;
             case 'date':
               stringSchema = ts.factory.createCallExpression(
                 ts.factory.createPropertyAccessExpression(
-                  ts.factory.createPropertyAccessExpression(
-                    ts.factory.createIdentifier('z'),
-                    ts.factory.createIdentifier('iso'),
-                  ),
-                  ts.factory.createIdentifier('date'),
+                  ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('z'), ts.factory.createIdentifier('iso')),
+                  ts.factory.createIdentifier('date')
                 ),
                 undefined,
-                [],
+                []
               );
               break;
             case 'time':
-              stringSchema = ts.factory.createCallExpression(
-                ts.factory.createPropertyAccessExpression(stringSchema, ts.factory.createIdentifier('time')),
-                undefined,
-                [],
-              );
+              stringSchema = ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(stringSchema, ts.factory.createIdentifier('time')), undefined, []);
               break;
             // Add more formats as needed
           }
@@ -2787,74 +2324,49 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
         // Apply string constraints
         if (typeof prop['minLength'] === 'number') {
-          stringSchema = ts.factory.createCallExpression(
-            ts.factory.createPropertyAccessExpression(stringSchema, ts.factory.createIdentifier('min')),
-            undefined,
-            [ts.factory.createNumericLiteral(String(prop['minLength']))],
-          );
+          stringSchema = ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(stringSchema, ts.factory.createIdentifier('min')), undefined, [
+            ts.factory.createNumericLiteral(String(prop['minLength']))
+          ]);
         }
+
         if (typeof prop['maxLength'] === 'number') {
-          stringSchema = ts.factory.createCallExpression(
-            ts.factory.createPropertyAccessExpression(stringSchema, ts.factory.createIdentifier('max')),
-            undefined,
-            [ts.factory.createNumericLiteral(String(prop['maxLength']))],
-          );
+          stringSchema = ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(stringSchema, ts.factory.createIdentifier('max')), undefined, [
+            ts.factory.createNumericLiteral(String(prop['maxLength']))
+          ]);
         }
+
         if (prop['pattern'] && typeof prop['pattern'] === 'string') {
-          stringSchema = ts.factory.createCallExpression(
-            ts.factory.createPropertyAccessExpression(stringSchema, ts.factory.createIdentifier('regex')),
-            undefined,
-            [
-              ts.factory.createNewExpression(ts.factory.createIdentifier('RegExp'), undefined, [
-                ts.factory.createStringLiteral(prop['pattern'], true),
-              ]),
-            ],
-          );
+          stringSchema = ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(stringSchema, ts.factory.createIdentifier('regex')), undefined, [
+            ts.factory.createNewExpression(ts.factory.createIdentifier('RegExp'), undefined, [ts.factory.createStringLiteral(prop['pattern'], true)])
+          ]);
         }
 
         // Apply default value if not required
         if (!required && prop['default'] !== undefined) {
           const defaultValue = this.buildDefaultValue(prop['default']);
-          stringSchema = ts.factory.createCallExpression(
-            ts.factory.createPropertyAccessExpression(stringSchema, ts.factory.createIdentifier('default')),
-            undefined,
-            [defaultValue],
-          );
+          stringSchema = ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(stringSchema, ts.factory.createIdentifier('default')), undefined, [
+            defaultValue
+          ]);
         }
 
         return required
           ? stringSchema
-          : ts.factory.createCallExpression(
-              ts.factory.createPropertyAccessExpression(stringSchema, ts.factory.createIdentifier('optional')),
-              undefined,
-              [],
-            );
+          : ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(stringSchema, ts.factory.createIdentifier('optional')), undefined, []);
       }
       case 'boolean': {
         let booleanSchema = this.buildZodAST(['boolean']);
 
         // Apply default value if not required
         if (!required && prop['default'] !== undefined) {
-          const defaultValue =
-            typeof prop['default'] === 'boolean'
-              ? prop['default']
-                ? ts.factory.createTrue()
-                : ts.factory.createFalse()
-              : ts.factory.createFalse();
-          booleanSchema = ts.factory.createCallExpression(
-            ts.factory.createPropertyAccessExpression(booleanSchema, ts.factory.createIdentifier('default')),
-            undefined,
-            [defaultValue],
-          );
+          const defaultValue = typeof prop['default'] === 'boolean' ? (prop['default'] ? ts.factory.createTrue() : ts.factory.createFalse()) : ts.factory.createFalse();
+          booleanSchema = ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(booleanSchema, ts.factory.createIdentifier('default')), undefined, [
+            defaultValue
+          ]);
         }
 
         return required
           ? booleanSchema
-          : ts.factory.createCallExpression(
-              ts.factory.createPropertyAccessExpression(booleanSchema, ts.factory.createIdentifier('optional')),
-              undefined,
-              [],
-            );
+          : ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(booleanSchema, ts.factory.createIdentifier('optional')), undefined, []);
       }
       case 'unknown':
       default:
@@ -2866,54 +2378,52 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     if (typeof value === 'string') {
       return ts.factory.createStringLiteral(value, true);
     }
+
     if (typeof value === 'number') {
       return ts.factory.createNumericLiteral(String(value));
     }
+
     if (typeof value === 'boolean') {
       return value ? ts.factory.createTrue() : ts.factory.createFalse();
     }
+
     if (value === null) {
       return ts.factory.createNull();
     }
+
     if (Array.isArray(value)) {
       return ts.factory.createArrayLiteralExpression(
         value.map((item) => this.buildDefaultValue(item)),
-        false,
+        false
       );
     }
+
     if (typeof value === 'object') {
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (value === null) {
         return ts.factory.createNull();
       }
+
       return ts.factory.createObjectLiteralExpression(
-        Object.entries(value).map(([key, val]) =>
-          ts.factory.createPropertyAssignment(ts.factory.createIdentifier(key), this.buildDefaultValue(val)),
-        ),
-        true,
+        Object.entries(value).map(([key, val]) => ts.factory.createPropertyAssignment(ts.factory.createIdentifier(key), this.buildDefaultValue(val))),
+        true
       );
     }
+
     if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
       return ts.factory.createStringLiteral(String(value), true);
     }
+
     // For objects and arrays, we need to handle them differently
     // This should not happen in practice, but we handle it for type safety
     return ts.factory.createStringLiteral(JSON.stringify(value), true);
   }
 
-  private handleLogicalOperator(
-    operator: 'anyOf' | 'oneOf' | 'allOf' | 'not',
-    schemas: unknown[],
-    required: boolean,
-  ): ts.CallExpression {
+  private handleLogicalOperator(operator: 'anyOf' | 'oneOf' | 'allOf' | 'not', schemas: unknown[], required: boolean): ts.CallExpression {
     const logicalExpression = this.buildLogicalOperator(operator, schemas);
     return required
       ? logicalExpression
-      : ts.factory.createCallExpression(
-          ts.factory.createPropertyAccessExpression(logicalExpression, ts.factory.createIdentifier('optional')),
-          undefined,
-          [],
-        );
+      : ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(logicalExpression, ts.factory.createIdentifier('optional')), undefined, []);
   }
 
   private buildLogicalOperator(operator: 'anyOf' | 'oneOf' | 'allOf' | 'not', schemas: unknown[]): ts.CallExpression {
@@ -2921,14 +2431,9 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       case 'anyOf':
       case 'oneOf': {
         const unionSchemas = schemas.map((schema) => this.buildSchemaFromLogicalOperator(schema));
-        return ts.factory.createCallExpression(
-          ts.factory.createPropertyAccessExpression(
-            ts.factory.createIdentifier('z'),
-            ts.factory.createIdentifier('union'),
-          ),
-          undefined,
-          [ts.factory.createArrayLiteralExpression(unionSchemas, false)],
-        );
+        return ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('z'), ts.factory.createIdentifier('union')), undefined, [
+          ts.factory.createArrayLiteralExpression(unionSchemas, false)
+        ]);
       }
       case 'allOf': {
         if (schemas.length === 0) {
@@ -2939,12 +2444,9 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
         return schemas.slice(1).reduce<ts.Expression>((acc, schema) => {
           const schemaExpression = this.buildSchemaFromLogicalOperator(schema);
           return ts.factory.createCallExpression(
-            ts.factory.createPropertyAccessExpression(
-              ts.factory.createIdentifier('z'),
-              ts.factory.createIdentifier('intersection'),
-            ),
+            ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('z'), ts.factory.createIdentifier('intersection')),
             undefined,
-            [acc, schemaExpression],
+            [acc, schemaExpression]
           );
         }, firstSchema) as ts.CallExpression;
       }
@@ -2952,11 +2454,8 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
         const notSchema = this.buildSchemaFromLogicalOperator(schemas[0]);
         return ts.factory.createCallExpression(
           ts.factory.createPropertyAccessExpression(
-            ts.factory.createPropertyAccessExpression(
-              ts.factory.createIdentifier('z'),
-              ts.factory.createIdentifier('any'),
-            ),
-            ts.factory.createIdentifier('refine'),
+            ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('z'), ts.factory.createIdentifier('any')),
+            ts.factory.createIdentifier('refine')
           ),
           undefined,
           [
@@ -2968,20 +2467,15 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
               ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
               ts.factory.createPrefixUnaryExpression(
                 ts.SyntaxKind.ExclamationToken,
-                ts.factory.createCallExpression(
-                  ts.factory.createPropertyAccessExpression(notSchema, ts.factory.createIdentifier('safeParse')),
-                  undefined,
-                  [ts.factory.createIdentifier('val')],
-                ),
-              ),
+                ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(notSchema, ts.factory.createIdentifier('safeParse')), undefined, [
+                  ts.factory.createIdentifier('val')
+                ])
+              )
             ),
             ts.factory.createObjectLiteralExpression([
-              ts.factory.createPropertyAssignment(
-                ts.factory.createIdentifier('message'),
-                ts.factory.createStringLiteral('Value must not match the excluded schema'),
-              ),
-            ]),
-          ],
+              ts.factory.createPropertyAssignment(ts.factory.createIdentifier('message'), ts.factory.createStringLiteral('Value must not match the excluded schema'))
+            ])
+          ]
         );
       }
       default:
@@ -3005,7 +2499,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
   private buildBasicTypeFromSchema(schema: unknown): ts.CallExpression | ts.Identifier {
     if (typeof schema === 'object' && schema !== null && 'type' in schema) {
-      const schemaObj = schema as {type: string; properties?: Record<string, unknown>; items?: unknown};
+      const schemaObj = schema as { type: string; properties?: Record<string, unknown>; items?: unknown };
 
       switch (schemaObj.type) {
         case 'string':
@@ -3028,7 +2522,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     return this.buildZodAST(['unknown']);
   }
 
-  private buildObjectTypeFromSchema(schemaObj: {properties?: Record<string, unknown>}): ts.CallExpression {
+  private buildObjectTypeFromSchema(schemaObj: { properties?: Record<string, unknown> }): ts.CallExpression {
     const properties = Object.entries(schemaObj.properties ?? {});
 
     if (properties.length > 0) {
@@ -3038,71 +2532,63 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
           args: [
             ts.factory.createObjectLiteralExpression(
               properties.map(([name, property]): ts.ObjectLiteralElementLike => {
-                return ts.factory.createPropertyAssignment(
-                  ts.factory.createIdentifier(name),
-                  this.buildSchemaFromLogicalOperator(property),
-                );
+                return ts.factory.createPropertyAssignment(ts.factory.createIdentifier(name), this.buildSchemaFromLogicalOperator(property));
               }),
-              true,
-            ),
-          ],
-        },
+              true
+            )
+          ]
+        }
       ]);
     }
 
     return this.buildZodAST([
       {
         type: 'record',
-        args: [this.buildZodAST(['string']), this.buildZodAST(['unknown'])],
-      },
+        args: [this.buildZodAST(['string']), this.buildZodAST(['unknown'])]
+      }
     ]);
   }
 
-  private buildArrayTypeFromSchema(schemaObj: {items?: unknown}): ts.CallExpression {
+  private buildArrayTypeFromSchema(schemaObj: { items?: unknown }): ts.CallExpression {
     if (schemaObj.items) {
       return this.buildZodAST([
         {
           type: 'array',
-          args: [this.buildSchemaFromLogicalOperator(schemaObj.items)],
-        },
+          args: [this.buildSchemaFromLogicalOperator(schemaObj.items)]
+        }
       ]);
     }
+
     return this.buildZodAST(['array']);
   }
 
   private isReference(reference: unknown): reference is ReferenceType {
     if (typeof reference === 'object' && reference !== null && '$ref' in reference) {
-      const ref = reference satisfies {$ref?: unknown};
+      const ref = reference satisfies { $ref?: unknown };
       return typeof ref.$ref === 'string' && ref.$ref.length > 0;
     }
+
     return false;
   }
 
   private buildFromReference(reference: ReferenceType): ts.CallExpression | ts.Identifier {
-    const {$ref = ''} = Reference.parse(reference);
+    const { $ref = '' } = Reference.parse(reference);
     const refName = $ref.split('/').pop() ?? 'never';
     const sanitizedRefName = this.typeBuilder.sanitizeIdentifier(refName);
 
     // Check if this reference creates a circular dependency
     if (this.isCircularReference(refName)) {
       // Generate: z.lazy(() => RefSchema)
-      return ts.factory.createCallExpression(
-        ts.factory.createPropertyAccessExpression(
-          ts.factory.createIdentifier('z'),
-          ts.factory.createIdentifier('lazy'),
-        ),
-        undefined,
-        [
-          ts.factory.createArrowFunction(
-            undefined,
-            undefined,
-            [],
-            undefined,
-            ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
-            ts.factory.createIdentifier(sanitizedRefName),
-          ),
-        ],
-      );
+      return ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('z'), ts.factory.createIdentifier('lazy')), undefined, [
+        ts.factory.createArrowFunction(
+          undefined,
+          undefined,
+          [],
+          undefined,
+          ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+          ts.factory.createIdentifier(sanitizedRefName)
+        )
+      ]);
     }
 
     return ts.factory.createIdentifier(sanitizedRefName);
@@ -3122,11 +2608,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
     // Case 2: Reference to a schema that's part of a circular dependency chain
     // and we're currently building a schema that's also in that chain
-    if (
-      this.circularSchemas.has(refName) &&
-      this.currentSchemaName !== null &&
-      this.circularSchemas.has(this.currentSchemaName)
-    ) {
+    if (this.circularSchemas.has(refName) && this.currentSchemaName !== null && this.circularSchemas.has(this.currentSchemaName)) {
       return true;
     }
 
@@ -3224,6 +2706,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       if (visiting.has(name)) {
         return;
       }
+
       if (visited.has(name)) {
         return;
       }

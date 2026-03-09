@@ -11,7 +11,7 @@ After running `zod-codegen`, you'll get:
 ## Basic Usage
 
 ```typescript
-import {SwaggerPetstoreOpenAPI30} from './api';
+import { SwaggerPetstoreOpenAPI30 } from './api';
 
 // Create a client instance using default server from OpenAPI spec
 const client = new SwaggerPetstoreOpenAPI30({});
@@ -26,19 +26,19 @@ console.log('Available pets:', pets);
 The generated client supports flexible server configuration:
 
 ```typescript
-import {SwaggerPetstoreOpenAPI30, ClientOptions} from './api';
+import { SwaggerPetstoreOpenAPI30, ClientOptions } from './api';
 
 // Option 1: Use default server (first server from OpenAPI spec)
 const defaultClient = new SwaggerPetstoreOpenAPI30({});
 
 // Option 2: Override with custom base URL
 const customClient = new SwaggerPetstoreOpenAPI30({
-  baseUrl: 'https://custom-api.example.com/v3',
+  baseUrl: 'https://custom-api.example.com/v3'
 });
 
 // Option 3: Select server by index (if multiple servers exist)
 const indexedClient = new SwaggerPetstoreOpenAPI30({
-  serverIndex: 0,
+  serverIndex: 0
 });
 
 // Option 4: Use server variables (if your OpenAPI spec has templated URLs)
@@ -48,15 +48,15 @@ const variableClient = new SwaggerPetstoreOpenAPI30({
   serverVariables: {
     environment: 'api.staging',
     port: '8443',
-    version: '2',
-  },
+    version: '2'
+  }
 });
 ```
 
 ## Example: Finding Pets
 
 ```typescript
-import {SwaggerPetstoreOpenAPI30} from './api';
+import { SwaggerPetstoreOpenAPI30 } from './api';
 
 async function findAvailablePets() {
   const client = new SwaggerPetstoreOpenAPI30({});
@@ -84,8 +84,8 @@ findAvailablePets();
 ## Example: Adding a Pet
 
 ```typescript
-import {SwaggerPetstoreOpenAPI30, Pet, PetStatus} from './api';
-import {z} from 'zod';
+import { SwaggerPetstoreOpenAPI30, Pet, PetStatus } from './api';
+import { z } from 'zod';
 
 async function addNewPet() {
   const client = new SwaggerPetstoreOpenAPI30({});
@@ -96,13 +96,13 @@ async function addNewPet() {
     status: PetStatus.enum.available,
     category: {
       id: 1,
-      name: 'Dogs',
+      name: 'Dogs'
     },
     photoUrls: ['https://example.com/fluffy.jpg'],
     tags: [
-      {id: 1, name: 'friendly'},
-      {id: 2, name: 'cute'},
-    ],
+      { id: 1, name: 'friendly' },
+      { id: 2, name: 'cute' }
+    ]
   };
 
   try {
@@ -118,4 +118,4 @@ addNewPet();
 
 ## Example: Extending the Client
 
-See the main [EXAMPLES.md](../../EXAMPLES.md) for comprehensive examples on extending the client for authentication, CORS, and custom headers.
+See the main [EXAMPLES.md](../../EXAMPLES.md) for comprehensive examples on extending the client for authentication, CORS, custom headers, and response handling (including [4xx/5xx error handling](../../EXAMPLES.md#handling-4xx5xx-in-handleresponse)).

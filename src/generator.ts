@@ -1,14 +1,14 @@
-import {extname, resolve} from 'node:path';
-import {TypeScriptCodeGeneratorService} from './services/code-generator.service';
-import {OpenApiFileParserService, SyncFileReaderService} from './services/file-reader.service';
-import {SyncFileWriterService} from './services/file-writer.service';
-import type {GeneratorOptions} from './types/generator-options';
-import type {OpenApiSpecType} from './types/openapi';
-import type {Reporter} from './utils/reporter';
+import { extname, resolve } from 'node:path';
+import { TypeScriptCodeGeneratorService } from './services/code-generator.service';
+import { OpenApiFileParserService, SyncFileReaderService } from './services/file-reader.service';
+import { SyncFileWriterService } from './services/file-writer.service';
+import type { GeneratorOptions } from './types/generator-options';
+import type { OpenApiSpecType } from './types/openapi';
+import type { Reporter } from './utils/reporter';
 
 // Re-export types for library users
-export type {GeneratorOptions} from './types/generator-options';
-export type {NamingConvention, OperationDetails, OperationNameTransformer} from './utils/naming-convention';
+export type { GeneratorOptions } from './types/generator-options';
+export type { NamingConvention, OperationDetails, OperationNameTransformer } from './utils/naming-convention';
 
 /**
  * Main generator class for creating TypeScript code from OpenAPI specifications.
@@ -60,12 +60,11 @@ export class Generator {
     private readonly reporter: Reporter,
     private readonly inputPath: string,
     private readonly _outputDir: string,
-    options: GeneratorOptions = {},
+    options: GeneratorOptions = {}
   ) {
     this.fileWriter = new SyncFileWriterService(this._name, this._version, inputPath);
     const ext = extname(this._outputDir);
-    this.outputPath =
-      ext === '.ts' || ext === '.tsx' ? resolve(this._outputDir) : this.fileWriter.resolveOutputPath(this._outputDir);
+    this.outputPath = ext === '.ts' || ext === '.tsx' ? resolve(this._outputDir) : this.fileWriter.resolveOutputPath(this._outputDir);
     this.codeGenerator = new TypeScriptCodeGeneratorService(options);
   }
 

@@ -6,27 +6,27 @@
 // @ts-nocheck
 
 // Imports
-import {z} from 'zod';
+import { z } from 'zod';
 
 // Components schemas
 export const NamedAPIResource = z.object({
   name: z.string(),
-  url: z.string().url(),
+  url: z.string().url()
 });
 export const PokemonType = z.object({
   slot: z.number().int().optional(),
-  type: NamedAPIResource.optional(),
+  type: NamedAPIResource.optional()
 });
 export const PokemonAbility = z.object({
   ability: NamedAPIResource.optional(),
   is_hidden: z.boolean().optional(),
-  slot: z.number().int().optional(),
+  slot: z.number().int().optional()
 });
 export const PokemonSprites = z.object({
   front_default: z.string().url().optional(),
   front_shiny: z.string().url().optional(),
   back_default: z.string().url().optional(),
-  back_shiny: z.string().url().optional(),
+  back_shiny: z.string().url().optional()
 });
 export const Pokemon = z.object({
   id: z.number().int(),
@@ -36,13 +36,13 @@ export const Pokemon = z.object({
   base_experience: z.number().int().optional(),
   types: z.array(PokemonType).optional(),
   abilities: z.array(PokemonAbility).optional(),
-  sprites: PokemonSprites.optional(),
+  sprites: PokemonSprites.optional()
 });
 export const PokemonListResponse = z.object({
   count: z.number().int(),
   next: z.string().url().optional(),
   previous: z.string().url().optional(),
-  results: z.array(NamedAPIResource),
+  results: z.array(NamedAPIResource)
 });
 export const defaultBaseUrl = 'https://pokeapi.co/api/v2';
 
@@ -58,7 +58,7 @@ export class PokAPI {
   async #makeRequest<T>(
     method: string,
     path: string,
-    options: _params___Record_string__string___number___boolean___data___unknown__contentType___string__headers___Record_string__string__ = {},
+    options: _params___Record_string__string___number___boolean___data___unknown__contentType___string__headers___Record_string__string__ = {}
   ): Promise<T> {
     const baseUrl = `${this.#baseUrl}${path}`;
     const url =
@@ -71,17 +71,9 @@ export class PokAPI {
           })()
         : new URL(baseUrl).toString();
     const baseOptions = this.getBaseRequestOptions();
-    const contentType =
-      options.contentType === 'application/x-www-form-urlencoded'
-        ? 'application/x-www-form-urlencoded'
-        : 'application/json';
+    const contentType = options.contentType === 'application/x-www-form-urlencoded' ? 'application/x-www-form-urlencoded' : 'application/json';
     const baseHeaders = baseOptions.headers !== undefined ? baseOptions.headers : {};
-    const headers = Object.assign(
-      {},
-      baseHeaders,
-      {'Content-Type': contentType},
-      options.headers !== undefined ? options.headers : {},
-    );
+    const headers = Object.assign({}, baseHeaders, { 'Content-Type': contentType }, options.headers !== undefined ? options.headers : {});
     const body =
       options.data !== undefined
         ? options.contentType === 'application/x-www-form-urlencoded'
@@ -94,7 +86,7 @@ export class PokAPI {
             })()
           : JSON.stringify(options.data)
         : null;
-    const response = await fetch(url, Object.assign({}, baseOptions, {method, headers: headers, body: body}));
+    const response = await fetch(url, Object.assign({}, baseOptions, { method, headers: headers, body: body }));
     if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     return await response.json();
   }
@@ -102,8 +94,6 @@ export class PokAPI {
     return Pokemon.parse(await this.#makeRequest('GET', `/pokemon/${id}`, {}));
   }
   async getPokemonList(limit?: number, offset?: number): Promise<PokemonListResponse> {
-    return PokemonListResponse.parse(
-      await this.#makeRequest('GET', '/pokemon', {params: {limit: limit, offset: offset}}),
-    );
+    return PokemonListResponse.parse(await this.#makeRequest('GET', '/pokemon', { params: { limit: limit, offset: offset } }));
   }
 }

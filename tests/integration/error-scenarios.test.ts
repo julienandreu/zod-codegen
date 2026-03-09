@@ -1,10 +1,9 @@
-import {describe, expect, it, vi, beforeEach, afterEach} from 'vitest';
-import {Generator} from '../../src/generator';
-import {Reporter} from '../../src/utils/reporter';
-import {readFileSync, existsSync, mkdirSync, rmSync, writeFileSync} from 'node:fs';
-import {join} from 'node:path';
-import {fileURLToPath} from 'node:url';
-import {dirname} from 'node:path';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Generator } from '../../src/generator';
+import { Reporter } from '../../src/utils/reporter';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const testOutputDir = join(__dirname, '../../test-output-errors');
@@ -17,13 +16,14 @@ describe('Error Scenarios', () => {
 
   beforeEach(() => {
     if (existsSync(testOutputDir)) {
-      rmSync(testOutputDir, {recursive: true, force: true});
+      rmSync(testOutputDir, { recursive: true, force: true });
     }
-    mkdirSync(testOutputDir, {recursive: true});
+
+    mkdirSync(testOutputDir, { recursive: true });
 
     mockReporter = {
       log: logSpy,
-      error: errorSpy,
+      error: errorSpy
     } as unknown as Reporter;
 
     logSpy.mockClear();
@@ -32,7 +32,7 @@ describe('Error Scenarios', () => {
 
   afterEach(() => {
     if (existsSync(testOutputDir)) {
-      rmSync(testOutputDir, {recursive: true, force: true});
+      rmSync(testOutputDir, { recursive: true, force: true });
     }
   });
 
@@ -44,7 +44,7 @@ describe('Error Scenarios', () => {
 
       expect(exitCode).toBe(1);
       expect(errorSpy).toHaveBeenCalled();
-      expect(errorSpy.mock.calls[0][0]).toContain('Error');
+      expect(String(errorSpy.mock.calls[0]?.[0] ?? '')).toContain('Error');
     });
 
     it('should handle network errors when fetching URL', async () => {
@@ -52,13 +52,7 @@ describe('Error Scenarios', () => {
       const mockFetch = vi.fn().mockRejectedValue(new Error('Network error'));
       global.fetch = mockFetch;
 
-      generator = new Generator(
-        'test-app',
-        '1.0.0',
-        mockReporter,
-        'https://example.com/nonexistent.json',
-        testOutputDir,
-      );
+      generator = new Generator('test-app', '1.0.0', mockReporter, 'https://example.com/nonexistent.json', testOutputDir);
 
       const exitCode = await generator.run();
 
@@ -75,7 +69,7 @@ describe('Error Scenarios', () => {
         ok: false,
         status: 500,
         statusText: 'Internal Server Error',
-        text: async () => 'Error response',
+        text: async () => 'Error response'
       } as Response);
       global.fetch = mockFetch;
 
@@ -86,7 +80,7 @@ describe('Error Scenarios', () => {
       expect(exitCode).toBe(1);
       expect(errorSpy).toHaveBeenCalled();
       // Error should mention the HTTP error or parsing failure
-      const errorMessage = errorSpy.mock.calls[0][0] as string;
+      const errorMessage = (errorSpy.mock.calls[0]?.[0] ?? '') as string;
       expect(errorMessage).toMatch(/500|Error|Failed/);
 
       global.fetch = originalFetch;
@@ -128,7 +122,7 @@ info:
   title: Test API
   version: 1.0.0
 paths: {}
-`,
+`
       );
 
       generator = new Generator('test-app', '1.0.0', mockReporter, invalidFile, testOutputDir);
@@ -146,7 +140,7 @@ paths: {}
         `
 openapi: 3.0.0
 paths: {}
-`,
+`
       );
 
       generator = new Generator('test-app', '1.0.0', mockReporter, invalidFile, testOutputDir);
@@ -162,7 +156,7 @@ paths: {}
     it('should handle write permission errors gracefully', async () => {
       // Create a read-only directory (on Unix systems)
       const readOnlyDir = join(testOutputDir, 'readonly');
-      mkdirSync(readOnlyDir, {recursive: true});
+      mkdirSync(readOnlyDir, { recursive: true });
       // Note: chmod doesn't work the same way on all systems, so this test
       // might need to be adjusted based on the environment
 
@@ -198,7 +192,7 @@ info:
   title: Test API
   version: 1.0.0
 paths: {}
-`,
+`
       );
 
       generator = new Generator('test-app', '1.0.0', mockReporter, noPathsFile, testOutputDir);
@@ -226,7 +220,7 @@ paths:
       responses:
         '200':
           description: Success
-`,
+`
       );
 
       generator = new Generator('test-app', '1.0.0', mockReporter, noComponentsFile, testOutputDir);
