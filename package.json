@@ -74,9 +74,6 @@
   },
   "overrides": {
     "diff": "^8.0.3",
-    "@semantic-release/npm": {
-      "npm": "https://codeload.github.com/npm/cli/tar.gz/ff51827ba603b069afababf0292016ffb8841bd2"
-    },
     "@actions/http-client": {
       "undici": "^7.18.0"
     }
