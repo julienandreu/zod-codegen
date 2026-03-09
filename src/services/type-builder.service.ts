@@ -1,5 +1,5 @@
 import * as ts from 'typescript';
-import type {TypeBuilder} from '../interfaces/code-generator';
+import type { TypeBuilder } from '../interfaces/code-generator';
 
 export class TypeScriptTypeBuilderService implements TypeBuilder {
   buildType(type: string): ts.TypeNode {
@@ -18,16 +18,15 @@ export class TypeScriptTypeBuilderService implements TypeBuilder {
           const itemType = type.slice(0, -2);
           return ts.factory.createArrayTypeNode(this.buildType(itemType));
         }
+
         // Handle Record types
         if (type.startsWith('Record<')) {
           // For now, return unknown for complex Record types
           return ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword);
         }
+
         // Custom type name - create a type reference
-        return ts.factory.createTypeReferenceNode(
-          ts.factory.createIdentifier(this.sanitizeIdentifier(type)),
-          undefined,
-        );
+        return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(this.sanitizeIdentifier(type)), undefined);
     }
   }
 
@@ -39,33 +38,23 @@ export class TypeScriptTypeBuilderService implements TypeBuilder {
       ts.factory[createIdentifier](name),
       undefined,
       this.buildType(type),
-      undefined,
+      undefined
     );
   }
 
-  createParameter(
-    name: string,
-    type?: string | ts.TypeNode,
-    defaultValue?: ts.Expression,
-    isOptional = false,
-  ): ts.ParameterDeclaration {
+  createParameter(name: string, type?: string | ts.TypeNode, defaultValue?: ts.Expression, isOptional = false): ts.ParameterDeclaration {
     return ts.factory.createParameterDeclaration(
       undefined,
       undefined,
       ts.factory.createIdentifier(this.sanitizeIdentifier(name)),
       isOptional ? ts.factory.createToken(ts.SyntaxKind.QuestionToken) : undefined,
       typeof type === 'string' ? this.buildType(type) : type,
-      defaultValue,
+      defaultValue
     );
   }
 
   createGenericType(name: string): ts.TypeParameterDeclaration {
-    return ts.factory.createTypeParameterDeclaration(
-      undefined,
-      ts.factory.createIdentifier(name),
-      undefined,
-      undefined,
-    );
+    return ts.factory.createTypeParameterDeclaration(undefined, ts.factory.createIdentifier(name), undefined, undefined);
   }
 
   sanitizeIdentifier(name: string): string {

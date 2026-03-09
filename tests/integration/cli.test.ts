@@ -1,13 +1,13 @@
-import {describe, expect, it} from 'vitest';
-import {execSync} from 'node:child_process';
-import {resolve} from 'node:path';
+import { execSync } from 'node:child_process';
+import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
 
 describe('CLI Integration', () => {
   describe('--help', () => {
     it('should display help information', () => {
       const result = execSync('node ./dist/src/cli.js --help', {
         encoding: 'utf-8',
-        cwd: resolve(__dirname, '../..'),
+        cwd: resolve(__dirname, '../..')
       });
 
       expect(result).toContain('Usage:');
@@ -20,7 +20,7 @@ describe('CLI Integration', () => {
     it('should display version information', () => {
       const result = execSync('node ./dist/src/cli.js --version', {
         encoding: 'utf-8',
-        cwd: resolve(__dirname, '../..'),
+        cwd: resolve(__dirname, '../..')
       });
 
       expect(result).toMatch(/\d+\.\d+\.\d+/);

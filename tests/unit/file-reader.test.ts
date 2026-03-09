@@ -1,8 +1,8 @@
-import {describe, expect, it, vi, beforeEach} from 'vitest';
-import {SyncFileReaderService, OpenApiFileParserService} from '../../src/services/file-reader.service';
-import {join} from 'node:path';
-import {fileURLToPath} from 'node:url';
-import {dirname} from 'node:path';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { OpenApiFileParserService, SyncFileReaderService } from '../../src/services/file-reader.service';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { dirname } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -36,7 +36,7 @@ describe('SyncFileReaderService', () => {
       const originalFetch = global.fetch;
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
-        text: async () => '{"openapi": "3.0.0", "info": {"title": "Test", "version": "1.0.0"}, "paths": {}}',
+        text: async () => '{"openapi": "3.0.0", "info": {"title": "Test", "version": "1.0.0"}, "paths": {}}'
       } as Response);
 
       const content = await reader.readFile('https://example.com/openapi.json');
@@ -50,7 +50,7 @@ describe('SyncFileReaderService', () => {
       const mockFetch = vi.fn().mockResolvedValue({
         ok: false,
         status: 404,
-        statusText: 'Not Found',
+        statusText: 'Not Found'
       } as Response);
       global.fetch = mockFetch;
 
@@ -74,8 +74,8 @@ describe('OpenApiFileParserService', () => {
     it('should parse valid JSON OpenAPI spec', () => {
       const jsonSpec = JSON.stringify({
         openapi: '3.0.0',
-        info: {title: 'Test API', version: '1.0.0'},
-        paths: {},
+        info: { title: 'Test API', version: '1.0.0' },
+        paths: {}
       });
 
       const result = parser.parse(jsonSpec);
@@ -102,8 +102,8 @@ paths: {}
     it('should parse already parsed objects', () => {
       const spec = {
         openapi: '3.0.0',
-        info: {title: 'Test API', version: '1.0.0'},
-        paths: {},
+        info: { title: 'Test API', version: '1.0.0' },
+        paths: {}
       };
 
       const result = parser.parse(spec);
@@ -114,8 +114,8 @@ paths: {}
     it('should validate OpenAPI structure', () => {
       const invalidSpec = {
         openapi: '2.0.0', // Wrong version format
-        info: {title: 'Test API', version: '1.0.0'},
-        paths: {},
+        info: { title: 'Test API', version: '1.0.0' },
+        paths: {}
       };
 
       expect(() => parser.parse(invalidSpec)).toThrow();
@@ -125,7 +125,7 @@ paths: {}
       const invalidSpec = {
         openapi: '3.0.0',
         // Missing info
-        paths: {},
+        paths: {}
       };
 
       expect(() => parser.parse(invalidSpec)).toThrow();

@@ -1,5 +1,5 @@
-import {describe, expect, it, beforeEach} from 'vitest';
-import {TypeScriptTypeBuilderService} from '../../src/services/type-builder.service';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { TypeScriptTypeBuilderService } from '../../src/services/type-builder.service';
 import * as ts from 'typescript';
 
 describe('TypeScriptTypeBuilderService', () => {

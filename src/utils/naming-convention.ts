@@ -8,13 +8,7 @@
  * transformNamingConvention('getUserById', 'snake_case') // 'get_user_by_id'
  * ```
  */
-export type NamingConvention =
-  | 'camelCase'
-  | 'PascalCase'
-  | 'snake_case'
-  | 'kebab-case'
-  | 'SCREAMING_SNAKE_CASE'
-  | 'SCREAMING-KEBAB-CASE';
+export type NamingConvention = 'camelCase' | 'PascalCase' | 'snake_case' | 'kebab-case' | 'SCREAMING_SNAKE_CASE' | 'SCREAMING-KEBAB-CASE';
 
 /**
  * Operation details provided to custom transformers.
@@ -66,7 +60,10 @@ export type OperationNameTransformer = (details: OperationDetails) => string;
  * Capitalizes the first letter of a word
  */
 function capitalize(word: string): string {
-  if (word.length === 0) return word;
+  if (word.length === 0) {
+    return word;
+  }
+
   return word.charAt(0).toUpperCase() + word.slice(1);
 }
 
@@ -126,9 +123,15 @@ function normalizeToWords(input: string): string[] {
  * Converts words array to camelCase
  */
 function toCamelCase(words: string[]): string {
-  if (words.length === 0) return '';
+  if (words.length === 0) {
+    return '';
+  }
+
   const [first, ...rest] = words;
-  if (!first) return '';
+  if (!first) {
+    return '';
+  }
+
   return first + rest.map((w) => capitalize(w)).join('');
 }
 

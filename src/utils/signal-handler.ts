@@ -1,12 +1,11 @@
-import {getExecutionTime} from './execution-time';
-import type {Reporter} from './reporter';
+import { getExecutionTime } from './execution-time';
+import type { Reporter } from './reporter';
 
-export const signalReceived =
-  (process: NodeJS.Process, startTime: bigint, event: NodeJS.Signals, reporter: Reporter) => (): void => {
-    reporter.log(`Done after ${String(getExecutionTime(startTime))}s`);
-    process.kill(process.pid, event);
-    process.exit(1);
-  };
+export const signalReceived = (process: NodeJS.Process, startTime: bigint, event: NodeJS.Signals, reporter: Reporter) => (): void => {
+  reporter.log(`Done after ${String(getExecutionTime(startTime))}s`);
+  process.kill(process.pid, event);
+  process.exit(1);
+};
 
 export const handleSignals = (process: NodeJS.Process, startTime: bigint, reporter: Reporter): void => {
   const catchSignals: NodeJS.Signals[] = ['SIGTERM', 'SIGINT', 'SIGUSR2'];

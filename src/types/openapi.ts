@@ -1,7 +1,7 @@
-import {z} from 'zod';
+import { z } from 'zod';
 
 export const Reference = z.object({
-  $ref: z.string().optional(),
+  $ref: z.string().optional()
 });
 
 const BaseSchemaProperties = z.object({
@@ -38,32 +38,32 @@ const BaseSchemaProperties = z.object({
   xml: z
     .object({
       name: z.string().optional(),
-      wrapped: z.boolean().optional(),
+      wrapped: z.boolean().optional()
     })
     .optional(),
   externalDocs: Reference.optional(),
   example: z.unknown().optional(),
-  deprecated: z.boolean().optional(),
+  deprecated: z.boolean().optional()
 });
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const SchemaProperties: z.ZodLazy<z.ZodObject<any>> = z.lazy(() =>
   BaseSchemaProperties.extend({
     properties: z.record(z.string(), SchemaProperties).optional(),
-    items: SchemaProperties.optional(),
-  }),
+    items: SchemaProperties.optional()
+  })
 );
 
 const ServerVariable = z.object({
   default: z.string(),
   description: z.string().optional(),
-  enum: z.array(z.string()).optional(),
+  enum: z.array(z.string()).optional()
 });
 
 const Server = z.object({
   url: z.string(), // Allow templated URLs with {variables}
   description: z.string().optional(),
-  variables: z.record(z.string(), ServerVariable).optional(),
+  variables: z.record(z.string(), ServerVariable).optional()
 });
 
 export const Parameter = z.object({
@@ -77,7 +77,7 @@ export const Parameter = z.object({
   style: z.string().optional(),
   explode: z.boolean().optional(),
   allowReserved: z.boolean().optional(),
-  schema: SchemaProperties.optional(),
+  schema: SchemaProperties.optional()
 });
 
 const ResponseHeader = z.object({
@@ -89,25 +89,25 @@ const ResponseHeader = z.object({
   style: z.string().optional(),
   explode: z.boolean().optional(),
   allowReserved: z.boolean().optional(),
-  schema: Reference.optional(),
+  schema: Reference.optional()
 });
 
 const MediaType = z.object({
-  schema: z.unknown().optional(),
+  schema: z.unknown().optional()
 });
 
 export const Response = z.object({
   $ref: z.string().optional(),
   description: z.string(),
   headers: z.record(z.string(), ResponseHeader).optional(),
-  content: z.record(z.string(), MediaType).optional(),
+  content: z.record(z.string(), MediaType).optional()
 });
 
 export const RequestBody = z.object({
   $ref: z.string().optional(),
   description: z.string().optional(),
   required: z.boolean().optional(),
-  content: z.record(z.string(), MediaType).optional(),
+  content: z.record(z.string(), MediaType).optional()
 });
 
 export const MethodSchema = z.object({
@@ -118,7 +118,7 @@ export const MethodSchema = z.object({
   requestBody: RequestBody.optional(),
   responses: z.record(z.string(), Response).optional(),
   tags: z.array(z.string()).optional(),
-  deprecated: z.boolean().optional(),
+  deprecated: z.boolean().optional()
 });
 
 export const PathItem = z.object({
@@ -133,7 +133,7 @@ export const PathItem = z.object({
   head: MethodSchema.optional(),
   options: MethodSchema.optional(),
   trace: MethodSchema.optional(),
-  parameters: z.array(Parameter).optional(),
+  parameters: z.array(Parameter).optional()
 });
 
 const Info = z.object({
@@ -145,15 +145,15 @@ const Info = z.object({
     .object({
       name: z.string().optional(),
       email: z.email().optional(),
-      url: z.url().optional(),
+      url: z.url().optional()
     })
     .optional(),
   license: z
     .object({
       name: z.string().min(1),
-      url: z.url().optional(),
+      url: z.url().optional()
     })
-    .optional(),
+    .optional()
 });
 
 const SecurityRequirement = z.record(z.string(), z.array(z.string()));
@@ -161,12 +161,12 @@ const SecurityRequirement = z.record(z.string(), z.array(z.string()));
 const Tag = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
-  externalDocs: Reference.optional(),
+  externalDocs: Reference.optional()
 });
 
 const ExternalDocumentation = z.object({
   description: z.string().optional(),
-  url: z.url(),
+  url: z.url()
 });
 
 const Components = z.object({
@@ -178,7 +178,7 @@ const Components = z.object({
   headers: z.record(z.string(), ResponseHeader).optional(),
   securitySchemes: z.record(z.string(), Reference).optional(),
   links: z.record(z.string(), Reference).optional(),
-  callbacks: z.record(z.string(), Reference).optional(),
+  callbacks: z.record(z.string(), Reference).optional()
 });
 
 export const OpenApiSpec = z.object({
@@ -189,7 +189,7 @@ export const OpenApiSpec = z.object({
   components: Components.optional(),
   security: z.array(SecurityRequirement).optional(),
   tags: z.array(Tag).optional(),
-  externalDocs: ExternalDocumentation.optional(),
+  externalDocs: ExternalDocumentation.optional()
 });
 
 export type OpenApiSpecType = z.infer<typeof OpenApiSpec>;

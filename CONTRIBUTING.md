@@ -22,7 +22,7 @@ This project adheres to a code of conduct. By participating, you are expected to
 ### Prerequisites
 
 - Node.js >= 18.0.0
-- yarn
+- npm
 - Git
 
 ### Development Setup
@@ -37,24 +37,24 @@ This project adheres to a code of conduct. By participating, you are expected to
 2. **Install Dependencies**
 
    ```bash
-   yarn install
+   npm install
    ```
 
 3. **Build the Project**
 
    ```bash
-   yarn build
+   npm run build
    ```
 
 4. **Run Tests**
 
    ```bash
-   yarn test
+   npm test
    ```
 
 5. **Run Development Mode**
    ```bash
-   yarn dev
+   npm run dev
    ```
 
 ## Making Changes
@@ -119,7 +119,7 @@ test: add integration tests for CLI
 3. **Validate Your Changes**
 
    ```bash
-   yarn validate
+   npm run validate
    ```
 
    This runs:
@@ -171,10 +171,10 @@ We use ESLint and Prettier for consistent code style:
 
 ```bash
 # Auto-fix linting issues
-yarn lint
+npm run lint
 
 # Format code
-yarn format
+npm run format
 ```
 
 ### File Structure
@@ -218,16 +218,16 @@ tests/
 
 ```bash
 # Run all tests
-yarn test
+npm test
 
 # Run tests in watch mode
-yarn test:watch
+npm run test:watch
 
 # Run with coverage
-yarn test:coverage
+npm run test:coverage
 
 # Run specific test file
-yarn vitest run generator.test.ts
+npx vitest run generator.test.ts
 ```
 
 ## Documentation

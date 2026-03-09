@@ -1,13 +1,13 @@
 import * as ts from 'typescript';
-import {z} from 'zod';
-import type {ImportBuilder} from '../interfaces/code-generator';
+import { z } from 'zod';
+import type { ImportBuilder } from '../interfaces/code-generator';
 
 const IsTypeImport = z.boolean();
 const ImportedElement = z.record(z.string(), IsTypeImport);
 
 const ImportOptions = z.object({
   defaultImport: ImportedElement.optional(),
-  namedImports: ImportedElement.optional(),
+  namedImports: ImportedElement.optional()
 });
 
 type ImportOptionsType = z.infer<typeof ImportOptions>;
@@ -16,15 +16,15 @@ export class TypeScriptImportBuilderService implements ImportBuilder {
   buildImports(): ts.ImportDeclaration[] {
     return [
       this.createImport('zod', {
-        namedImports: {z: false},
-      }),
+        namedImports: { z: false }
+      })
     ];
   }
 
   createImport(target: string, options: ImportOptionsType): ts.ImportDeclaration {
     const safeOptions = ImportOptions.parse(options);
     const [defaultImport] = Object.entries(safeOptions.defaultImport ?? {})[0] ?? [undefined, false];
-    const {success: hasDefaultImport} = z.string().safeParse(defaultImport);
+    const { success: hasDefaultImport } = z.string().safeParse(defaultImport);
 
     const safeNameImports = ImportedElement.safeParse(safeOptions.namedImports);
     const namedImportList = safeNameImports.success ? Object.entries(safeNameImports.data) : [];
@@ -35,7 +35,7 @@ export class TypeScriptImportBuilderService implements ImportBuilder {
         ? ts.factory.createNamedImports(
             namedImportList.map(([name, isTypeImport]) => {
               return ts.factory.createImportSpecifier(isTypeImport, undefined, ts.factory.createIdentifier(name));
-            }),
+            })
           )
         : undefined;
 
@@ -48,14 +48,10 @@ export class TypeScriptImportBuilderService implements ImportBuilder {
       undefined,
       hasAnyImports
         ? // eslint-disable-next-line @typescript-eslint/no-deprecated
-          ts.factory.createImportClause(
-            false,
-            hasDefaultImport && defaultImport ? ts.factory.createIdentifier(defaultImport) : undefined,
-            namedImports ?? undefined,
-          )
+          ts.factory.createImportClause(false, hasDefaultImport && defaultImport ? ts.factory.createIdentifier(defaultImport) : undefined, namedImports ?? undefined)
         : undefined,
       ts.factory.createStringLiteral(target, true),
-      undefined,
+      undefined
     );
   }
 }

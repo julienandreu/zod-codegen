@@ -1,6 +1,6 @@
-import {beforeEach, describe, expect, it} from 'vitest';
-import {TypeScriptCodeGeneratorService} from '../../src/services/code-generator.service';
-import type {OpenApiSpecType} from '../../src/types/openapi';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { TypeScriptCodeGeneratorService } from '../../src/services/code-generator.service';
+import type { OpenApiSpecType } from '../../src/types/openapi';
 
 describe('TypeScriptCodeGeneratorService', () => {
   let generator: TypeScriptCodeGeneratorService;
@@ -15,7 +15,7 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {
           '/users': {
@@ -26,18 +26,18 @@ describe('TypeScriptCodeGeneratorService', () => {
                   description: 'Success',
                   content: {
                     'application/json': {
-                      schema: {type: 'string'},
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
+                      schema: { type: 'string' }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       };
 
       const generatorWithConvention = new TypeScriptCodeGeneratorService({
-        namingConvention: 'camelCase',
+        namingConvention: 'camelCase'
       });
       const code = generatorWithConvention.generate(spec);
       expect(code).toContain('async getUserById');
@@ -49,7 +49,7 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {
           '/users': {
@@ -60,18 +60,18 @@ describe('TypeScriptCodeGeneratorService', () => {
                   description: 'Success',
                   content: {
                     'application/json': {
-                      schema: {type: 'string'},
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
+                      schema: { type: 'string' }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       };
 
       const generatorWithConvention = new TypeScriptCodeGeneratorService({
-        namingConvention: 'PascalCase',
+        namingConvention: 'PascalCase'
       });
       const code = generatorWithConvention.generate(spec);
       expect(code).toContain('async GetUserById');
@@ -83,7 +83,7 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {
           '/users': {
@@ -94,18 +94,18 @@ describe('TypeScriptCodeGeneratorService', () => {
                   description: 'Success',
                   content: {
                     'application/json': {
-                      schema: {type: 'string'},
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
+                      schema: { type: 'string' }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       };
 
       const generatorWithConvention = new TypeScriptCodeGeneratorService({
-        namingConvention: 'snake_case',
+        namingConvention: 'snake_case'
       });
       const code = generatorWithConvention.generate(spec);
       expect(code).toContain('async get_user_by_id');
@@ -117,7 +117,7 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {
           '/users/{id}': {
@@ -130,29 +130,22 @@ describe('TypeScriptCodeGeneratorService', () => {
                   description: 'Success',
                   content: {
                     'application/json': {
-                      schema: {type: 'string'},
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
+                      schema: { type: 'string' }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       };
 
-      const customTransformer = (details: {
-        operationId: string;
-        method: string;
-        path: string;
-        tags?: string[];
-        summary?: string;
-        description?: string;
-      }) => {
+      const customTransformer = (details: { operationId: string; method: string; path: string; tags?: string[]; summary?: string; description?: string }) => {
         return `${details.method.toUpperCase()}_${details.tags?.[0] || 'default'}_${details.operationId}`;
       };
 
       const generatorWithTransformer = new TypeScriptCodeGeneratorService({
-        operationNameTransformer: customTransformer,
+        operationNameTransformer: customTransformer
       });
       const code = generatorWithTransformer.generate(spec);
       expect(code).toContain('async GET_users_getUserById');
@@ -163,7 +156,7 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {
           '/users': {
@@ -174,21 +167,21 @@ describe('TypeScriptCodeGeneratorService', () => {
                   description: 'Success',
                   content: {
                     'application/json': {
-                      schema: {type: 'string'},
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
+                      schema: { type: 'string' }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       };
 
       const customTransformer = () => 'customName';
 
       const generatorWithBoth = new TypeScriptCodeGeneratorService({
         namingConvention: 'PascalCase',
-        operationNameTransformer: customTransformer,
+        operationNameTransformer: customTransformer
       });
       const code = generatorWithBoth.generate(spec);
       expect(code).toContain('async customName');
@@ -203,9 +196,9 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
-        paths: {},
+        paths: {}
       };
 
       const code = generator.generate(spec);
@@ -220,7 +213,7 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
@@ -228,13 +221,13 @@ describe('TypeScriptCodeGeneratorService', () => {
             User: {
               type: 'object',
               properties: {
-                id: {type: 'integer'},
-                name: {type: 'string'},
+                id: { type: 'integer' },
+                name: { type: 'string' }
               },
-              required: ['id', 'name'],
-            },
-          },
-        },
+              required: ['id', 'name']
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -249,7 +242,7 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {
           '/users': {
@@ -262,15 +255,15 @@ describe('TypeScriptCodeGeneratorService', () => {
                     'application/json': {
                       schema: {
                         type: 'array',
-                        items: {type: 'string'},
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
+                        items: { type: 'string' }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -283,9 +276,9 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
-        paths: {},
+        paths: {}
       };
 
       const code = generator.generate(spec);
@@ -298,10 +291,10 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
-        servers: [{url: 'https://api.example.com'}],
-        paths: {},
+        servers: [{ url: 'https://api.example.com' }],
+        paths: {}
       };
 
       const code = generator.generate(spec);
@@ -314,7 +307,7 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
@@ -322,21 +315,21 @@ describe('TypeScriptCodeGeneratorService', () => {
             User: {
               type: 'object',
               properties: {
-                id: {type: 'integer'},
-                profile: {$ref: '#/components/schemas/Profile'},
+                id: { type: 'integer' },
+                profile: { $ref: '#/components/schemas/Profile' }
               },
-              required: ['id'],
+              required: ['id']
             },
             Profile: {
               type: 'object',
               properties: {
-                name: {type: 'string'},
-                email: {type: 'string', format: 'email'},
+                name: { type: 'string' },
+                email: { type: 'string', format: 'email' }
               },
-              required: ['name', 'email'],
-            },
-          },
-        },
+              required: ['name', 'email']
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -353,17 +346,17 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
           schemas: {
             Status: {
               type: 'string',
-              enum: ['active', 'inactive', 'pending'],
-            },
-          },
-        },
+              enum: ['active', 'inactive', 'pending']
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -378,21 +371,21 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
           schemas: {
             Status: {
               type: 'integer',
-              enum: [-99, 0, 1, 2],
+              enum: [-99, 0, 1, 2]
             },
             ExecutionMode: {
               type: 'integer',
-              enum: [1, 2],
-            },
-          },
-        },
+              enum: [1, 2]
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -413,7 +406,7 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {
           '/test': {
@@ -424,14 +417,14 @@ describe('TypeScriptCodeGeneratorService', () => {
                   description: 'Success',
                   content: {
                     'application/json': {
-                      schema: {type: 'string'},
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
+                      schema: { type: 'string' }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -456,17 +449,17 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
           schemas: {
             Tags: {
               type: 'array',
-              items: {type: 'string'},
-            },
-          },
-        },
+              items: { type: 'string' }
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -477,31 +470,31 @@ describe('TypeScriptCodeGeneratorService', () => {
 
   describe('buildSchema', () => {
     it('should build schema for string type', () => {
-      const schema = {type: 'string'};
+      const schema = { type: 'string' };
       const result = generator.buildSchema(schema, true);
       expect(result).toBeDefined();
     });
 
     it('should build schema for number type', () => {
-      const schema = {type: 'number'};
+      const schema = { type: 'number' };
       const result = generator.buildSchema(schema, true);
       expect(result).toBeDefined();
     });
 
     it('should build schema for boolean type', () => {
-      const schema = {type: 'boolean'};
+      const schema = { type: 'boolean' };
       const result = generator.buildSchema(schema, true);
       expect(result).toBeDefined();
     });
 
     it('should handle optional fields', () => {
-      const schema = {type: 'string'};
+      const schema = { type: 'string' };
       const result = generator.buildSchema(schema, false);
       expect(result).toBeDefined();
     });
 
     it('should handle string formats', () => {
-      const schema = {type: 'string', format: 'email'};
+      const schema = { type: 'string', format: 'email' };
       const result = generator.buildSchema(schema, true);
       expect(result).toBeDefined();
     });
@@ -513,7 +506,7 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
@@ -521,16 +514,16 @@ describe('TypeScriptCodeGeneratorService', () => {
             TreeNode: {
               type: 'object',
               properties: {
-                value: {type: 'string'},
+                value: { type: 'string' },
                 children: {
                   type: 'array',
-                  items: {$ref: '#/components/schemas/TreeNode'},
-                },
+                  items: { $ref: '#/components/schemas/TreeNode' }
+                }
               },
-              required: ['value'],
-            },
-          },
-        },
+              required: ['value']
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -542,7 +535,7 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
@@ -550,21 +543,21 @@ describe('TypeScriptCodeGeneratorService', () => {
             Person: {
               type: 'object',
               properties: {
-                name: {type: 'string'},
-                bestFriend: {$ref: '#/components/schemas/Friend'},
+                name: { type: 'string' },
+                bestFriend: { $ref: '#/components/schemas/Friend' }
               },
-              required: ['name'],
+              required: ['name']
             },
             Friend: {
               type: 'object',
               properties: {
-                nickname: {type: 'string'},
-                person: {$ref: '#/components/schemas/Person'},
+                nickname: { type: 'string' },
+                person: { $ref: '#/components/schemas/Person' }
               },
-              required: ['nickname'],
-            },
-          },
-        },
+              required: ['nickname']
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -578,7 +571,7 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
@@ -586,20 +579,20 @@ describe('TypeScriptCodeGeneratorService', () => {
             User: {
               type: 'object',
               properties: {
-                id: {type: 'integer'},
-                profile: {$ref: '#/components/schemas/Profile'},
+                id: { type: 'integer' },
+                profile: { $ref: '#/components/schemas/Profile' }
               },
-              required: ['id'],
+              required: ['id']
             },
             Profile: {
               type: 'object',
               properties: {
-                name: {type: 'string'},
+                name: { type: 'string' }
               },
-              required: ['name'],
-            },
-          },
-        },
+              required: ['name']
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -613,7 +606,7 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
@@ -621,23 +614,23 @@ describe('TypeScriptCodeGeneratorService', () => {
             Alpha: {
               type: 'object',
               properties: {
-                beta: {$ref: '#/components/schemas/Beta'},
-              },
+                beta: { $ref: '#/components/schemas/Beta' }
+              }
             },
             Beta: {
               type: 'object',
               properties: {
-                gamma: {$ref: '#/components/schemas/Gamma'},
-              },
+                gamma: { $ref: '#/components/schemas/Gamma' }
+              }
             },
             Gamma: {
               type: 'object',
               properties: {
-                alpha: {$ref: '#/components/schemas/Alpha'},
-              },
-            },
-          },
-        },
+                alpha: { $ref: '#/components/schemas/Alpha' }
+              }
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -652,7 +645,7 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
@@ -660,16 +653,16 @@ describe('TypeScriptCodeGeneratorService', () => {
             Category: {
               type: 'object',
               properties: {
-                name: {type: 'string'},
+                name: { type: 'string' },
                 subcategories: {
                   type: 'array',
-                  items: {$ref: '#/components/schemas/Category'},
-                },
+                  items: { $ref: '#/components/schemas/Category' }
+                }
               },
-              required: ['name'],
-            },
-          },
-        },
+              required: ['name']
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -681,7 +674,7 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
@@ -690,12 +683,12 @@ describe('TypeScriptCodeGeneratorService', () => {
               type: 'object',
               properties: {
                 value: {
-                  anyOf: [{type: 'string'}, {$ref: '#/components/schemas/Expression'}],
-                },
-              },
-            },
-          },
-        },
+                  anyOf: [{ type: 'string' }, { $ref: '#/components/schemas/Expression' }]
+                }
+              }
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -709,16 +702,16 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
           schemas: {
             StringOrNumber: {
-              anyOf: [{type: 'string'}, {type: 'number'}],
-            },
-          },
-        },
+              anyOf: [{ type: 'string' }, { type: 'number' }]
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -732,19 +725,19 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
           schemas: {
             Variant: {
               oneOf: [
-                {type: 'object', properties: {name: {type: 'string'}}},
-                {type: 'object', properties: {id: {type: 'number'}}},
-              ],
-            },
-          },
-        },
+                { type: 'object', properties: { name: { type: 'string' } } },
+                { type: 'object', properties: { id: { type: 'number' } } }
+              ]
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -756,19 +749,19 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
           schemas: {
             Combined: {
               allOf: [
-                {type: 'object', properties: {id: {type: 'number'}}},
-                {type: 'object', properties: {name: {type: 'string'}}},
-              ],
-            },
-          },
-        },
+                { type: 'object', properties: { id: { type: 'number' } } },
+                { type: 'object', properties: { name: { type: 'string' } } }
+              ]
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -780,16 +773,16 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
           schemas: {
             EmptyObject: {
-              anyOf: [{type: 'object', properties: {}}],
-            },
-          },
-        },
+              anyOf: [{ type: 'object', properties: {} }]
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -802,16 +795,16 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
           schemas: {
             GenericArray: {
-              anyOf: [{type: 'array'}],
-            },
-          },
-        },
+              anyOf: [{ type: 'array' }]
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -825,16 +818,16 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
           schemas: {
             UnknownType: {
-              anyOf: [{type: 'unknown' as any}],
-            },
-          },
-        },
+              anyOf: [{ type: 'unknown' as any }]
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -846,16 +839,16 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
           schemas: {
             InvalidSchema: {
-              anyOf: [null as any],
-            },
-          },
-        },
+              anyOf: [null as any]
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -868,16 +861,16 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
           schemas: {
             IntOrString: {
-              anyOf: [{type: 'integer'}, {type: 'string'}],
-            },
-          },
-        },
+              anyOf: [{ type: 'integer' }, { type: 'string' }]
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -890,16 +883,16 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
           schemas: {
             BoolOrString: {
-              anyOf: [{type: 'boolean'}, {type: 'string'}],
-            },
-          },
-        },
+              anyOf: [{ type: 'boolean' }, { type: 'string' }]
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -912,7 +905,7 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
@@ -922,14 +915,14 @@ describe('TypeScriptCodeGeneratorService', () => {
                 {
                   type: 'object',
                   properties: {
-                    name: {type: 'string'},
-                    age: {type: 'number'},
-                  },
-                },
-              ],
-            },
-          },
-        },
+                    name: { type: 'string' },
+                    age: { type: 'number' }
+                  }
+                }
+              ]
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -943,7 +936,7 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
@@ -952,12 +945,12 @@ describe('TypeScriptCodeGeneratorService', () => {
               anyOf: [
                 {
                   type: 'array',
-                  items: {type: 'string'},
-                },
-              ],
-            },
-          },
-        },
+                  items: { type: 'string' }
+                }
+              ]
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -971,16 +964,16 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
           schemas: {
             InvalidSchema: {
-              anyOf: [{} as any],
-            },
-          },
-        },
+              anyOf: [{} as any]
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -995,7 +988,7 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         servers: [
           {
@@ -1003,18 +996,18 @@ describe('TypeScriptCodeGeneratorService', () => {
             variables: {
               environment: {
                 default: 'api',
-                enum: ['api', 'api.staging', 'api.prod'],
+                enum: ['api', 'api.staging', 'api.prod']
               },
               port: {
-                default: '443',
+                default: '443'
               },
               version: {
-                default: '1',
-              },
-            },
-          },
+                default: '1'
+              }
+            }
+          }
         ],
-        paths: {},
+        paths: {}
       };
 
       const code = generator.generate(spec);
@@ -1031,7 +1024,7 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         servers: [
           {
@@ -1040,12 +1033,12 @@ describe('TypeScriptCodeGeneratorService', () => {
               env: {
                 default: 'prod',
                 enum: ['dev', 'staging', 'prod'],
-                description: 'Environment',
-              },
-            },
-          },
+                description: 'Environment'
+              }
+            }
+          }
         ],
-        paths: {},
+        paths: {}
       };
 
       const code = generator.generate(spec);
@@ -1060,22 +1053,22 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         servers: [
           {
-            url: 'https://api.example.com',
+            url: 'https://api.example.com'
           },
           {
             url: 'https://{env}.example.com',
             variables: {
               env: {
-                default: 'staging',
-              },
-            },
-          },
+                default: 'staging'
+              }
+            }
+          }
         ],
-        paths: {},
+        paths: {}
       };
 
       const code = generator.generate(spec);
@@ -1092,7 +1085,7 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
@@ -1100,13 +1093,13 @@ describe('TypeScriptCodeGeneratorService', () => {
             Order: {
               type: 'object',
               properties: {
-                id: {type: 'integer'},
-                name: {type: 'string'},
+                id: { type: 'integer' },
+                name: { type: 'string' }
               },
-              required: ['id', 'name'],
-            },
-          },
-        },
+              required: ['id', 'name']
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -1128,17 +1121,17 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
           schemas: {
             Status: {
               type: 'string',
-              enum: ['active', 'inactive', 'pending'],
-            },
-          },
-        },
+              enum: ['active', 'inactive', 'pending']
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -1158,17 +1151,17 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
           schemas: {
             Tags: {
               type: 'array',
-              items: {type: 'string'},
-            },
-          },
-        },
+              items: { type: 'string' }
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -1185,7 +1178,7 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
@@ -1193,20 +1186,20 @@ describe('TypeScriptCodeGeneratorService', () => {
             User: {
               type: 'object',
               properties: {
-                id: {type: 'integer'},
-                profile: {$ref: '#/components/schemas/Profile'},
+                id: { type: 'integer' },
+                profile: { $ref: '#/components/schemas/Profile' }
               },
-              required: ['id'],
+              required: ['id']
             },
             Profile: {
               type: 'object',
               properties: {
-                name: {type: 'string'},
+                name: { type: 'string' }
               },
-              required: ['name'],
-            },
-          },
-        },
+              required: ['name']
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -1228,16 +1221,16 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
           schemas: {
             StringOrNumber: {
-              anyOf: [{type: 'string'}, {type: 'number'}],
-            },
-          },
-        },
+              anyOf: [{ type: 'string' }, { type: 'number' }]
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -1254,7 +1247,7 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
@@ -1262,23 +1255,23 @@ describe('TypeScriptCodeGeneratorService', () => {
             Base: {
               type: 'object',
               properties: {
-                id: {type: 'integer'},
+                id: { type: 'integer' }
               },
-              required: ['id'],
+              required: ['id']
             },
             Extended: {
               allOf: [
-                {$ref: '#/components/schemas/Base'},
+                { $ref: '#/components/schemas/Base' },
                 {
                   type: 'object',
                   properties: {
-                    name: {type: 'string'},
-                  },
-                },
-              ],
-            },
-          },
-        },
+                    name: { type: 'string' }
+                  }
+                }
+              ]
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -1299,7 +1292,7 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
@@ -1307,13 +1300,13 @@ describe('TypeScriptCodeGeneratorService', () => {
             User: {
               type: 'object',
               properties: {
-                id: {type: 'integer'},
-                email: {type: 'string'},
+                id: { type: 'integer' },
+                email: { type: 'string' }
               },
-              required: ['id'],
-            },
-          },
-        },
+              required: ['id']
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -1329,7 +1322,7 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
@@ -1337,16 +1330,16 @@ describe('TypeScriptCodeGeneratorService', () => {
             Node: {
               type: 'object',
               properties: {
-                id: {type: 'integer'},
+                id: { type: 'integer' },
                 children: {
                   type: 'array',
-                  items: {$ref: '#/components/schemas/Node'},
-                },
+                  items: { $ref: '#/components/schemas/Node' }
+                }
               },
-              required: ['id'],
-            },
-          },
-        },
+              required: ['id']
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);
@@ -1367,17 +1360,17 @@ describe('TypeScriptCodeGeneratorService', () => {
         openapi: '3.0.0',
         info: {
           title: 'Test API',
-          version: '1.0.0',
+          version: '1.0.0'
         },
         paths: {},
         components: {
           schemas: {
             Priority: {
               type: 'integer',
-              enum: [0, 1, 2],
-            },
-          },
-        },
+              enum: [0, 1, 2]
+            }
+          }
+        }
       };
 
       const code = generator.generate(spec);

@@ -1,9 +1,9 @@
-import {format} from 'node:util';
+import { format } from 'node:util';
 
 export class Reporter {
   constructor(
     private readonly stdout: NodeJS.WriteStream,
-    private readonly stderr: NodeJS.WriteStream = stdout,
+    private readonly stderr: NodeJS.WriteStream = stdout
   ) {
     this.log = this.log.bind(this);
     this.error = this.error.bind(this);

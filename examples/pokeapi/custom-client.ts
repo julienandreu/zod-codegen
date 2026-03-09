@@ -4,7 +4,7 @@
  * Run with: npx ts-node examples/pokeapi/custom-client.ts
  */
 
-import {PokAPI, defaultBaseUrl} from './type';
+import { defaultBaseUrl, PokAPI } from './api';
 
 class CustomPokeAPIClient extends PokAPI {
   protected getBaseRequestOptions(): Partial<Omit<RequestInit, 'method' | 'body'>> {
@@ -14,10 +14,10 @@ class CustomPokeAPIClient extends PokAPI {
       headers: {
         ...((options.headers as Record<string, string>) || {}),
         'User-Agent': 'MyPokemonApp/1.0.0 (https://myapp.com)',
-        Accept: 'application/json',
+        'Accept': 'application/json'
       },
       mode: 'cors',
-      cache: 'default',
+      cache: 'default'
     };
   }
 }
@@ -49,6 +49,7 @@ async function main() {
     } else {
       console.error('❌ Unknown error:', error);
     }
+
     process.exit(1);
   }
 }
