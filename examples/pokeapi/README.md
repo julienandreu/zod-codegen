@@ -15,10 +15,10 @@ zod-codegen --input ./samples/pokeapi-openapi.json --output ./examples/pokeapi
 ## Basic Usage
 
 ```typescript
-import {PokAPI, defaultBaseUrl} from './api';
+import PokAPI from './api';
 
 // Create a client instance
-const client = new PokAPI(defaultBaseUrl);
+const client = new PokAPI({});
 
 // Use the generated methods
 const pokemon = await client.getPokemonById('pikachu');
@@ -30,10 +30,10 @@ console.log('Pokemon:', pokemon);
 See [basic-usage.ts](./basic-usage.ts) for a complete example:
 
 ```typescript
-import {PokAPI, defaultBaseUrl} from './api';
+import PokAPI from './api';
 
 async function getPokemonInfo() {
-  const client = new PokAPI(defaultBaseUrl);
+  const client = new PokAPI({});
 
   try {
     // Get a specific Pokémon by ID or name
@@ -73,7 +73,7 @@ npx ts-node examples/pokeapi/basic-usage.ts
 See [custom-client.ts](./custom-client.ts) for a complete example:
 
 ```typescript
-import {PokAPI, defaultBaseUrl} from './api';
+import PokAPI from './api';
 
 class CustomPokeAPI extends PokAPI {
   protected getBaseRequestOptions(): Partial<Omit<RequestInit, 'method' | 'body'>> {
@@ -83,15 +83,15 @@ class CustomPokeAPI extends PokAPI {
       headers: {
         ...((options.headers as Record<string, string>) || {}),
         'User-Agent': 'MyPokemonApp/1.0.0',
-        Accept: 'application/json',
+        'Accept': 'application/json'
       },
       mode: 'cors',
-      cache: 'default',
+      cache: 'default'
     };
   }
 }
 
-const client = new CustomPokeAPI(defaultBaseUrl);
+const client = new CustomPokeAPI({});
 ```
 
 **Run the example:**

@@ -4,7 +4,7 @@
  * Run with: npx ts-node examples/pokeapi/custom-client.ts
  */
 
-import { defaultBaseUrl, PokAPI } from './api';
+import PokAPI from './api';
 
 class CustomPokeAPIClient extends PokAPI {
   protected getBaseRequestOptions(): Partial<Omit<RequestInit, 'method' | 'body'>> {
@@ -23,7 +23,7 @@ class CustomPokeAPIClient extends PokAPI {
 }
 
 async function main() {
-  const client = new CustomPokeAPIClient(defaultBaseUrl);
+  const client = new CustomPokeAPIClient({});
 
   try {
     console.log('🔍 Fetching Pokémon with custom client...\n');

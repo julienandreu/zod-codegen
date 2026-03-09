@@ -144,6 +144,7 @@ The generator creates a single TypeScript file (`api.ts`) containing:
 
 - **Zod Schemas**: Exported Zod validation schemas for all component schemas defined in your OpenAPI spec
 - **API Client Class**: A type-safe client class with methods for each endpoint operation
+- **ResponseValidationError**: A generic error class thrown when response data fails Zod schema validation, carrying the original response and error details
 - **Server Configuration**: `serverConfigurations` array and `defaultBaseUrl` constant extracted from OpenAPI servers
 - **Client Options Type**: `ClientOptions` type for flexible server selection and variable overrides
 - **Protected Extension Points**:
@@ -272,6 +273,21 @@ export type ClientOptions = {
   serverVariables?: Record<string, string>;
 };
 
+// ResponseValidationError class
+export class ResponseValidationError<T> extends Error {
+  readonly response: Response;
+  readonly error: z.ZodError<T>;
+  constructor(message: string, response: Response, error: z.ZodError<T>) {
+    super(message);
+    this.name = 'ResponseValidationError' as const;
+    this.response = response;
+    this.error = error;
+  }
+  get data(): T {
+    return this.response.json() as T;
+  }
+}
+
 // Client class
 export class UserAPI {
   readonly #baseUrl: string;
@@ -284,18 +300,23 @@ export class UserAPI {
     return {};
   }
 
-  async getUserById(id: number): Promise<z.infer<typeof User>> {
-    return User.parse(await this.#makeRequest<z.infer<typeof User>>('GET', `/users/${id}`, {}));
+  async getUserById(id: number): Promise<User> {
+    const response = await this.makeRequest('GET', `/users/${id}`, {});
+    const parsedUser = User.safeParse(response);
+    if (!parsedUser.success) {
+      throw new ResponseValidationError<User>(`Invalid user: ...`, response, parsedUser.error);
+    }
+    return parsedUser.data;
   }
 
-  // ... private #makeRequest method
+  // ... protected makeRequest method
 }
 ```
 
 **Usage:**
 
 ```typescript
-import { UserAPI, User } from './generated/api';
+import UserAPI from './generated/api';
 
 // Use default server from OpenAPI spec
 const client = new UserAPI({});
@@ -316,7 +337,8 @@ The generated client includes a protected `getBaseRequestOptions()` method that 
 #### Basic Authentication Example
 
 ```typescript
-import { UserAPI, ClientOptions } from './generated/api';
+import UserAPI from './generated/api';
+import type { ClientOptions } from './generated/api';
 
 class AuthenticatedUserAPI extends UserAPI {
   private accessToken: string | null = null;
@@ -350,7 +372,8 @@ const user = await client.getUserById(123); // Includes Authorization header
 #### Complete Configuration Example
 
 ```typescript
-import { UserAPI, ClientOptions } from './generated/api';
+import UserAPI from './generated/api';
+import type { ClientOptions } from './generated/api';
 
 class FullyConfiguredAPI extends UserAPI {
   private accessToken: string | null = null;

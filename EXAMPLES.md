@@ -13,7 +13,8 @@ All examples below demonstrate how to extend the generated client class to add t
 ### Example: Adding Bearer Token Authentication
 
 ```typescript
-import { SwaggerPetstoreOpenAPI30, ClientOptions } from './generated/api';
+import SwaggerPetstoreOpenAPI30 from './generated/api';
+import type { ClientOptions } from './generated/api';
 
 class AuthenticatedPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
   private accessToken: string | null = null;
@@ -69,7 +70,7 @@ void main();
 ### Example: Session Management with Token Refresh
 
 ```typescript
-import { SwaggerPetstoreOpenAPI30 } from './generated/api';
+import SwaggerPetstoreOpenAPI30 from './generated/api';
 
 class SessionManagedPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
   private accessToken: string | null = null;
@@ -132,7 +133,8 @@ class SessionManagedPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
 If you need to pass custom headers for specific requests, you can extend the client and add helper methods:
 
 ```typescript
-import { SwaggerPetstoreOpenAPI30, ClientOptions } from './generated/api';
+import SwaggerPetstoreOpenAPI30 from './generated/api';
+import type { ClientOptions } from './generated/api';
 
 class CustomHeadersPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
   constructor(options: ClientOptions = {}) {
@@ -159,7 +161,8 @@ class CustomHeadersPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
 ### Example: API Key Authentication
 
 ```typescript
-import { SwaggerPetstoreOpenAPI30, ClientOptions } from './generated/api';
+import SwaggerPetstoreOpenAPI30 from './generated/api';
+import type { ClientOptions } from './generated/api';
 
 class ApiKeyAuthenticatedPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
   constructor(options: ClientOptions & { apiKey: string }) {
@@ -185,7 +188,8 @@ class ApiKeyAuthenticatedPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
 ### Example: Using AbortController for Request Cancellation
 
 ```typescript
-import { SwaggerPetstoreOpenAPI30, ClientOptions } from './generated/api';
+import SwaggerPetstoreOpenAPI30 from './generated/api';
+import type { ClientOptions } from './generated/api';
 
 class CancellablePetstoreAPI extends SwaggerPetstoreOpenAPI30 {
   constructor(options: ClientOptions = {}) {
@@ -220,7 +224,8 @@ client.cancelRequests();
 ### Example: Custom Credentials and CORS Mode
 
 ```typescript
-import { SwaggerPetstoreOpenAPI30, ClientOptions } from './generated/api';
+import SwaggerPetstoreOpenAPI30 from './generated/api';
+import type { ClientOptions } from './generated/api';
 
 class CustomCorsPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
   constructor(options: ClientOptions = {}) {
@@ -241,15 +246,13 @@ class CustomCorsPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
 const client = new CustomCorsPetstoreAPI({});
 ```
 
-<｜tool▁call▁begin｜>
-grep
-
 ### Example: Complete Configuration (CORS, User-Agent, Authentication)
 
 Here's a comprehensive example showing how to combine CORS settings, custom User-Agent, and authentication:
 
 ```typescript
-import { SwaggerPetstoreOpenAPI30, ClientOptions } from './generated/api';
+import SwaggerPetstoreOpenAPI30 from './generated/api';
+import type { ClientOptions } from './generated/api';
 
 class FullyConfiguredPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
   private accessToken: string | null = null;
@@ -315,7 +318,8 @@ const pets = await client.findPetsByStatus('available');
 You can also create different configurations for different environments:
 
 ```typescript
-import { SwaggerPetstoreOpenAPI30, ClientOptions } from './generated/api';
+import SwaggerPetstoreOpenAPI30 from './generated/api';
+import type { ClientOptions } from './generated/api';
 
 interface ClientConfig {
   userAgent?: string;
@@ -475,7 +479,7 @@ getBaseRequestOptions() called → Returns base options
     ↓
 fetch() called with merged options
     ↓
-Response returned and validated with Zod
+Response validated with Zod safeParse and ResponseValidationError
 ```
 
 ## Best Practices
@@ -595,7 +599,8 @@ class RobustAPI extends YourAPI {
 ### Pattern 1: Simple Authentication
 
 ```typescript
-import { YourAPI, ClientOptions } from './generated/api';
+import YourAPI from './generated/api';
+import type { ClientOptions } from './generated/api';
 
 class SimpleAuthAPI extends YourAPI {
   private token: string | null = null;
@@ -620,7 +625,8 @@ class SimpleAuthAPI extends YourAPI {
 ### Pattern 2: Multiple Headers
 
 ```typescript
-import { YourAPI, ClientOptions } from './generated/api';
+import YourAPI from './generated/api';
+import type { ClientOptions } from './generated/api';
 
 class MultiHeaderAPI extends YourAPI {
   constructor(options: ClientOptions = {}) {
@@ -645,7 +651,8 @@ class MultiHeaderAPI extends YourAPI {
 ### Pattern 3: Conditional Options
 
 ```typescript
-import { YourAPI, ClientOptions } from './generated/api';
+import YourAPI from './generated/api';
+import type { ClientOptions } from './generated/api';
 
 class ConditionalAPI extends YourAPI {
   constructor(options: ClientOptions = {}) {
@@ -702,7 +709,8 @@ return {
 **Solution**: Store token as instance property:
 
 ```typescript
-import { YourAPI, ClientOptions } from './generated/api';
+import YourAPI from './generated/api';
+import type { ClientOptions } from './generated/api';
 
 class MyAPI extends YourAPI {
   private token: string | null = null; // ✅ Instance property
@@ -765,7 +773,7 @@ Because `handleResponse` runs **before** the `!response.ok` check in the generat
 **Example override with optional HttpError class:**
 
 ```typescript
-import { SwaggerPetstoreOpenAPI30 } from './generated/api';
+import SwaggerPetstoreOpenAPI30 from './generated/api';
 
 /** Custom error for HTTP 4xx/5xx with status, statusText, and optional body */
 export class HttpError extends Error {
@@ -831,7 +839,7 @@ See [examples/petstore/error-handling-usage.ts](./examples/petstore/error-handli
 ### Example: Basic Retry Handler
 
 ```typescript
-import {SwaggerPetstoreOpenAPI30} from './generated/api';
+import SwaggerPetstoreOpenAPI30 from './generated/api';
 
 class PetstoreClientWithRetry extends SwaggerPetstoreOpenAPI30 {
   private retrying = false;

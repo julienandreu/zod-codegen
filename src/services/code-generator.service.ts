@@ -109,6 +109,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       ...Object.values(schemas),
       ...schemaTypeAliases,
       ...serverConfig,
+      this.buildResponseValidationErrorClass(),
       this.createComment('Client class'),
       clientClass
     ];
@@ -357,6 +358,98 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     });
 
     return ts.factory.createInterfaceDeclaration([ts.factory.createToken(ts.SyntaxKind.ExportKeyword)], ts.factory.createIdentifier(name), undefined, undefined, members);
+  }
+
+  private buildResponseValidationErrorClass(): ts.ClassDeclaration {
+    const typeParamT = ts.factory.createTypeParameterDeclaration(undefined, 'T');
+
+    const responseProperty = ts.factory.createPropertyDeclaration(
+      [ts.factory.createToken(ts.SyntaxKind.ReadonlyKeyword)],
+      'response',
+      undefined,
+      ts.factory.createTypeReferenceNode('Response'),
+      undefined
+    );
+
+    const errorProperty = ts.factory.createPropertyDeclaration(
+      [ts.factory.createToken(ts.SyntaxKind.ReadonlyKeyword)],
+      'error',
+      undefined,
+      ts.factory.createTypeReferenceNode(ts.factory.createQualifiedName(ts.factory.createIdentifier('z'), 'ZodError'), [ts.factory.createTypeReferenceNode('T')]),
+      undefined
+    );
+
+    const constructorDecl = ts.factory.createConstructorDeclaration(
+      undefined,
+      [
+        ts.factory.createParameterDeclaration(undefined, undefined, 'message', undefined, ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)),
+        ts.factory.createParameterDeclaration(undefined, undefined, 'response', undefined, ts.factory.createTypeReferenceNode('Response')),
+        ts.factory.createParameterDeclaration(
+          undefined,
+          undefined,
+          'error',
+          undefined,
+          ts.factory.createTypeReferenceNode(ts.factory.createQualifiedName(ts.factory.createIdentifier('z'), 'ZodError'), [ts.factory.createTypeReferenceNode('T')])
+        )
+      ],
+      ts.factory.createBlock(
+        [
+          ts.factory.createExpressionStatement(ts.factory.createCallExpression(ts.factory.createSuper(), undefined, [ts.factory.createIdentifier('message')])),
+          ts.factory.createExpressionStatement(
+            ts.factory.createBinaryExpression(
+              ts.factory.createPropertyAccessExpression(ts.factory.createThis(), 'name'),
+              ts.SyntaxKind.EqualsToken,
+              ts.factory.createAsExpression(ts.factory.createStringLiteral('ResponseValidationError', true), ts.factory.createTypeReferenceNode('const'))
+            )
+          ),
+          ts.factory.createExpressionStatement(
+            ts.factory.createBinaryExpression(
+              ts.factory.createPropertyAccessExpression(ts.factory.createThis(), 'response'),
+              ts.SyntaxKind.EqualsToken,
+              ts.factory.createIdentifier('response')
+            )
+          ),
+          ts.factory.createExpressionStatement(
+            ts.factory.createBinaryExpression(
+              ts.factory.createPropertyAccessExpression(ts.factory.createThis(), 'error'),
+              ts.SyntaxKind.EqualsToken,
+              ts.factory.createIdentifier('error')
+            )
+          )
+        ],
+        true
+      )
+    );
+
+    const dataGetter = ts.factory.createGetAccessorDeclaration(
+      undefined,
+      'data',
+      [],
+      ts.factory.createTypeReferenceNode('T'),
+      ts.factory.createBlock(
+        [
+          ts.factory.createReturnStatement(
+            ts.factory.createAsExpression(
+              ts.factory.createCallExpression(
+                ts.factory.createPropertyAccessExpression(ts.factory.createPropertyAccessExpression(ts.factory.createThis(), 'response'), 'json'),
+                undefined,
+                []
+              ),
+              ts.factory.createTypeReferenceNode('T')
+            )
+          )
+        ],
+        true
+      )
+    );
+
+    return ts.factory.createClassDeclaration(
+      [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
+      'ResponseValidationError',
+      [typeParamT],
+      [ts.factory.createHeritageClause(ts.SyntaxKind.ExtendsKeyword, [ts.factory.createExpressionWithTypeArguments(ts.factory.createIdentifier('Error'), undefined)])],
+      [responseProperty, errorProperty, constructorDecl, dataGetter]
+    );
   }
 
   private buildClientClass(openapi: OpenApiSpecType, schemas: Record<string, ts.VariableStatement>): ts.ClassDeclaration {
@@ -1161,13 +1254,95 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       [ts.factory.createStringLiteral(method.toUpperCase(), true), pathExpression, optionsExpression]
     );
 
-    // Add Zod validation if we have a response schema
     if (responseSchema) {
-      const validateCall = ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(responseSchema, ts.factory.createIdentifier('parse')), undefined, [
-        ts.factory.createAwaitExpression(makeRequestCall)
-      ]);
+      const schemaName = responseSchema.text;
+      const schemaNameLower = schemaName.charAt(0).toLowerCase() + schemaName.slice(1);
+      const parsedVarName = `parsed${schemaName}`;
 
-      statements.push(ts.factory.createReturnStatement(validateCall));
+      // const response = await this.makeRequest(...)
+      statements.push(
+        ts.factory.createVariableStatement(
+          undefined,
+          ts.factory.createVariableDeclarationList(
+            [ts.factory.createVariableDeclaration('response', undefined, undefined, ts.factory.createAwaitExpression(makeRequestCall))],
+            ts.NodeFlags.Const
+          )
+        )
+      );
+
+      // const parsed{Name} = {Schema}.safeParse(response)
+      statements.push(
+        ts.factory.createVariableStatement(
+          undefined,
+          ts.factory.createVariableDeclarationList(
+            [
+              ts.factory.createVariableDeclaration(
+                parsedVarName,
+                undefined,
+                undefined,
+                ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(responseSchema, ts.factory.createIdentifier('safeParse')), undefined, [
+                  ts.factory.createIdentifier('response')
+                ])
+              )
+            ],
+            ts.NodeFlags.Const
+          )
+        )
+      );
+
+      // if (!parsed{Name}.success) { throw new ResponseValidationError<{Type}>(...) }
+      statements.push(
+        ts.factory.createIfStatement(
+          ts.factory.createPrefixUnaryExpression(ts.SyntaxKind.ExclamationToken, ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier(parsedVarName), 'success')),
+          ts.factory.createBlock(
+            [
+              ts.factory.createThrowStatement(
+                ts.factory.createNewExpression(
+                  ts.factory.createIdentifier('ResponseValidationError'),
+                  [ts.factory.createTypeReferenceNode(schemaName)],
+                  [
+                    ts.factory.createTemplateExpression(ts.factory.createTemplateHead(`Invalid ${schemaNameLower}: `), [
+                      ts.factory.createTemplateSpan(
+                        ts.factory.createCallExpression(
+                          ts.factory.createPropertyAccessExpression(
+                            ts.factory.createCallExpression(
+                              ts.factory.createPropertyAccessExpression(
+                                ts.factory.createPropertyAccessExpression(ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier(parsedVarName), 'error'), 'errors'),
+                                'map'
+                              ),
+                              undefined,
+                              [
+                                ts.factory.createArrowFunction(
+                                  undefined,
+                                  undefined,
+                                  [ts.factory.createParameterDeclaration(undefined, undefined, 'error')],
+                                  undefined,
+                                  ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+                                  ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('error'), 'message')
+                                )
+                              ]
+                            ),
+                            'join'
+                          ),
+                          undefined,
+                          [ts.factory.createStringLiteral(', ', true)]
+                        ),
+                        ts.factory.createTemplateTail('')
+                      )
+                    ]),
+                    ts.factory.createIdentifier('response'),
+                    ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier(parsedVarName), 'error')
+                  ]
+                )
+              )
+            ],
+            true
+          )
+        )
+      );
+
+      // return parsed{Name}.data
+      statements.push(ts.factory.createReturnStatement(ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier(parsedVarName), 'data')));
     } else {
       statements.push(ts.factory.createReturnStatement(ts.factory.createAwaitExpression(makeRequestCall)));
     }
