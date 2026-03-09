@@ -53,7 +53,7 @@ zod-codegen --input ./samples/pokeapi-openapi.json --output ./examples/pokeapi
 
 Each example directory contains:
 
-- `type.ts` - Generated client and schemas (created by zod-codegen)
+- `api.ts` - Generated client and schemas (created by zod-codegen)
 - `README.md` - Example-specific documentation
 - `basic-usage.ts` - Basic usage examples
 - `authenticated-usage.ts` - Authentication examples (if applicable)
@@ -62,7 +62,7 @@ Each example directory contains:
 
 1. **Choose an example** that matches your use case
 2. **Generate the client** using the command shown in the example's README
-3. **Review the generated code** in `type.ts`
+3. **Review the generated code** in `api.ts`
 4. **Run the example scripts** to see it in action
 5. **Extend the client** using patterns from [EXAMPLES.md](../EXAMPLES.md)
 

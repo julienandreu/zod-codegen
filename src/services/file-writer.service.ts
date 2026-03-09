@@ -30,7 +30,7 @@ export class SyncFileWriterService implements FileWriter {
     writeFileSync(filePath, generatedContent);
   }
 
-  resolveOutputPath(outputDir: string, fileName = 'type.ts'): string {
+  resolveOutputPath(outputDir: string, fileName = 'api.ts'): string {
     return resolve(outputDir, fileName);
   }
 }

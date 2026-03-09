@@ -4,7 +4,7 @@
  * Run with: npx ts-node examples/pokeapi/basic-usage.ts
  */
 
-import {PokAPI, defaultBaseUrl} from './type';
+import {PokAPI, defaultBaseUrl} from './api';
 
 async function main() {
   const client = new PokAPI(defaultBaseUrl);

@@ -1,9 +1,10 @@
-import type {Reporter} from './utils/reporter';
-import type {OpenApiSpecType} from './types/openapi';
-import type {GeneratorOptions} from './types/generator-options';
-import {OpenApiFileParserService, SyncFileReaderService} from './services/file-reader.service';
+import {extname, resolve} from 'node:path';
 import {TypeScriptCodeGeneratorService} from './services/code-generator.service';
+import {OpenApiFileParserService, SyncFileReaderService} from './services/file-reader.service';
 import {SyncFileWriterService} from './services/file-writer.service';
+import type {GeneratorOptions} from './types/generator-options';
+import type {OpenApiSpecType} from './types/openapi';
+import type {Reporter} from './utils/reporter';
 
 // Re-export types for library users
 export type {GeneratorOptions} from './types/generator-options';
@@ -50,7 +51,7 @@ export class Generator {
    * @param _version - The version of the application/library (used in generated file headers)
    * @param reporter - Reporter instance for logging messages and errors
    * @param inputPath - Path or URL to the OpenAPI specification file
-   * @param _outputDir - Directory where generated files will be written
+   * @param _outputDir - Output directory (writes to <dir>/api.ts) or path to the generated file (e.g. ./dist/api.ts)
    * @param options - Optional configuration for code generation
    */
   constructor(
@@ -62,7 +63,9 @@ export class Generator {
     options: GeneratorOptions = {},
   ) {
     this.fileWriter = new SyncFileWriterService(this._name, this._version, inputPath);
-    this.outputPath = this.fileWriter.resolveOutputPath(this._outputDir);
+    const ext = extname(this._outputDir);
+    this.outputPath =
+      ext === '.ts' || ext === '.tsx' ? resolve(this._outputDir) : this.fileWriter.resolveOutputPath(this._outputDir);
     this.codeGenerator = new TypeScriptCodeGeneratorService(options);
   }
 

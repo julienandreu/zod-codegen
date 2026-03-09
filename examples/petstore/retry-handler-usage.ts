@@ -5,7 +5,7 @@
  * Run with: npx ts-node examples/petstore/retry-handler-usage.ts
  */
 
-import {SwaggerPetstoreOpenAPI30} from './type';
+import {SwaggerPetstoreOpenAPI30} from './api';
 
 class PetstoreClientWithRetry extends SwaggerPetstoreOpenAPI30 {
   private maxRetries = 3;

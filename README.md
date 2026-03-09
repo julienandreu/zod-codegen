@@ -29,13 +29,13 @@ A powerful TypeScript code generator that creates **Zod schemas** and **type-saf
 ### Global Installation (CLI)
 
 ```bash
-yarn global add zod-codegen
+npm install -g zod-codegen
 ```
 
 ### Project Installation
 
 ```bash
-yarn add --dev zod-codegen
+npm install --save-dev zod-codegen
 ```
 
 ## 🔧 Usage
@@ -55,13 +55,13 @@ zod-codegen -i ./swagger.yaml -o ./src/generated
 
 #### CLI Options
 
-| Option                | Alias | Description                         | Default     |
-| --------------------- | ----- | ----------------------------------- | ----------- |
-| `--input`             | `-i`  | Path or URL to OpenAPI file         | Required    |
-| `--output`            | `-o`  | Directory to output generated files | `generated` |
-| `--naming-convention` | `-n`  | Naming convention for operation IDs | (none)      |
-| `--help`              | `-h`  | Show help                           |             |
-| `--version`           | `-v`  | Show version                        |             |
+| Option                | Alias | Description                                                    | Default     |
+| --------------------- | ----- | -------------------------------------------------------------- | ----------- |
+| `--input`             | `-i`  | Path or URL to OpenAPI file                                    | Required    |
+| `--output`            | `-o`  | Output directory (writes api.ts) or path to the generated file | `generated` |
+| `--naming-convention` | `-n`  | Naming convention for operation IDs                            | (none)      |
+| `--help`              | `-h`  | Show help                                                      |             |
+| `--version`           | `-v`  | Show version                                                   |             |
 
 #### Naming Conventions
 
@@ -140,7 +140,7 @@ const generator = new Generator('my-app', '1.0.0', reporter, './openapi.json', '
 
 ## 📁 Generated Output
 
-The generator creates a single TypeScript file (`type.ts`) containing:
+The generator creates a single TypeScript file (`api.ts`) containing:
 
 - **Zod Schemas**: Exported Zod validation schemas for all component schemas defined in your OpenAPI spec
 - **API Client Class**: A type-safe client class with methods for each endpoint operation
@@ -202,7 +202,7 @@ export const defaultBaseUrl: string;   // First server with default variables
 
 ```
 generated/
-└── type.ts           # All schemas and client in one file
+└── api.ts             # All schemas and client in one file
 ```
 
 ## 🎯 Example
@@ -247,7 +247,7 @@ components:
       required: [id, name, email]
 ```
 
-**Generated Output** (`generated/type.ts`):
+**Generated Output** (`generated/api.ts`):
 
 ```typescript
 import {z} from 'zod';
@@ -295,7 +295,7 @@ export class UserAPI {
 **Usage:**
 
 ```typescript
-import {UserAPI, User} from './generated/type';
+import {UserAPI, User} from './generated/api';
 
 // Use default server from OpenAPI spec
 const client = new UserAPI({});
@@ -316,7 +316,7 @@ The generated client includes a protected `getBaseRequestOptions()` method that 
 #### Basic Authentication Example
 
 ```typescript
-import {UserAPI, ClientOptions} from './generated/type';
+import {UserAPI, ClientOptions} from './generated/api';
 
 class AuthenticatedUserAPI extends UserAPI {
   private accessToken: string | null = null;
@@ -350,7 +350,7 @@ const user = await client.getUserById(123); // Includes Authorization header
 #### Complete Configuration Example
 
 ```typescript
-import {UserAPI, ClientOptions} from './generated/type';
+import {UserAPI, ClientOptions} from './generated/api';
 
 class FullyConfiguredAPI extends UserAPI {
   private accessToken: string | null = null;
@@ -436,8 +436,8 @@ Each example includes:
 
 ### Prerequisites
 
-- Node.js ≥ 24.11.1
-- yarn
+- Node.js ≥ 18.0.0 (see [.nvmrc](.nvmrc) for recommended version)
+- npm
 
 ### Setup
 
@@ -447,56 +447,56 @@ git clone https://github.com/julienandreu/zod-codegen.git
 cd zod-codegen
 
 # Install dependencies
-yarn install
+npm install
 
 # Build the project
-yarn build
+npm run build
 
 # Run tests
-yarn test
+npm test
 
 # Run linting
-yarn lint
+npm run lint
 
 # Format code
-yarn format
+npm run format
 ```
 
 ### Testing
 
 ```bash
 # Run all tests
-yarn test
+npm test
 
 # Run tests in watch mode
-yarn test:watch
+npm run test:watch
 
 # Run tests with coverage
-yarn test:coverage
+npm run test:coverage
 
 # Run tests with UI
-yarn test:ui
+npm run test:ui
 ```
 
 ### Available Scripts
 
-| Script               | Description                                     |
-| -------------------- | ----------------------------------------------- |
-| `yarn build`         | Build the project                               |
-| `yarn build:watch`   | Build in watch mode                             |
-| `yarn dev`           | Development mode with example                   |
-| `yarn test`          | Run tests                                       |
-| `yarn test:watch`    | Run tests in watch mode                         |
-| `yarn test:coverage` | Run tests with coverage                         |
-| `yarn lint`          | Lint and fix code                               |
-| `yarn format`        | Format code with Prettier                       |
-| `yarn type-check`    | Type check without emitting                     |
-| `yarn validate`      | Run all checks (lint, format, type-check, test) |
-| `yarn clean`         | Clean build artifacts                           |
+| Script                  | Description                                     |
+| ----------------------- | ----------------------------------------------- |
+| `npm run build`         | Build the project                               |
+| `npm run build:watch`   | Build in watch mode                             |
+| `npm run dev`           | Development mode with example                   |
+| `npm test`              | Run tests                                       |
+| `npm run test:watch`    | Run tests in watch mode                         |
+| `npm run test:coverage` | Run tests with coverage                         |
+| `npm run lint`          | Lint and fix code                               |
+| `npm run format`        | Format code with Prettier                       |
+| `npm run type-check`    | Type check without emitting                     |
+| `npm run validate`      | Run all checks (lint, format, type-check, test) |
+| `npm run clean`         | Clean build artifacts                           |
 
 ## 📋 Requirements
 
-- **Node.js**: ≥ 24.11.1
+- **Node.js**: ≥ 18.0.0
 - **TypeScript**: ≥ 5.9.3
 - **Zod**: ≥ 4.1.12
 
@@ -509,8 +509,8 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 1. Fork the repository
 2. Create your feature branch: `git checkout -b feature/amazing-feature`
 3. Make your changes
-4. Run tests: `yarn test`
-5. Run validation: `yarn validate`
+4. Run tests: `npm test`
+5. Run validation: `npm run validate`
 6. Commit your changes: `git commit -m 'feat: add amazing feature'`
 7. Push to the branch: `git push origin feature/amazing-feature`
 8. Open a Pull Request

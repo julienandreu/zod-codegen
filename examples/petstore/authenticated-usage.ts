@@ -4,7 +4,7 @@
  * Run with: npx ts-node examples/petstore/authenticated-usage.ts
  */
 
-import {SwaggerPetstoreOpenAPI30, ClientOptions} from './type';
+import {ClientOptions, SwaggerPetstoreOpenAPI30} from './api';
 
 class AuthenticatedPetstoreAPI extends SwaggerPetstoreOpenAPI30 {
   private apiKey: string | null = null;

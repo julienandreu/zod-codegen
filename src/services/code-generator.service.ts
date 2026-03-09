@@ -64,7 +64,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
   }
 
   generate(spec: OpenApiSpecType): string {
-    const file = ts.createSourceFile('generated.ts', '', ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
+    const file = ts.createSourceFile('api.ts', '', ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
     const nodes = this.buildAST(spec);
     return this.printer.printList(ts.ListFormat.MultiLine, ts.factory.createNodeArray(nodes), file);
   }

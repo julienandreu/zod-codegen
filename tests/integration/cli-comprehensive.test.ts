@@ -1,7 +1,7 @@
-import {describe, expect, it} from 'vitest';
 import {execSync} from 'node:child_process';
+import {existsSync, readFileSync, rmSync} from 'node:fs';
 import {resolve} from 'node:path';
-import {existsSync, rmSync, readFileSync} from 'node:fs';
+import {describe, expect, it} from 'vitest';
 
 describe('CLI Comprehensive Integration', () => {
   const cwd = resolve(__dirname, '../..');
@@ -26,7 +26,7 @@ describe('CLI Comprehensive Integration', () => {
         cwd,
       });
 
-      const outputFile = resolve(cwd, 'generated/type.ts');
+      const outputFile = resolve(cwd, 'generated/api.ts');
       expect(existsSync(outputFile)).toBe(true);
 
       const content = readFileSync(outputFile, 'utf-8');
@@ -39,7 +39,7 @@ describe('CLI Comprehensive Integration', () => {
         cwd,
       });
 
-      const outputFile = resolve(testOutputDir, 'type.ts');
+      const outputFile = resolve(testOutputDir, 'api.ts');
       expect(existsSync(outputFile)).toBe(true);
     });
 
@@ -52,7 +52,7 @@ describe('CLI Comprehensive Integration', () => {
         },
       );
 
-      const outputFile = resolve(testOutputDir, 'type.ts');
+      const outputFile = resolve(testOutputDir, 'api.ts');
       const content = readFileSync(outputFile, 'utf-8');
 
       // Verify camelCase is applied (operation IDs should be camelCase)
@@ -70,6 +70,18 @@ describe('CLI Comprehensive Integration', () => {
           },
         );
       }).toThrow();
+    });
+
+    it('should write to custom file when output is a .ts path', () => {
+      const outputFile = resolve(testOutputDir, 'client.ts');
+      execSync(`node ./dist/src/cli.js --input ./samples/swagger-petstore.yaml --output "${outputFile}"`, {
+        encoding: 'utf-8',
+        cwd,
+      });
+
+      expect(existsSync(outputFile)).toBe(true);
+      const content = readFileSync(outputFile, 'utf-8');
+      expect(content).toContain('SwaggerPetstoreOpenAPI30');
     });
   });
 
@@ -106,7 +118,7 @@ describe('CLI Comprehensive Integration', () => {
         cwd,
       });
 
-      const outputFile = resolve(testOutputDir, 'type.ts');
+      const outputFile = resolve(testOutputDir, 'api.ts');
       expect(existsSync(outputFile)).toBe(true);
     });
 
@@ -116,7 +128,7 @@ describe('CLI Comprehensive Integration', () => {
         cwd,
       });
 
-      const outputFile = resolve(testOutputDir, 'type.ts');
+      const outputFile = resolve(testOutputDir, 'api.ts');
       expect(existsSync(outputFile)).toBe(true);
     });
   });

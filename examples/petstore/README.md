@@ -6,12 +6,12 @@ This example demonstrates how to use `zod-codegen` with the Swagger Petstore Ope
 
 After running `zod-codegen`, you'll get:
 
-- `type.ts` - Contains all Zod schemas and the generated API client
+- `api.ts` - Contains all Zod schemas and the generated API client
 
 ## Basic Usage
 
 ```typescript
-import {SwaggerPetstoreOpenAPI30} from './type';
+import {SwaggerPetstoreOpenAPI30} from './api';
 
 // Create a client instance using default server from OpenAPI spec
 const client = new SwaggerPetstoreOpenAPI30({});
@@ -26,7 +26,7 @@ console.log('Available pets:', pets);
 The generated client supports flexible server configuration:
 
 ```typescript
-import {SwaggerPetstoreOpenAPI30, ClientOptions} from './type';
+import {SwaggerPetstoreOpenAPI30, ClientOptions} from './api';
 
 // Option 1: Use default server (first server from OpenAPI spec)
 const defaultClient = new SwaggerPetstoreOpenAPI30({});
@@ -56,7 +56,7 @@ const variableClient = new SwaggerPetstoreOpenAPI30({
 ## Example: Finding Pets
 
 ```typescript
-import {SwaggerPetstoreOpenAPI30} from './type';
+import {SwaggerPetstoreOpenAPI30} from './api';
 
 async function findAvailablePets() {
   const client = new SwaggerPetstoreOpenAPI30({});
@@ -84,7 +84,7 @@ findAvailablePets();
 ## Example: Adding a Pet
 
 ```typescript
-import {SwaggerPetstoreOpenAPI30, Pet, PetStatus} from './type';
+import {SwaggerPetstoreOpenAPI30, Pet, PetStatus} from './api';
 import {z} from 'zod';
 
 async function addNewPet() {

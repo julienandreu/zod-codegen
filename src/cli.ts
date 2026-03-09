@@ -1,17 +1,17 @@
 #!/usr/bin/env node
 
+import {readFileSync} from 'node:fs';
+import {dirname, join} from 'node:path';
+import {fileURLToPath} from 'node:url';
 import yargs from 'yargs';
 import {hideBin} from 'yargs/helpers';
 import {Generator, type GeneratorOptions, type NamingConvention} from './generator';
-import {readFileSync} from 'node:fs';
-import {fileURLToPath} from 'node:url';
-import {dirname, join} from 'node:path';
 
+import debug from 'debug';
 import loudRejection from 'loud-rejection';
 import {handleErrors} from './utils/error-handler';
-import {handleSignals} from './utils/signal-handler';
-import debug from 'debug';
 import {Reporter} from './utils/reporter';
+import {handleSignals} from './utils/signal-handler';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Read package.json from the project root
@@ -69,8 +69,9 @@ const argv = yargs(hideBin(process.argv))
   .option('output', {
     alias: 'o',
     type: 'string',
-    description: 'Directory to output the generated files',
-    default: 'generated',
+    description:
+      'Output directory (writes to <output>/api.ts) or path to the generated file (e.g. ./dist/api.ts). Default: generated',
+    default: 'api.ts',
   })
   .option('naming-convention', {
     alias: 'n',

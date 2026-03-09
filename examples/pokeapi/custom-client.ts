@@ -4,7 +4,7 @@
  * Run with: npx ts-node examples/pokeapi/custom-client.ts
  */
 
-import {PokAPI, defaultBaseUrl} from './type';
+import {PokAPI, defaultBaseUrl} from './api';
 
 class CustomPokeAPIClient extends PokAPI {
   protected getBaseRequestOptions(): Partial<Omit<RequestInit, 'method' | 'body'>> {

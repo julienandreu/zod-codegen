@@ -1,11 +1,9 @@
+import {existsSync, mkdirSync, readFileSync, rmSync} from 'node:fs';
+import {dirname, join} from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {describe, expect, it} from 'vitest';
 import {Generator} from '../../src/generator';
 import {Reporter} from '../../src/utils/reporter';
-import {readFileSync, existsSync, mkdirSync, rmSync, writeFileSync} from 'node:fs';
-import {join} from 'node:path';
-import {fileURLToPath} from 'node:url';
-import {dirname} from 'node:path';
-import {execSync} from 'node:child_process';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const testOutputDir = join(__dirname, '../../test-output-snapshots');
@@ -34,7 +32,7 @@ describe('Generated Code Snapshots', () => {
       const exitCode = await generator.run();
       expect(exitCode).toBe(0);
 
-      const outputFile = join(testOutputDir, 'type.ts');
+      const outputFile = join(testOutputDir, 'api.ts');
       expect(existsSync(outputFile)).toBe(true);
 
       const content = readFileSync(outputFile, 'utf-8');
@@ -56,7 +54,7 @@ describe('Generated Code Snapshots', () => {
 
       await generator.run();
 
-      const outputFile = join(testOutputDir, 'type.ts');
+      const outputFile = join(testOutputDir, 'api.ts');
       const content = readFileSync(outputFile, 'utf-8');
 
       // Verify basic TypeScript syntax
@@ -78,7 +76,7 @@ describe('Generated Code Snapshots', () => {
 
       await generator.run();
 
-      const outputFile = join(testOutputDir, 'type.ts');
+      const outputFile = join(testOutputDir, 'api.ts');
       const content = readFileSync(outputFile, 'utf-8');
 
       // Verify logical operators are generated correctly
@@ -103,7 +101,7 @@ describe('Generated Code Snapshots', () => {
 
       await generator.run();
 
-      const outputFile = join(testOutputDir, 'type.ts');
+      const outputFile = join(testOutputDir, 'api.ts');
       const content = readFileSync(outputFile, 'utf-8');
 
       // Verify server variables are handled
@@ -120,7 +118,7 @@ describe('Generated Code Snapshots', () => {
 
       await generator.run();
 
-      const outputFile = join(testOutputDir, 'type.ts');
+      const outputFile = join(testOutputDir, 'api.ts');
       const content = readFileSync(outputFile, 'utf-8');
 
       expect(content).toMatch(/export (default )?class/);
