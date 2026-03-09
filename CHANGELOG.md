@@ -1,3 +1,14 @@
+## [1.7.0](https://github.com/julienandreu/zod-codegen/compare/v1.6.3...v1.7.0) (2026-03-09)
+
+### 🚀 Features
+
+- add API client generation, error handling examples, remove manifest ([#82](https://github.com/julienandreu/zod-codegen/issues/82)) ([0376803](https://github.com/julienandreu/zod-codegen/commit/0376803ad4025a742dbf48fd7fcb381eb43ad430))
+
+### 🐛 Bug Fixes
+
+- remove broken npm override causing release workflow failure ([#83](https://github.com/julienandreu/zod-codegen/issues/83)) ([03f285a](https://github.com/julienandreu/zod-codegen/commit/03f285a553f1e32e6e8747dc62724a48bcfaf525))
+- use system npm for semantic-release to avoid @npmcli/config errors ([#84](https://github.com/julienandreu/zod-codegen/issues/84)) ([72401dd](https://github.com/julienandreu/zod-codegen/commit/72401dd41b8eb665cd7825d03d03329c1037c7df))
+
 ## <small>1.6.3 (2026-01-22)</small>
 
 - fix: do not depend on inference anymore and build strict types all ar… (#60) ([b0b663e](https://github.com/julienandreu/zod-codegen/commit/b0b663e)), closes [#60](https://github.com/julienandreu/zod-codegen/issues/60)
