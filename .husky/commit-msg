@@ -1,2 +1,2 @@
 # Run commitlint to check commit message format
-npx --no -- commitlint --edit $1
+./node_modules/.bin/commitlint --edit "$1"

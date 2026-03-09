@@ -1,18 +1,17 @@
-import jp from 'jsonpath';
 import * as ts from 'typescript';
 import {z} from 'zod';
 import type {CodeGenerator, SchemaBuilder} from '../interfaces/code-generator';
-import type {MethodSchemaType, OpenApiSpecType, ReferenceType} from '../types/openapi';
 import type {GeneratorOptions} from '../types/generator-options';
+import type {MethodSchemaType, OpenApiSpecType, ReferenceType} from '../types/openapi';
 import {MethodSchema, Reference, SchemaProperties} from '../types/openapi';
-import {TypeScriptImportBuilderService} from './import-builder.service';
-import {TypeScriptTypeBuilderService} from './type-builder.service';
 import {
   type NamingConvention,
   type OperationDetails,
   type OperationNameTransformer,
   transformNamingConvention,
 } from '../utils/naming-convention';
+import {TypeScriptImportBuilderService} from './import-builder.service';
+import {TypeScriptTypeBuilderService} from './type-builder.service';
 
 export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuilder {
   private readonly typeBuilder = new TypeScriptTypeBuilderService();
@@ -34,6 +33,35 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     type: z.enum(['string', 'number', 'boolean', 'object', 'array', 'unknown', 'record']),
     args: z.array(z.unknown()).optional(),
   });
+
+  private extractSchemaReferences(schema: unknown): string[] {
+    const references = new Set<string>();
+
+    const walk = (node: unknown): void => {
+      if (Array.isArray(node)) {
+        for (const item of node) {
+          walk(item);
+        }
+        return;
+      }
+
+      if (node === null || typeof node !== 'object') {
+        return;
+      }
+
+      for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+        if (key === '$ref' && typeof value === 'string' && value.startsWith('#/components/schemas/')) {
+          references.add(value.replace('#/components/schemas/', ''));
+          continue;
+        }
+
+        walk(value);
+      }
+    };
+
+    walk(schema);
+    return [...references];
+  }
 
   generate(spec: OpenApiSpecType): string {
     const file = ts.createSourceFile('generated.ts', '', ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
@@ -3116,11 +3144,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     // Build dependency graph
     const graph = new Map<string, string[]>();
     for (const [name, schema] of Object.entries(schemas)) {
-      const dependencies = jp
-        .query(schema, '$..["$ref"]')
-        .filter((ref: string) => ref.startsWith('#/components/schemas/'))
-        .map((ref: string) => ref.replace('#/components/schemas/', ''))
-        .filter((dep: string) => dep in schemas);
+      const dependencies = this.extractSchemaReferences(schema).filter((dep: string) => dep in schemas);
       graph.set(name, dependencies);
     }
 
@@ -3206,10 +3230,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
       visiting.add(name);
       const schema = schemas[name];
-      const dependencies = jp
-        .query(schema, '$..["$ref"]')
-        .filter((ref: string) => ref.startsWith('#/components/schemas/'))
-        .map((ref: string) => ref.replace('#/components/schemas/', ''));
+      const dependencies = this.extractSchemaReferences(schema);
 
       for (const dep of dependencies) {
         if (schemas[dep]) {

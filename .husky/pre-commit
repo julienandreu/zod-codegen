@@ -1,5 +1,5 @@
 # Run lint-staged for staged files
-npx lint-staged
+./node_modules/.bin/lint-staged
 
 # Run type checking
 npm run type-check
