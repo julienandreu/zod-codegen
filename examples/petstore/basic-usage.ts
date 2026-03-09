@@ -4,7 +4,7 @@
  * Run with: npx ts-node examples/petstore/basic-usage.ts
  */
 
-import { SwaggerPetstoreOpenAPI30 } from './api';
+import SwaggerPetstoreOpenAPI30 from './api';
 
 async function main() {
   // Use default server (first server from OpenAPI spec)
