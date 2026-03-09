@@ -468,6 +468,114 @@ describe('TypeScriptCodeGeneratorService', () => {
     });
   });
 
+  describe('ResponseValidationError', () => {
+    it('should generate ResponseValidationError class', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0'
+        },
+        paths: {}
+      };
+
+      const code = generator.generate(spec);
+      expect(code).toContain('class ResponseValidationError<T> extends Error');
+      expect(code).toContain('readonly response: Response');
+      expect(code).toContain('readonly error: z.ZodError<T>');
+      expect(code).toContain("this.name = 'ResponseValidationError' as const");
+      expect(code).toContain('get data(): T');
+    });
+
+    it('should use safeParse with ResponseValidationError for methods with response schemas', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0'
+        },
+        paths: {
+          '/pets': {
+            post: {
+              operationId: 'createPet',
+              requestBody: {
+                content: {
+                  'application/json': {
+                    schema: { $ref: '#/components/schemas/Pet' }
+                  }
+                }
+              },
+              responses: {
+                '200': {
+                  description: 'Success',
+                  content: {
+                    'application/json': {
+                      schema: { $ref: '#/components/schemas/Pet' }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        components: {
+          schemas: {
+            Pet: {
+              type: 'object',
+              properties: {
+                id: { type: 'integer' },
+                name: { type: 'string' }
+              },
+              required: ['name']
+            }
+          }
+        }
+      };
+
+      const code = generator.generate(spec);
+      expect(code).toContain('Pet.safeParse(response)');
+      expect(code).toContain('parsedPet.success');
+      expect(code).toContain('new ResponseValidationError<Pet>');
+      expect(code).toContain('parsedPet.data');
+      expect(code).not.toContain('Pet.parse(');
+    });
+
+    it('should not use safeParse for methods without response schemas', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0'
+        },
+        paths: {
+          '/pets/{id}': {
+            delete: {
+              operationId: 'deletePet',
+              parameters: [
+                {
+                  name: 'id',
+                  in: 'path',
+                  required: true,
+                  schema: { type: 'integer' }
+                }
+              ],
+              responses: {
+                '204': {
+                  description: 'Deleted'
+                }
+              }
+            }
+          }
+        }
+      };
+
+      const code = generator.generate(spec);
+      expect(code).toContain('async deletePet');
+      expect(code).toContain('return await this.makeRequest');
+      expect(code).not.toContain('safeParse');
+    });
+  });
+
   describe('buildSchema', () => {
     it('should build schema for string type', () => {
       const schema = { type: 'string' };

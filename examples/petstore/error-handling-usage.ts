@@ -5,7 +5,7 @@
  * Run with: npx ts-node examples/petstore/error-handling-usage.ts
  */
 
-import { SwaggerPetstoreOpenAPI30 } from './api';
+import SwaggerPetstoreOpenAPI30 from './api';
 
 /** Custom error for HTTP 4xx/5xx with status, statusText, and optional body */
 export class HttpError extends Error {

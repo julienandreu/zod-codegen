@@ -4,10 +4,10 @@
  * Run with: npx ts-node examples/pokeapi/basic-usage.ts
  */
 
-import { defaultBaseUrl, PokAPI } from './api';
+import PokAPI from './api';
 
 async function main() {
-  const client = new PokAPI(defaultBaseUrl);
+  const client = new PokAPI({});
 
   try {
     console.log('🔍 Fetching Pokémon data...\n');

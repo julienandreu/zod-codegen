@@ -11,7 +11,7 @@ After running `zod-codegen`, you'll get:
 ## Basic Usage
 
 ```typescript
-import { SwaggerPetstoreOpenAPI30 } from './api';
+import SwaggerPetstoreOpenAPI30 from './api';
 
 // Create a client instance using default server from OpenAPI spec
 const client = new SwaggerPetstoreOpenAPI30({});
@@ -26,7 +26,8 @@ console.log('Available pets:', pets);
 The generated client supports flexible server configuration:
 
 ```typescript
-import { SwaggerPetstoreOpenAPI30, ClientOptions } from './api';
+import SwaggerPetstoreOpenAPI30 from './api';
+import type { ClientOptions } from './api';
 
 // Option 1: Use default server (first server from OpenAPI spec)
 const defaultClient = new SwaggerPetstoreOpenAPI30({});
@@ -56,7 +57,7 @@ const variableClient = new SwaggerPetstoreOpenAPI30({
 ## Example: Finding Pets
 
 ```typescript
-import { SwaggerPetstoreOpenAPI30 } from './api';
+import SwaggerPetstoreOpenAPI30 from './api';
 
 async function findAvailablePets() {
   const client = new SwaggerPetstoreOpenAPI30({});
@@ -84,16 +85,16 @@ findAvailablePets();
 ## Example: Adding a Pet
 
 ```typescript
-import { SwaggerPetstoreOpenAPI30, Pet, PetStatus } from './api';
-import { z } from 'zod';
+import SwaggerPetstoreOpenAPI30 from './api';
+import type { Pet } from './api';
 
 async function addNewPet() {
   const client = new SwaggerPetstoreOpenAPI30({});
 
-  const newPet: z.infer<typeof Pet> = {
+  const newPet: Pet = {
     id: 12345,
     name: 'Fluffy',
-    status: PetStatus.enum.available,
+    status: 'available',
     category: {
       id: 1,
       name: 'Dogs'
