@@ -5,21 +5,40 @@ import type { OpenApiSpecType } from '../types/openapi';
 import { OpenApiSpec } from '../types/openapi';
 
 export class SyncFileReaderService implements OpenApiFileReader {
-  async readFile(path: string): Promise<string> {
-    // Check if path is a URL
+  private isUrl(path: string): boolean {
     try {
       const url = new URL(path);
-      // If it's a valid URL, fetch it
-      const response = await fetch(url.toString());
-      if (!response.ok) {
-        throw new Error(`Failed to fetch ${path}: ${String(response.status)} ${response.statusText}`);
-      }
-
-      return await response.text();
+      return url.protocol === 'http:' || url.protocol === 'https:';
     } catch {
-      // If URL parsing fails, treat it as a local file path
-      return readFileSync(path, 'utf8');
+      return false;
     }
+  }
+
+  async readFile(path: string): Promise<string> {
+    if (this.isUrl(path)) {
+      return await this.fetchUrl(path);
+    }
+
+    return readFileSync(path, 'utf8');
+  }
+
+  private async fetchUrl(path: string): Promise<string> {
+    const url = new URL(path);
+
+    const headers: Record<string, string> = {};
+    if (url.username || url.password) {
+      const credentials = `${decodeURIComponent(url.username)}:${decodeURIComponent(url.password)}`;
+      headers['Authorization'] = `Basic ${btoa(credentials)}`;
+      url.username = '';
+      url.password = '';
+    }
+
+    const response = await fetch(url.toString(), { headers });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch ${path}: ${String(response.status)} ${response.statusText}`);
+    }
+
+    return await response.text();
   }
 }
 

@@ -125,5 +125,21 @@ describe('CLI Comprehensive Integration', () => {
       const outputFile = resolve(testOutputDir, 'api.ts');
       expect(existsSync(outputFile)).toBe(true);
     });
+
+    it('should generate code from a remote URL', () => {
+      execSync(`node ./dist/src/cli.js --input https://petstore3.swagger.io/api/v3/openapi.json --output ${testOutputDir}`, {
+        encoding: 'utf-8',
+        cwd,
+        timeout: 30000
+      });
+
+      const outputFile = resolve(testOutputDir, 'api.ts');
+      expect(existsSync(outputFile)).toBe(true);
+
+      const content = readFileSync(outputFile, 'utf-8');
+      expect(content).toContain('export default class');
+      expect(content).toContain('class ResponseValidationError<T> extends Error');
+      expect(content).toContain('import { z }');
+    });
   });
 });
