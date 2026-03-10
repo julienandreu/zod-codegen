@@ -1,8 +1,7 @@
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OpenApiFileParserService, SyncFileReaderService } from '../../src/services/file-reader.service';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { dirname } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -32,7 +31,6 @@ describe('SyncFileReaderService', () => {
     });
 
     it('should handle URLs', async () => {
-      // Mock fetch for URL test
       const originalFetch = global.fetch;
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
@@ -41,6 +39,7 @@ describe('SyncFileReaderService', () => {
 
       const content = await reader.readFile('https://example.com/openapi.json');
       expect(content).toBeTruthy();
+      expect(global.fetch).toHaveBeenCalledWith('https://example.com/openapi.json', { headers: {} });
 
       global.fetch = originalFetch;
     });
@@ -54,11 +53,52 @@ describe('SyncFileReaderService', () => {
       } as Response);
       global.fetch = mockFetch;
 
-      await expect(reader.readFile('https://example.com/not-found.json')).rejects.toThrow();
+      await expect(reader.readFile('https://example.com/not-found.json')).rejects.toThrow('Failed to fetch');
 
-      // Verify fetch was called
-      expect(mockFetch).toHaveBeenCalledWith('https://example.com/not-found.json');
       global.fetch = originalFetch;
+    });
+
+    it('should propagate network errors for URLs instead of falling back to readFileSync', async () => {
+      const originalFetch = global.fetch;
+      global.fetch = vi.fn().mockRejectedValue(new TypeError('fetch failed'));
+
+      await expect(reader.readFile('https://example.com/openapi.json')).rejects.toThrow('fetch failed');
+
+      global.fetch = originalFetch;
+    });
+
+    it('should extract basic auth credentials from URL into Authorization header', async () => {
+      const originalFetch = global.fetch;
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () => '{}'
+      } as Response);
+      global.fetch = mockFetch;
+
+      await reader.readFile('https://user:pass@example.com/openapi.json');
+
+      expect(mockFetch).toHaveBeenCalledWith('https://example.com/openapi.json', { headers: { Authorization: `Basic ${btoa('user:pass')}` } });
+
+      global.fetch = originalFetch;
+    });
+
+    it('should decode percent-encoded credentials from URL', async () => {
+      const originalFetch = global.fetch;
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () => '{}'
+      } as Response);
+      global.fetch = mockFetch;
+
+      await reader.readFile('https://julien%2Bstaging%40saris.ai:qwerty123@api.staging.saris.ai/api/openapi.json');
+
+      expect(mockFetch).toHaveBeenCalledWith('https://api.staging.saris.ai/api/openapi.json', { headers: { Authorization: `Basic ${btoa('julien+staging@saris.ai:qwerty123')}` } });
+
+      global.fetch = originalFetch;
+    });
+
+    it('should not treat non-http schemes as URLs', async () => {
+      await expect(reader.readFile('file:///etc/passwd')).rejects.toThrow();
     });
   });
 });
