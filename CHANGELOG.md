@@ -1,3 +1,9 @@
+## [1.7.1](https://github.com/julienandreu/zod-codegen/compare/v1.7.0...v1.7.1) (2026-03-10)
+
+### 🐛 Bug Fixes
+
+- properly handle URL inputs with authentication support ([#87](https://github.com/julienandreu/zod-codegen/issues/87)) ([49ba2c4](https://github.com/julienandreu/zod-codegen/commit/49ba2c483458397d9f12e03b8f6c634981e4454a))
+
 ## [1.7.0](https://github.com/julienandreu/zod-codegen/compare/v1.6.3...v1.7.0) (2026-03-09)
 
 ### 🚀 Features
