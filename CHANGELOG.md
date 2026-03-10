@@ -1,3 +1,9 @@
+## [1.7.2](https://github.com/julienandreu/zod-codegen/compare/v1.7.1...v1.7.2) (2026-03-10)
+
+### 🐛 Bug Fixes
+
+- redact credentials from source URL in generated file headers ([#88](https://github.com/julienandreu/zod-codegen/issues/88)) ([692901d](https://github.com/julienandreu/zod-codegen/commit/692901d0b3ea8a53cbb92102bc9c3f7f90aa44aa))
+
 ## [1.7.1](https://github.com/julienandreu/zod-codegen/compare/v1.7.0...v1.7.1) (2026-03-10)
 
 ### 🐛 Bug Fixes
