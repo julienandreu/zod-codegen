@@ -50,7 +50,7 @@
     "semantic-release": "^25.0.3",
     "ts-node": "^10.9.2",
     "typescript-eslint": "^8.56.1",
-    "undici": "^7.22.0",
+    "undici": "^7.24.1",
     "vitest": "^4.0.18"
   },
   "homepage": "https://github.com/julienandreu/zod-codegen",
