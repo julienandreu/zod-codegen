@@ -1,3 +1,9 @@
+## [1.7.3](https://github.com/julienandreu/zod-codegen/compare/v1.7.2...v1.7.3) (2026-05-29)
+
+### 🐛 Bug Fixes
+
+- **generator:** correct path-template middle segment for multi-param paths ([#115](https://github.com/julienandreu/zod-codegen/issues/115)) ([07b4e22](https://github.com/julienandreu/zod-codegen/commit/07b4e22beb0194c8fada2801d8affb83e216ddef))
+
 ## [1.7.2](https://github.com/julienandreu/zod-codegen/compare/v1.7.1...v1.7.2) (2026-03-10)
 
 ### 🐛 Bug Fixes
