@@ -1087,6 +1087,31 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
             ),
             undefined
           ),
+          // Skip JSON parse for 204 No Content / 205 Reset Content (RFC 7231: bodies MUST be empty)
+          ts.factory.createIfStatement(
+            ts.factory.createBinaryExpression(
+              ts.factory.createBinaryExpression(
+                ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('response'), ts.factory.createIdentifier('status')),
+                ts.factory.createToken(ts.SyntaxKind.EqualsEqualsEqualsToken),
+                ts.factory.createNumericLiteral(204)
+              ),
+              ts.factory.createToken(ts.SyntaxKind.BarBarToken),
+              ts.factory.createBinaryExpression(
+                ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('response'), ts.factory.createIdentifier('status')),
+                ts.factory.createToken(ts.SyntaxKind.EqualsEqualsEqualsToken),
+                ts.factory.createNumericLiteral(205)
+              )
+            ),
+            ts.factory.createBlock(
+              [
+                ts.factory.createReturnStatement(
+                  ts.factory.createAsExpression(ts.factory.createIdentifier('undefined'), ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('T'), undefined))
+                )
+              ],
+              true
+            ),
+            undefined
+          ),
           // Return parsed JSON
           ts.factory.createReturnStatement(
             ts.factory.createAwaitExpression(
