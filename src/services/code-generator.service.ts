@@ -1398,21 +1398,18 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
     // Build template expression
     const templateSpans: ts.TemplateSpan[] = [];
-    let lastIndex = 0;
 
     for (const [index, m] of matches.entries()) {
-      const before = path.substring(lastIndex, m.index);
       const sanitizedName = this.typeBuilder.sanitizeIdentifier(m.name);
-      const isLast = index === matches.length - 1;
-      const after = isLast ? path.substring(m.index + m.length) : '';
+      const next = matches[index + 1];
 
-      if (isLast) {
+      if (next === undefined) {
+        const after = path.substring(m.index + m.length);
         templateSpans.push(ts.factory.createTemplateSpan(ts.factory.createIdentifier(sanitizedName), ts.factory.createTemplateTail(after, after)));
       } else {
-        templateSpans.push(ts.factory.createTemplateSpan(ts.factory.createIdentifier(sanitizedName), ts.factory.createTemplateMiddle(before, before)));
+        const middle = path.substring(m.index + m.length, next.index);
+        templateSpans.push(ts.factory.createTemplateSpan(ts.factory.createIdentifier(sanitizedName), ts.factory.createTemplateMiddle(middle, middle)));
       }
-
-      lastIndex = m.index + m.length;
     }
 
     const firstMatch = matches[0];

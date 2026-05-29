@@ -466,6 +466,40 @@ describe('TypeScriptCodeGeneratorService', () => {
       expect(code).toContain('z.array');
       expect(code).toContain('z.string()');
     });
+
+    it('should preserve literal segments between path parameters for multi-param paths', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0'
+        },
+        paths: {
+          '/api/v2/users/{user_id}/roles/{code}': {
+            delete: {
+              operationId: 'revokeUserRole',
+              parameters: [
+                { name: 'user_id', in: 'path', required: true, schema: { type: 'string' } },
+                { name: 'code', in: 'path', required: true, schema: { type: 'string' } }
+              ],
+              responses: {
+                '204': {
+                  description: 'No Content'
+                }
+              }
+            }
+          }
+        }
+      };
+
+      const code = generator.generate(spec);
+
+      // The generated URL template must keep the literal '/roles/' between the
+      // two path parameters. Previously this segment was incorrectly replaced
+      // with the head segment, yielding `/api/v2/users/${user_id}/api/v2/users/${code}`.
+      expect(code).toContain('`/api/v2/users/${user_id}/roles/${code}`');
+      expect(code).not.toContain('/api/v2/users/${user_id}/api/v2/users/${code}');
+    });
   });
 
   describe('ResponseValidationError', () => {
