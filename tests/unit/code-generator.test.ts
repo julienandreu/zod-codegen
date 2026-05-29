@@ -500,6 +500,40 @@ describe('TypeScriptCodeGeneratorService', () => {
       expect(code).toContain('`/api/v2/users/${user_id}/roles/${code}`');
       expect(code).not.toContain('/api/v2/users/${user_id}/api/v2/users/${code}');
     });
+
+    it('should skip JSON parse in makeRequest for 204/205 No Content responses', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0'
+        },
+        paths: {
+          '/items/{id}': {
+            delete: {
+              operationId: 'deleteItem',
+              parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+              responses: {
+                '204': {
+                  description: 'No Content'
+                }
+              }
+            }
+          }
+        }
+      };
+
+      const code = generator.generate(spec);
+
+      // The generated makeRequest implementation must guard against parsing
+      // empty bodies for 204/205 responses. Without this guard, `response.json()`
+      // throws "Unexpected end of JSON input" for any endpoint that returns
+      // 204 No Content (commonly DELETE endpoints declared `Promise<void>`).
+      // Per RFC 7231 §6.3.5 / §6.3.6, 204 and 205 MUST have empty bodies.
+      expect(code).toContain('response.status === 204');
+      expect(code).toContain('response.status === 205');
+      expect(code).toContain('return undefined as T');
+    });
   });
 
   describe('ResponseValidationError', () => {
