@@ -1,3 +1,9 @@
+## [1.7.4](https://github.com/julienandreu/zod-codegen/compare/v1.7.3...v1.7.4) (2026-05-29)
+
+### 🐛 Bug Fixes
+
+- **generator:** skip JSON parse for 204/205 No Content responses ([#118](https://github.com/julienandreu/zod-codegen/issues/118)) ([20b317f](https://github.com/julienandreu/zod-codegen/commit/20b317f16671c6da923f624b41833f1ccd6e7661))
+
 ## [1.7.3](https://github.com/julienandreu/zod-codegen/compare/v1.7.2...v1.7.3) (2026-05-29)
 
 ### 🐛 Bug Fixes
