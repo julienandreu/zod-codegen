@@ -491,15 +491,10 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
                     ts.factory.createIdentifier('resolvedUrl'),
                     undefined,
                     undefined,
-                    ts.factory.createConditionalExpression(
-                      ts.factory.createBinaryExpression(
-                        ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('baseUrl')),
-                        ts.factory.createToken(ts.SyntaxKind.ExclamationEqualsEqualsToken),
-                        ts.factory.createNull()
-                      ),
-                      ts.factory.createToken(ts.SyntaxKind.QuestionToken),
+                    // An omitted baseUrl is undefined, not null, so only a nullish check falls back to the spec's servers.
+                    ts.factory.createBinaryExpression(
                       ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('baseUrl')),
-                      ts.factory.createToken(ts.SyntaxKind.ColonToken),
+                      ts.factory.createToken(ts.SyntaxKind.QuestionQuestionToken),
                       ts.factory.createCallExpression(ts.factory.createIdentifier('resolveServerUrl'), undefined, [
                         ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('serverIndex')),
                         ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('serverVariables'))
@@ -1993,7 +1988,8 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
           undefined,
           undefined,
           ts.factory.createIdentifier('serverVariables'),
-          ts.factory.createToken(ts.SyntaxKind.QuestionToken),
+          // A parameter with an initializer can't also be marked optional (TS1015); Node's type stripping rejects it.
+          undefined,
           ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Record'), [
             ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
             ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)

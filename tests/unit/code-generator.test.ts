@@ -1229,6 +1229,38 @@ describe('TypeScriptCodeGeneratorService', () => {
       expect(code).toContain('version');
     });
 
+    it('should fall back to the server list when baseUrl is undefined, not only null', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0'
+        },
+        servers: [{ url: 'https://api.example.com' }],
+        paths: {}
+      };
+
+      const code = generator.generate(spec);
+      expect(code).toContain('options.baseUrl ?? resolveServerUrl(options.serverIndex, options.serverVariables)');
+      expect(code).not.toContain('options.baseUrl !== null');
+    });
+
+    it('should not mark the defaulted serverVariables parameter as optional', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0'
+        },
+        servers: [{ url: 'https://api.example.com' }],
+        paths: {}
+      };
+
+      const code = generator.generate(spec);
+      expect(code).toContain('serverVariables: Record<string, string> = {}');
+      expect(code).not.toContain('serverVariables?: Record<string, string> = {}');
+    });
+
     it('should handle server variables with enum values', () => {
       const spec: OpenApiSpecType = {
         openapi: '3.0.0',

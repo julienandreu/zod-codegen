@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -7,7 +8,7 @@ import { TypeScriptCodeGeneratorService } from '../../src/services/code-generato
 import type { OpenApiSpecType } from '../../src/types/openapi';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const testOutputDir = join(__dirname, '../../test-output-response-validation');
+const testOutputDir = join(__dirname, '../../test-output-generated-client');
 const apiFile = join(testOutputDir, 'api.ts');
 const consumerFile = join(testOutputDir, 'consumer.ts');
 
@@ -66,7 +67,7 @@ interface GeneratedModule {
   ResponseValidationError: abstract new (...args: never[]) => GeneratedErrorInstance;
 }
 
-describe('Generated ResponseValidationError', () => {
+describe('Generated client', () => {
   let generated: GeneratedModule;
 
   beforeAll(async () => {
@@ -153,5 +154,19 @@ describe('Generated ResponseValidationError', () => {
     const diagnostics = ts.getPreEmitDiagnostics(program, program.getSourceFile(consumerFile)).map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'));
 
     expect(diagnostics).toEqual([]);
+  });
+
+  it('uses the first server URL when baseUrl is omitted', async () => {
+    stubFetch({ id: 1, name: 'Rex' });
+    const client = new generated.default({});
+
+    await expect(client.getPet(1)).resolves.toEqual({ id: 1, name: 'Rex' });
+    expect(vi.mocked(fetch).mock.calls[0]?.[0]).toBe('https://api.example.com/pets/1');
+  });
+
+  it.skipIf(!process.features.typescript)('loads under Node type stripping', () => {
+    const script = `await import(${JSON.stringify(pathToFileURL(apiFile).href)});`;
+
+    expect(() => execFileSync(process.execPath, ['--input-type=module', '--eval', script], { encoding: 'utf-8', stdio: 'pipe' })).not.toThrow();
   });
 });
