@@ -363,11 +363,12 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
   private buildResponseValidationErrorClass(): ts.ClassDeclaration {
     const typeParamT = ts.factory.createTypeParameterDeclaration(undefined, 'T');
 
+    // Generated methods pass the parsed JSON body, not a fetch Response, and that body failed the schema, so it is not a T.
     const responseProperty = ts.factory.createPropertyDeclaration(
       [ts.factory.createToken(ts.SyntaxKind.ReadonlyKeyword)],
       'response',
       undefined,
-      ts.factory.createTypeReferenceNode('Response'),
+      ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
       undefined
     );
 
@@ -383,7 +384,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       undefined,
       [
         ts.factory.createParameterDeclaration(undefined, undefined, 'message', undefined, ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)),
-        ts.factory.createParameterDeclaration(undefined, undefined, 'response', undefined, ts.factory.createTypeReferenceNode('Response')),
+        ts.factory.createParameterDeclaration(undefined, undefined, 'response', undefined, ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)),
         ts.factory.createParameterDeclaration(
           undefined,
           undefined,
@@ -425,31 +426,22 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       undefined,
       'data',
       [],
-      ts.factory.createTypeReferenceNode('T'),
-      ts.factory.createBlock(
-        [
-          ts.factory.createReturnStatement(
-            ts.factory.createAsExpression(
-              ts.factory.createCallExpression(
-                ts.factory.createPropertyAccessExpression(ts.factory.createPropertyAccessExpression(ts.factory.createThis(), 'response'), 'json'),
-                undefined,
-                []
-              ),
-              ts.factory.createTypeReferenceNode('T')
-            )
-          )
-        ],
-        true
-      )
+      ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
+      ts.factory.createBlock([ts.factory.createReturnStatement(ts.factory.createPropertyAccessExpression(ts.factory.createThis(), 'response'))], true)
     );
 
     return ts.factory.createClassDeclaration(
       [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
       'ResponseValidationError',
       [typeParamT],
-      [ts.factory.createHeritageClause(ts.SyntaxKind.ExtendsKeyword, [ts.factory.createExpressionWithTypeArguments(ts.factory.createIdentifier('Error'), undefined)])],
+      [ts.factory.createHeritageClause(ts.SyntaxKind.ExtendsKeyword, [ts.factory.createExpressionWithTypeArguments(this.buildGlobalErrorReference(), undefined)])],
       [responseProperty, errorProperty, constructorDecl, dataGetter]
     );
+  }
+
+  // A spec schema named `Error` is emitted as a module-level `Error`, which would shadow the built-in.
+  private buildGlobalErrorReference(): ts.Expression {
+    return ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('globalThis'), 'Error');
   }
 
   private buildClientClass(openapi: OpenApiSpecType, schemas: Record<string, ts.VariableStatement>): ts.ClassDeclaration {
@@ -1072,7 +1064,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
               ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('response'), ts.factory.createIdentifier('ok'))
             ),
             ts.factory.createThrowStatement(
-              ts.factory.createNewExpression(ts.factory.createIdentifier('Error'), undefined, [
+              ts.factory.createNewExpression(this.buildGlobalErrorReference(), undefined, [
                 ts.factory.createTemplateExpression(ts.factory.createTemplateHead('HTTP ', 'HTTP '), [
                   ts.factory.createTemplateSpan(
                     ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('response'), ts.factory.createIdentifier('status')),
@@ -1316,6 +1308,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       );
 
       // if (!parsed{Name}.success) { throw new ResponseValidationError<{Type}>(...) }
+      // The message reads `error.issues`: Zod 4 removed `ZodError.errors`, and Zod 3 has `issues` too.
       statements.push(
         ts.factory.createIfStatement(
           ts.factory.createPrefixUnaryExpression(ts.SyntaxKind.ExclamationToken, ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier(parsedVarName), 'success')),
@@ -1332,7 +1325,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
                           ts.factory.createPropertyAccessExpression(
                             ts.factory.createCallExpression(
                               ts.factory.createPropertyAccessExpression(
-                                ts.factory.createPropertyAccessExpression(ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier(parsedVarName), 'error'), 'errors'),
+                                ts.factory.createPropertyAccessExpression(ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier(parsedVarName), 'error'), 'issues'),
                                 'map'
                               ),
                               undefined,
