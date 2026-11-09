@@ -126,6 +126,7 @@ describe('Generated client', () => {
     expect((failure as Error).message).toBe('HTTP 500: Internal Server Error');
   });
 
+  // Building a TypeScript program over the DOM and Zod declarations took over 5 s under coverage on CI.
   it('types ResponseValidationError as a built-in Error for consumers', () => {
     writeFileSync(
       consumerFile,
@@ -154,7 +155,7 @@ describe('Generated client', () => {
     const diagnostics = ts.getPreEmitDiagnostics(program, program.getSourceFile(consumerFile)).map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'));
 
     expect(diagnostics).toEqual([]);
-  });
+  }, 30_000);
 
   it('uses the first server URL when baseUrl is omitted', async () => {
     stubFetch({ id: 1, name: 'Rex' });
