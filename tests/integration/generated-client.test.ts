@@ -1,90 +1,30 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import * as ts from 'typescript';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { format, resolveConfig } from 'prettier';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TypeScriptCodeGeneratorService } from '../../src/services/code-generator.service';
 import type { OpenApiSpecType } from '../../src/types/openapi';
+import PetAPI, { ResponseValidationError } from '../fixtures/error-schema/api';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const testOutputDir = join(__dirname, '../../test-output-generated-client');
-const apiFile = join(testOutputDir, 'api.ts');
-const consumerFile = join(testOutputDir, 'consumer.ts');
+// The spec's `Error` schema is the case that used to shadow the built-in Error in generated code.
+const fixtureDir = join(__dirname, '../fixtures/error-schema');
+const fixtureFile = join(fixtureDir, 'api.ts');
 
-// The `Error` schema is the case that used to shadow the built-in Error in generated code.
-const spec: OpenApiSpecType = {
-  openapi: '3.0.0',
-  info: { title: 'Pet API', version: '1.0.0' },
-  servers: [{ url: 'https://api.example.com' }],
-  paths: {
-    '/pets/{id}': {
-      get: {
-        operationId: 'getPet',
-        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
-        responses: {
-          '200': {
-            description: 'Success',
-            content: { 'application/json': { schema: { $ref: '#/components/schemas/Pet' } } }
-          },
-          'default': {
-            description: 'Failure',
-            content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } }
-          }
-        }
-      }
-    }
-  },
-  components: {
-    schemas: {
-      Pet: {
-        type: 'object',
-        properties: {
-          id: { type: 'integer' },
-          name: { type: 'string' }
-        },
-        required: ['id', 'name']
-      },
-      Error: {
-        type: 'object',
-        properties: {
-          message: { type: 'string' }
-        },
-        required: ['message']
-      }
-    }
-  }
-};
-
-interface GeneratedErrorInstance extends Error {
-  readonly data: unknown;
-  readonly response: unknown;
-  readonly error: { issues: { message: string; path: PropertyKey[] }[] };
-}
-
-interface GeneratedModule {
-  default: new (options: { baseUrl?: string }) => { getPet(id: number): Promise<unknown> };
-  ResponseValidationError: abstract new (...args: never[]) => GeneratedErrorInstance;
-}
+// The CLI writes the same last two lines; its build and date lines are left out so the fixture is stable.
+const fixtureHeader = [
+  '// Generated from openapi.json by tests/integration/generated-client.test.ts.',
+  '// Update with `npx vitest run tests/integration/generated-client.test.ts -u`.',
+  '/* eslint-disable */',
+  '// @ts-nocheck',
+  ''
+].join('\n');
 
 describe('Generated client', () => {
-  let generated: GeneratedModule;
-
-  beforeAll(async () => {
-    rmSync(testOutputDir, { recursive: true, force: true });
-    mkdirSync(testOutputDir, { recursive: true });
-    writeFileSync(apiFile, new TypeScriptCodeGeneratorService().generate(spec));
-    generated = (await import(pathToFileURL(apiFile).href)) as GeneratedModule;
-  });
-
   afterEach(() => {
     vi.unstubAllGlobals();
-  });
-
-  afterAll(() => {
-    if (existsSync(testOutputDir)) {
-      rmSync(testOutputDir, { recursive: true, force: true });
-    }
   });
 
   const stubFetch = (body: unknown, init: ResponseInit = { status: 200 }): void => {
@@ -94,16 +34,24 @@ describe('Generated client', () => {
     );
   };
 
+  it('matches the committed fixture that the type tests check', async () => {
+    const spec = JSON.parse(readFileSync(join(fixtureDir, 'openapi.json'), 'utf-8')) as OpenApiSpecType;
+    const generated = fixtureHeader + new TypeScriptCodeGeneratorService().generate(spec);
+    const formatted = await format(generated, { ...(await resolveConfig(fixtureFile)), filepath: fixtureFile });
+
+    await expect(formatted).toMatchFileSnapshot(fixtureFile);
+  });
+
   it('rejects an invalid response body with ResponseValidationError carrying the body and the Zod issues', async () => {
     const body = { id: 'not-a-number' };
     stubFetch(body);
-    const client = new generated.default({ baseUrl: 'https://api.example.com' });
+    const client = new PetAPI({ baseUrl: 'https://api.example.com' });
 
     const failure: unknown = await client.getPet(1).catch((error: unknown) => error);
 
-    expect(failure).toBeInstanceOf(generated.ResponseValidationError);
+    expect(failure).toBeInstanceOf(ResponseValidationError);
     expect(failure).toBeInstanceOf(Error);
-    const validation = failure as GeneratedErrorInstance;
+    const validation = failure as ResponseValidationError<unknown>;
     expect(validation.name).toBe('ResponseValidationError');
     expect(validation.message).toMatch(/^Invalid pet: /);
     expect(validation.response).toEqual(body);
@@ -117,56 +65,25 @@ describe('Generated client', () => {
 
   it('rejects a non-OK response with the built-in Error, not the Error schema', async () => {
     stubFetch({ message: 'boom' }, { status: 500, statusText: 'Internal Server Error' });
-    const client = new generated.default({ baseUrl: 'https://api.example.com' });
+    const client = new PetAPI({ baseUrl: 'https://api.example.com' });
 
     const failure: unknown = await client.getPet(1).catch((error: unknown) => error);
 
     expect(failure).toBeInstanceOf(Error);
-    expect(failure).not.toBeInstanceOf(generated.ResponseValidationError);
+    expect(failure).not.toBeInstanceOf(ResponseValidationError);
     expect((failure as Error).message).toBe('HTTP 500: Internal Server Error');
   });
 
-  // Building a TypeScript program over the DOM and Zod declarations took over 5 s under coverage on CI.
-  it('types ResponseValidationError as a built-in Error for consumers', () => {
-    writeFileSync(
-      consumerFile,
-      [
-        "import { ResponseValidationError } from './api';",
-        'export function describeFailure(caught: unknown): string {',
-        '  if (caught instanceof ResponseValidationError) {',
-        '    const issues: number = caught.error.issues.length;',
-        '    const body: unknown = caught.data ?? caught.response;',
-        '    return `${caught.name}: ${caught.message} (${issues} issues, ${String(body)}) ${caught.stack ?? ""}`;',
-        '  }',
-        "  return '';",
-        '}'
-      ].join('\n')
-    );
-
-    const program = ts.createProgram([consumerFile], {
-      strict: true,
-      noEmit: true,
-      skipLibCheck: true,
-      target: ts.ScriptTarget.ES2022,
-      module: ts.ModuleKind.ESNext,
-      moduleResolution: ts.ModuleResolutionKind.Bundler,
-      lib: ['lib.es2022.d.ts', 'lib.dom.d.ts']
-    });
-    const diagnostics = ts.getPreEmitDiagnostics(program, program.getSourceFile(consumerFile)).map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'));
-
-    expect(diagnostics).toEqual([]);
-  }, 30_000);
-
   it('uses the first server URL when baseUrl is omitted', async () => {
     stubFetch({ id: 1, name: 'Rex' });
-    const client = new generated.default({});
+    const client = new PetAPI({});
 
     await expect(client.getPet(1)).resolves.toEqual({ id: 1, name: 'Rex' });
     expect(vi.mocked(fetch).mock.calls[0]?.[0]).toBe('https://api.example.com/pets/1');
   });
 
   it.skipIf(!process.features.typescript)('loads under Node type stripping', () => {
-    const script = `await import(${JSON.stringify(pathToFileURL(apiFile).href)});`;
+    const script = `await import(${JSON.stringify(pathToFileURL(fixtureFile).href)});`;
 
     expect(() => execFileSync(process.execPath, ['--input-type=module', '--eval', script], { encoding: 'utf-8', stdio: 'pipe' })).not.toThrow();
   });

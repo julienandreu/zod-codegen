@@ -203,9 +203,14 @@ tests/
 │   ├── *.test.ts
 ├── integration/        # Integration tests
 │   ├── *.test.ts
+├── types/              # Type tests, checked by `vitest --typecheck`
+│   ├── *.test-d.ts
 └── fixtures/           # Test data
     ├── *.json
+    └── error-schema/   # Spec and committed generated client used by the type tests
 ```
+
+`tests/fixtures/error-schema/api.ts` is generated output. When a generator change alters it, the fixture test fails. Regenerate it with `npx vitest run tests/integration/generated-client.test.ts -u` and commit the result.
 
 ### Writing Tests
 
