@@ -1,3 +1,9 @@
+## [1.7.5](https://github.com/julienandreu/zod-codegen/compare/v1.7.4...v1.7.5) (2026-11-11)
+
+### 🐛 Bug Fixes
+
+- **generator:** fix ResponseValidationError and server URL fallback in generated clients ([#124](https://github.com/julienandreu/zod-codegen/issues/124)) ([e2217b5](https://github.com/julienandreu/zod-codegen/commit/e2217b53cbaf449d3ae62ce3cfbd13f1736131cc))
+
 ## [1.7.4](https://github.com/julienandreu/zod-codegen/compare/v1.7.3...v1.7.4) (2026-05-29)
 
 ### 🐛 Bug Fixes
