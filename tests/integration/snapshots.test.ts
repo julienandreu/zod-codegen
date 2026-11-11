@@ -48,7 +48,7 @@ describe('Generated Code Snapshots', () => {
       expect(content).toContain('async addPet');
       expect(content).toContain('protected getBaseRequestOptions');
       expect(content).toContain('protected async handleResponse');
-      expect(content).toContain('class ResponseValidationError<T> extends Error');
+      expect(content).toContain('class ResponseValidationError<T> extends globalThis.Error');
       expect(content).toContain('Pet.safeParse(response)');
       expect(content).toContain('new ResponseValidationError<Pet>');
     });

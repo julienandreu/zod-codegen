@@ -548,11 +548,43 @@ describe('TypeScriptCodeGeneratorService', () => {
       };
 
       const code = generator.generate(spec);
-      expect(code).toContain('class ResponseValidationError<T> extends Error');
-      expect(code).toContain('readonly response: Response');
+      expect(code).toContain('class ResponseValidationError<T> extends globalThis.Error');
+      expect(code).toContain('readonly response: unknown');
       expect(code).toContain('readonly error: z.ZodError<T>');
+      expect(code).toContain('constructor(message: string, response: unknown, error: z.ZodError<T>)');
       expect(code).toContain("this.name = 'ResponseValidationError' as const");
-      expect(code).toContain('get data(): T');
+      expect(code).toContain('get data(): unknown');
+      expect(code).not.toContain('.json() as T');
+    });
+
+    it('should reference the built-in Error through globalThis when a schema is named Error', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0'
+        },
+        paths: {},
+        components: {
+          schemas: {
+            Error: {
+              type: 'object',
+              properties: {
+                message: { type: 'string' }
+              },
+              required: ['message']
+            }
+          }
+        }
+      };
+
+      const code = generator.generate(spec);
+      expect(code).toContain('export interface Error {');
+      expect(code).toContain('export const Error: z.ZodType<Error>');
+      expect(code).toContain('class ResponseValidationError<T> extends globalThis.Error');
+      expect(code).toContain('throw new globalThis.Error(`HTTP ');
+      expect(code).not.toMatch(/extends Error\b/);
+      expect(code).not.toMatch(/new Error\(/);
     });
 
     it('should use safeParse with ResponseValidationError for methods with response schemas', () => {
@@ -604,6 +636,8 @@ describe('TypeScriptCodeGeneratorService', () => {
       expect(code).toContain('Pet.safeParse(response)');
       expect(code).toContain('parsedPet.success');
       expect(code).toContain('new ResponseValidationError<Pet>');
+      expect(code).toContain('parsedPet.error.issues.map(');
+      expect(code).not.toContain('.error.errors');
       expect(code).toContain('parsedPet.data');
       expect(code).not.toContain('Pet.parse(');
     });
@@ -1193,6 +1227,38 @@ describe('TypeScriptCodeGeneratorService', () => {
       expect(code).toContain('environment');
       expect(code).toContain('port');
       expect(code).toContain('version');
+    });
+
+    it('should fall back to the server list when baseUrl is undefined, not only null', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0'
+        },
+        servers: [{ url: 'https://api.example.com' }],
+        paths: {}
+      };
+
+      const code = generator.generate(spec);
+      expect(code).toContain('options.baseUrl ?? resolveServerUrl(options.serverIndex, options.serverVariables)');
+      expect(code).not.toContain('options.baseUrl !== null');
+    });
+
+    it('should not mark the defaulted serverVariables parameter as optional', () => {
+      const spec: OpenApiSpecType = {
+        openapi: '3.0.0',
+        info: {
+          title: 'Test API',
+          version: '1.0.0'
+        },
+        servers: [{ url: 'https://api.example.com' }],
+        paths: {}
+      };
+
+      const code = generator.generate(spec);
+      expect(code).toContain('serverVariables: Record<string, string> = {}');
+      expect(code).not.toContain('serverVariables?: Record<string, string> = {}');
     });
 
     it('should handle server variables with enum values', () => {

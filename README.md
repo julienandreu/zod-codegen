@@ -144,7 +144,7 @@ The generator creates a single TypeScript file (`api.ts`) containing:
 
 - **Zod Schemas**: Exported Zod validation schemas for all component schemas defined in your OpenAPI spec
 - **API Client Class**: A type-safe client class with methods for each endpoint operation
-- **ResponseValidationError**: A generic error class thrown when response data fails Zod schema validation, carrying the original response and error details
+- **ResponseValidationError**: A generic error class thrown when response data fails Zod schema validation, carrying the parsed response body (`response`, also readable as `data`) and the `ZodError` (`error`)
 - **Server Configuration**: `serverConfigurations` array and `defaultBaseUrl` constant extracted from OpenAPI servers
 - **Client Options Type**: `ClientOptions` type for flexible server selection and variable overrides
 - **Protected Extension Points**:
@@ -274,17 +274,17 @@ export type ClientOptions = {
 };
 
 // ResponseValidationError class
-export class ResponseValidationError<T> extends Error {
-  readonly response: Response;
+export class ResponseValidationError<T> extends globalThis.Error {
+  readonly response: unknown;
   readonly error: z.ZodError<T>;
-  constructor(message: string, response: Response, error: z.ZodError<T>) {
+  constructor(message: string, response: unknown, error: z.ZodError<T>) {
     super(message);
     this.name = 'ResponseValidationError' as const;
     this.response = response;
     this.error = error;
   }
-  get data(): T {
-    return this.response.json() as T;
+  get data(): unknown {
+    return this.response;
   }
 }
 
@@ -304,7 +304,7 @@ export class UserAPI {
     const response = await this.makeRequest('GET', `/users/${id}`, {});
     const parsedUser = User.safeParse(response);
     if (!parsedUser.success) {
-      throw new ResponseValidationError<User>(`Invalid user: ...`, response, parsedUser.error);
+      throw new ResponseValidationError<User>(`Invalid user: ${parsedUser.error.issues.map((error) => error.message).join(', ')}`, response, parsedUser.error);
     }
     return parsedUser.data;
   }
