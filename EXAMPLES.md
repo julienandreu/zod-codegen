@@ -410,14 +410,14 @@ The generated client uses a layered approach to request configuration:
 When a request is made, options are merged in this order (later values override earlier ones):
 
 1. **Base Options** from `getBaseRequestOptions()` - All RequestInit options (headers, signal, credentials, mode, cache, etc.)
-2. **Content-Type Header** - Automatically set based on request body (`application/json` or `application/x-www-form-urlencoded`)
+2. **Content-Type Header** - Set only when the request has a body (`application/json`, or `application/x-www-form-urlencoded` when the operation accepts only form data)
 3. **Request-Specific Headers** - From `options.headers` parameter (if provided)
 4. **Method and Body** - Always set by generated code (cannot be overridden)
 
 **Important**: `getBaseRequestOptions()` returns **base options that are merged with**, not replaced by, request-specific options. This means:
 
 - ✅ Base options like `mode`, `credentials`, `signal` are preserved
-- ✅ Headers are merged (base headers + Content-Type + request headers)
+- ✅ Headers are merged (base headers + Content-Type when there is a body + request headers)
 - ✅ Request-specific headers override base headers
 - ✅ Method and body always come from the request (not from baseOptions)
 
@@ -432,54 +432,47 @@ This ensures type safety while preventing accidental overrides of critical reque
 
 ### Complete Options Merging Details
 
-The final fetch request uses `Object.assign()` to merge options:
+`send()` merges the options like this before calling fetch:
 
 ```typescript
-// Headers are merged first:
-const finalHeaders = Object.assign(
-  {}, // Start with empty object
-  baseOptions.headers || {}, // 1. Base headers from getBaseRequestOptions()
-  { 'Content-Type': contentType }, // 2. Content-Type (may override base)
-  options.headers || {} // 3. Request-specific headers (highest priority)
-);
+const baseOptions = this.getBaseRequestOptions();
 
-// Then all options are merged:
-const finalOptions = Object.assign(
-  {}, // Start with empty object
-  baseOptions, // 1. All base options (mode, credentials, signal, cache, etc.)
-  {
-    // 2. Request-specific options (override base)
-    method, // Always from endpoint
-    headers: finalHeaders, // Merged headers
-    body // Always from request data
-  }
-);
+// 1. Base headers from getBaseRequestOptions() (a Headers instance, an array or a plain object)
+const headers = new Headers(baseOptions.headers);
 
-fetch(url, finalOptions);
+// 2. Content-Type, only when the request has a body
+if (options.data !== undefined) {
+  headers.set('Content-Type', options.contentType ?? 'application/json');
+}
+
+// 3. Request-specific headers (highest priority)
+for (const [key, value] of Object.entries(options.headers ?? {})) {
+  headers.set(key, value);
+}
+
+// All base options (mode, credentials, signal, cache, ...), then method, headers and body from the request
+fetch(url, { ...baseOptions, method, headers, body });
 ```
 
 **Important**:
 
-- Always return `Record<string, string>` for headers in `getBaseRequestOptions()` for predictable merging behavior
 - Base options (like `mode`, `credentials`, `signal`) are preserved unless explicitly overridden
-- Headers are merged, not replaced - base headers + Content-Type + request headers
+- Headers are merged, not replaced: base headers, then Content-Type when there is a body, then request headers
 
 ### Request Flow
 
 ```
 User calls endpoint method
     ↓
-getBaseRequestOptions() called → Returns base options
+send() builds the URL (keeping the server's base path), headers and body
     ↓
-#makeRequest() merges:
-    - Base options (headers, signal, credentials, etc.)
-    - Content-Type header
-    - Request-specific headers
-    - Method and body
+fetch() called with the merged options (the global fetch, or ClientOptions.fetch)
     ↓
-fetch() called with merged options
+handleResponse() sees the Response before its body is read (retry, log or throw here)
     ↓
-Response validated with Zod safeParse and ResponseValidationError
+readBody() decodes the body once: JSON is parsed, anything else is text
+    ↓
+Non-2xx → HttpError; 2xx → validated against the schema for its status (ResponseValidationError on mismatch)
 ```
 
 ## Best Practices
@@ -739,96 +732,30 @@ protected getBaseRequestOptions(): Partial<Omit<RequestInit, 'method' | 'body'>>
 
 ## Response Handling
 
-The generated client includes a protected `handleResponse()` method that you can override to implement custom response handling logic such as retries, logging, and error transformation.
+The generated client throws two error classes, and lets you hook into each step of a request.
 
-### Understanding handleResponse
+### Built-in errors
 
-The `handleResponse()` method is called **before** error checking, allowing you to:
+- **`HttpError`** for any non-2xx status: `status`, `response` (headers such as `Retry-After`) and `body`, already decoded (parsed JSON, or text, including malformed JSON)
+- **`ResponseValidationError`** when a 2xx body does not match its schema: `response`, `body` (the value that failed) and `error` (the `ZodError`)
 
-- Intercept responses and handle special cases
-- Implement retry logic for specific status codes
-- Log requests and responses
-- Transform or modify responses
-
-**Method Signature:**
+Both extend `Error`, so existing `catch` blocks still catch them.
 
 ```typescript
-protected async handleResponse<T>(
-  response: Response,
-  method: string,
-  path: string,
-  options: {
-    params?: Record<string, string | number | boolean>;
-    data?: unknown;
-    contentType?: string;
-    headers?: Record<string, string>;
-  },
-): Promise<Response>
-```
+import SwaggerPetstoreOpenAPI30, { HttpError, ResponseValidationError } from './generated/api';
 
-### Handling 4xx/5xx in handleResponse
+const client = new SwaggerPetstoreOpenAPI30({});
 
-Because `handleResponse` runs **before** the `!response.ok` check in the generated client, you can override it to catch 4xx/5xx responses and throw custom errors with status, statusText, and optionally the response body. This lets you use `catch (e) { if (e instanceof HttpError && e.status === 404) ... }` for type-safe error handling.
-
-**Example override with optional HttpError class:**
-
-```typescript
-import SwaggerPetstoreOpenAPI30 from './generated/api';
-
-/** Custom error for HTTP 4xx/5xx with status, statusText, and optional body */
-export class HttpError extends Error {
-  readonly status: number;
-  readonly statusText: string;
-  readonly body?: unknown;
-
-  constructor(message: string, status: number, statusText: string, body?: unknown) {
-    super(message);
-    this.name = 'HttpError';
-    this.status = status;
-    this.statusText = statusText;
-    this.body = body;
-    Object.setPrototypeOf(this, HttpError.prototype);
-  }
-}
-
-class PetstoreClientWithCustomErrors extends SwaggerPetstoreOpenAPI30 {
-  protected async handleResponse<T>(
-    response: Response,
-    _method: string,
-    _path: string,
-    _options: { params?: Record<string, string | number | boolean>; data?: unknown; contentType?: string; headers?: Record<string, string> }
-  ): Promise<Response> {
-    if (response.ok) {
-      return response;
-    }
-
-    // Optionally read body for error details (with try/catch for non-JSON responses)
-    let body: unknown;
-    try {
-      const contentType = response.headers.get('Content-Type') ?? '';
-      body = contentType.includes('application/json') ? await response.json() : await response.text();
-    } catch {
-      body = undefined;
-    }
-
-    throw new HttpError(`HTTP ${response.status}: ${response.statusText}`, response.status, response.statusText, body);
-  }
-}
-
-// Usage with type-safe error handling
-async function main() {
-  const client = new PetstoreClientWithCustomErrors({});
-  try {
-    const pet = await client.getPetById(99999); // May 404
-    console.log(pet);
-  } catch (e) {
-    if (e instanceof HttpError) {
-      if (e.status === 404) {
-        console.error('Pet not found:', e.body);
-      } else if (e.status >= 500) {
-        console.error('Server error:', e.status, e.body);
-      }
-    }
+try {
+  await client.getPetById(99999); // May 404
+} catch (e) {
+  if (e instanceof HttpError && e.status === 404) {
+    console.error('Pet not found:', e.body);
+  } else if (e instanceof HttpError && e.status >= 500) {
+    console.error('Server error:', e.status, e.body);
+  } else if (e instanceof ResponseValidationError) {
+    console.error('Unexpected response shape:', e.error.issues, e.body);
+  } else {
     throw e;
   }
 }
@@ -836,52 +763,84 @@ async function main() {
 
 See [examples/petstore/error-handling-usage.ts](./examples/petstore/error-handling-usage.ts) for a complete runnable example.
 
-### Example: Basic Retry Handler
+### Understanding handleResponse
+
+`handleResponse()` is called by `send()` with every response, **before** its body is read, allowing you to:
+
+- Retry requests on specific status codes, by calling `this.send()` again
+- Log requests and responses
+- Throw your own errors for specific statuses
+
+**Method Signature:**
 
 ```typescript
-import SwaggerPetstoreOpenAPI30 from './generated/api';
+protected async handleResponse(response: Response, method: string, path: string, options: RequestOptions): Promise<Response>
+```
+
+Throw from it to replace the built-in `HttpError` for a status, for example a 401:
+
+```typescript
+import SwaggerPetstoreOpenAPI30, { type RequestOptions } from './generated/api';
+
+class PetstoreClientWithCustomErrors extends SwaggerPetstoreOpenAPI30 {
+  protected override async handleResponse(response: Response, method: string, path: string, options: RequestOptions): Promise<Response> {
+    if (response.status === 401) {
+      throw new AuthenticationError(response); // your own error class
+    }
+
+    return super.handleResponse(response, method, path, options);
+  }
+}
+```
+
+### Example: Basic Retry Handler
+
+Because `handleResponse()` runs before the body is read, a retry is just another `send()`: only the final response is decoded and validated. `send()` passes the same options object to every attempt of a call, so it can key the attempt count.
+
+```typescript
+import SwaggerPetstoreOpenAPI30, { type RequestOptions } from './generated/api';
 
 class PetstoreClientWithRetry extends SwaggerPetstoreOpenAPI30 {
-  private retrying = false;
+  readonly #attempts = new WeakMap<RequestOptions, number>();
 
-  protected async handleResponse<T>(
-    response: Response,
-    method: string,
-    path: string,
-    options: {...},
-  ): Promise<Response> {
-    // Prevent infinite loops
-    if (this.retrying) {
-      return response;
+  protected override async handleResponse(response: Response, method: string, path: string, options: RequestOptions): Promise<Response> {
+    const attempt = (this.#attempts.get(options) ?? 1) + 1;
+    if (response.status !== 429 || attempt > 3) {
+      return response; // Out of attempts: the client throws HttpError with this response
     }
 
-    // Handle 429 Too Many Requests
-    if (response.status === 429) {
-      const retryAfter = response.headers.get('Retry-After');
-      const delay = retryAfter ? parseInt(retryAfter, 10) * 1000 : 1000;
-
-      for (let attempt = 0; attempt < 3; attempt++) {
-        await new Promise((resolve) => setTimeout(resolve, delay * (attempt + 1)));
-
-        this.retrying = true;
-        try {
-          const retryResponse = await this.retryRequest(method, path, options);
-          if (retryResponse.ok) {
-            return retryResponse;
-          }
-        } finally {
-          this.retrying = false;
-        }
-      }
-    }
-
-    return response;
-  }
-
-  private async retryRequest(...): Promise<Response> {
-    // Reconstruct and make the request
+    const retryAfter = Number(response.headers.get('Retry-After'));
+    this.#attempts.set(options, attempt);
+    await new Promise((resolve) => setTimeout(resolve, retryAfter > 0 ? retryAfter * 1000 : 1000));
+    return this.send(method, path, options);
   }
 }
 ```
 
 See [examples/petstore/retry-handler-usage.ts](./examples/petstore/retry-handler-usage.ts) for a complete example.
+
+### Custom decoding with readBody
+
+`readBody()` reads each body once: empty bodies, 204, 205 and HEAD give `undefined`, JSON media types (including `+json`) are parsed, and anything else is returned as text. Override it for binary responses:
+
+```typescript
+class FilesClient extends GeneratedClient {
+  protected override async readBody(response: Response): Promise<unknown> {
+    if (response.headers.get('Content-Type')?.startsWith('image/')) {
+      return await response.blob();
+    }
+
+    return super.readBody(response);
+  }
+}
+```
+
+### Testing without a network
+
+Pass `fetch` in the client options; it is called for every request instead of the global one:
+
+```typescript
+const client = new SwaggerPetstoreOpenAPI30({
+  fetch: async () => new Response(JSON.stringify({ id: 1, name: 'Rex', photoUrls: [] }), { headers: { 'Content-Type': 'application/json' } })
+});
+```
