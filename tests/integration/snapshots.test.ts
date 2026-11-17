@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Generator } from '../../src/generator';
 import { Reporter } from '../../src/utils/reporter';
 
@@ -122,6 +122,20 @@ describe('Generated Code Snapshots', () => {
       expect(content).toMatch(/export (default )?class/);
       expect(content).toContain('export const Pokemon');
       expect(content).toContain('async getPokemonById');
+    });
+  });
+
+  describe('merge-keys/openapi.yaml', () => {
+    it('should generate merged schemas from YAML merge keys', async () => {
+      generator = new Generator('test-app', '1.0.0', reporter, './tests/fixtures/merge-keys/openapi.yaml', testOutputDir);
+
+      expect(await generator.run()).toBe(0);
+
+      const content = readFileSync(join(testOutputDir, 'api.ts'), 'utf-8');
+
+      expect(content).toMatch(/export const Pet: z\.ZodType<Pet> = z\.object\(\{\s*id: z\.string\(\),\s*name: z\.string\(\)\.optional\(\)\s*\}\);/);
+      expect(content).toMatch(/export const Owner: z\.ZodType<Owner> = z\.object\(\{\s*id: z\.string\(\),\s*name: z\.string\(\)\.optional\(\),\s*email: z\.string\(\)\s*\}\);/);
+      expect(content).not.toContain('<<');
     });
   });
 });

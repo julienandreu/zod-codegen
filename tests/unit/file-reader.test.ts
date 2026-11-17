@@ -139,6 +139,102 @@ paths: {}
       expect(result.info.title).toBe('Test API');
     });
 
+    it('should apply YAML merge keys (<<) as js-yaml 4 did', () => {
+      const result = parser.parse(`
+openapi: 3.0.0
+info: { title: Test API, version: 1.0.0 }
+paths: {}
+components:
+  schemas:
+    Base: &base
+      type: object
+      properties: &baseProps
+        id: { type: string }
+        name: { type: string }
+    Pet:
+      <<: *base
+      required: [id]
+    Owner:
+      type: object
+      properties:
+        email: { type: string }
+        <<: *baseProps
+`);
+      const schemas = result.components?.schemas ?? {};
+
+      expect(schemas['Pet']).toMatchObject({ type: 'object', required: ['id'] });
+      expect(Object.keys(schemas['Pet']?.['properties'] ?? {})).toEqual(['id', 'name']);
+      expect(Object.keys(schemas['Owner']?.['properties'] ?? {})).toEqual(['email', 'id', 'name']);
+    });
+
+    it('should give explicit keys precedence over merged ones, and earlier merge sources over later ones', () => {
+      const result = parser.parse(`
+openapi: 3.0.0
+info: { title: Test API, version: 1.0.0 }
+paths: {}
+components:
+  schemas:
+    A: &a { type: object, title: from-a, description: from-a }
+    B: &b { type: string, format: from-b, description: from-b }
+    C:
+      description: explicit
+      <<: [*a, *b]
+`);
+
+      expect(result.components?.schemas?.['C']).toMatchObject({ type: 'object', title: 'from-a', format: 'from-b', description: 'explicit' });
+    });
+
+    it('should resolve YAML scalars as js-yaml 4 did, except unquoted dates', () => {
+      const result = parser.parse(`
+openapi: 3.0.0
+info: { title: Test API, version: 1.0.0 }
+paths: {}
+components:
+  schemas:
+    Values:
+      enum: [0b101, -0x1F, +0o17, 0x1F, 0o17, 017, 10, -3, 1.5, .inf, 1e3, true, null, yes, on, '1:23', 1:23, 1_000, 0X1F, 2024-01-15]
+`);
+
+      expect(result.components?.schemas?.['Values']?.['enum']).toEqual([
+        5,
+        -31,
+        15,
+        31,
+        15,
+        17,
+        10,
+        -3,
+        1.5,
+        Infinity,
+        1000,
+        true,
+        null,
+        'yes',
+        'on',
+        '1:23',
+        '1:23',
+        '1_000',
+        '0X1F',
+        '2024-01-15'
+      ]);
+    });
+
+    it('should keep unquoted YAML dates as strings, as JSON input would', () => {
+      const result = parser.parse(`
+openapi: 3.0.0
+info: { title: Test API, version: 1.0.0 }
+paths: {}
+servers:
+  - url: https://{release}.example.com
+    variables:
+      release:
+        default: 2024-01-15
+        enum: [2024-01-15, 2024-02-01]
+`);
+
+      expect(result.servers?.[0]?.variables?.['release']).toEqual({ default: '2024-01-15', enum: ['2024-01-15', '2024-02-01'] });
+    });
+
     it('should parse already parsed objects', () => {
       const spec = {
         openapi: '3.0.0',

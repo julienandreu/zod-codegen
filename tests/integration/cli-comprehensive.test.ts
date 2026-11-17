@@ -1,7 +1,7 @@
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 describe('CLI Comprehensive Integration', () => {
   const cwd = resolve(__dirname, '../..');

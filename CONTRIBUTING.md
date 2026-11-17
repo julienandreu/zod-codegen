@@ -21,7 +21,7 @@ This project adheres to a code of conduct. By participating, you are expected to
 
 ### Prerequisites
 
-- Node.js >= 18.0.0
+- Node.js >= 24 (26 recommended, see `.nvmrc`)
 - npm
 - Git
 

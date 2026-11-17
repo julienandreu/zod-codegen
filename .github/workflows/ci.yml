@@ -12,28 +12,34 @@ concurrency:
 
 jobs:
   test:
-    name: Test
+    name: Test (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Supported range is engines.node (>=24); 26 is the .nvmrc LTS and the
+        # only leg that uploads coverage and the build artifact.
+        node-version: ['24', '26']
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7
         with:
-          node-version-file: '.nvmrc'
+          node-version: ${{ matrix.node-version }}
           cache: 'npm'
 
       - name: Cache node_modules
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: node-modules-${{ runner.os }}-node${{ matrix.node-version }}-${{ hashFiles('package-lock.json') }}
           restore-keys: |
-            node-modules-${{ runner.os }}-
+            node-modules-${{ runner.os }}-node${{ matrix.node-version }}-
 
       - name: Install dependencies
         run: npm ci
@@ -61,8 +67,8 @@ jobs:
           test -f generated/api.ts
 
       - name: Upload coverage to Codecov
-        if: github.event_name == 'push'
-        uses: codecov/codecov-action@v5
+        if: github.event_name == 'push' && matrix.node-version == '26'
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage/lcov.info
@@ -70,7 +76,8 @@ jobs:
           name: codecov-umbrella
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v6
+        if: matrix.node-version == '26'
+        uses: actions/upload-artifact@v7
         with:
           name: build-${{ github.sha }}
           path: dist/
@@ -82,16 +89,16 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
       - name: Cache node_modules
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -112,18 +119,18 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
       - name: Cache node_modules
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -134,7 +141,7 @@ jobs:
         run: npm ci
 
       - name: Download build artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-${{ github.sha }}
           path: dist

@@ -459,7 +459,7 @@ Each example includes:
 
 ### Prerequisites
 
-- Node.js ≥ 18.0.0 (see [.nvmrc](.nvmrc) for recommended version)
+- Node.js ≥ 24 (see [.nvmrc](.nvmrc) for the recommended version)
 - npm
 
 ### Setup
@@ -519,7 +519,7 @@ npm run test:ui
 
 ## 📋 Requirements
 
-- **Node.js**: ≥ 18.0.0
+- **Node.js**: ≥ 24
 - **TypeScript**: ≥ 5.9.3
 - **Zod**: ≥ 4.1.12
 
