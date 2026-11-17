@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { CodeGenerator, SchemaBuilder } from '../interfaces/code-generator';
 import type { GeneratorOptions } from '../types/generator-options';
 import type { MethodSchemaType, OpenApiSpecType, ReferenceType } from '../types/openapi';
-import { MethodSchema, Reference, SchemaProperties } from '../types/openapi';
+import { MethodSchema, Reference, type Response as ResponseObject, SchemaProperties } from '../types/openapi';
 import { type NamingConvention, type OperationDetails, type OperationNameTransformer, transformNamingConvention } from '../utils/naming-convention';
 import { buildClientMembersSource, buildRuntimeDeclarationsSource } from './client-runtime';
 import { TypeScriptImportBuilderService } from './import-builder.service';
@@ -19,6 +19,10 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
   // Track circular dependencies for z.lazy() wrapping
   private circularSchemas = new Set<string>();
   private currentSchemaName: string | null = null;
+
+  // Exported <Operation>Response types and schemas, collected while the client methods are built
+  private responseDeclarations: ts.Statement[] = [];
+  private readonly emptyFile = ts.createSourceFile('api.ts', '', ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
 
   constructor(options: GeneratorOptions = {}) {
     this.namingConvention = options.namingConvention;
@@ -93,6 +97,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
   }
 
   private buildAST(openapi: OpenApiSpecType): ts.Statement[] {
+    this.responseDeclarations = [];
     const imports = this.importBuilder.buildImports();
     const schemas = this.buildSchemas(openapi);
     const schemaTypeAliases = this.buildSchemaTypeAliases(schemas);
@@ -109,6 +114,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       this.createComment('Components schemas'),
       ...Object.values(schemas),
       ...schemaTypeAliases,
+      ...(this.responseDeclarations.length > 0 ? [this.createComment('Response schemas'), ...this.responseDeclarations] : []),
       ...serverConfig,
       ...this.parseTemplate(buildRuntimeDeclarationsSource(this.hasServers(openapi))),
       this.createComment('Client class'),
@@ -506,8 +512,9 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
   private buildEndpointMethod(method: string, path: string, schema: MethodSchemaType, schemas: Record<string, ts.VariableStatement>): ts.MethodDeclaration {
     const { parameters, pathParams, queryParams, hasRequestBody, contentType } = this.buildMethodParameters(schema, schemas);
-    const responseType = this.getResponseType(schema, schemas);
-    const responseSchema = this.getResponseSchema(schema, schemas);
+    const transformedOperationId = this.transformOperationName(String(schema.operationId), method, path, schema);
+    const { resultType, responseSchemas } = this.buildResponsePlan(method, transformedOperationId, schema);
+    const responseType = ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [resultType]);
 
     const statements: ts.Statement[] = [];
 
@@ -552,14 +559,6 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       pathExpression,
       optionsExpression
     ]);
-    const responseSchemas = ts.factory.createObjectLiteralExpression(
-      responseSchema ? [ts.factory.createPropertyAssignment(ts.factory.createStringLiteral('*', true), responseSchema)] : [],
-      false
-    );
-    const resultType =
-      responseType && ts.isTypeReferenceNode(responseType) && responseType.typeArguments?.[0]
-        ? responseType.typeArguments[0]
-        : ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword);
 
     statements.push(
       ts.factory.createReturnStatement(
@@ -570,8 +569,6 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
         )
       )
     );
-
-    const transformedOperationId = this.transformOperationName(String(schema.operationId), method, path, schema);
 
     const methodDeclaration = ts.factory.createMethodDeclaration(
       [ts.factory.createToken(ts.SyntaxKind.AsyncKeyword)],
@@ -810,76 +807,124 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     }
   }
 
-  private getResponseSchema(schema: MethodSchemaType, _schemas: Record<string, ts.VariableStatement>): ts.Identifier | undefined {
-    // Try to find a 200 response first, then 201, then default
-    const response200 = schema.responses?.['200'];
-    const response201 = schema.responses?.['201'];
-    const responseDefault = schema.responses?.['default'];
+  /**
+   * Decides what each success status returns: the method's return type, and the schemas #parse checks the
+   * body against (the exact status, then its NXX range, then '*' for any other 2xx). `default` is used only
+   * when the operation declares no 2xx response. Inline schemas are exported as <Operation>Response.
+   */
+  private buildResponsePlan(method: string, operationName: string, schema: MethodSchemaType): { resultType: ts.TypeNode; responseSchemas: ts.ObjectLiteralExpression } {
+    const responses = Object.entries(schema.responses ?? {});
+    const successes = responses.map(([status, response]) => [status.toUpperCase(), response] as const).filter(([status]) => /^2(\d\d|XX)$/.test(status));
+    const declared = successes.length > 0 ? successes : responses.filter(([status]) => status === 'default').map(([, response]) => ['*', response] as const);
 
-    const response = response200 ?? response201 ?? responseDefault;
-    if (!response?.content?.['application/json']?.schema) {
-      return undefined;
+    // A HEAD response has no body to read or validate.
+    if (method.toLowerCase() === 'head' || declared.length === 0) {
+      return { resultType: ts.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword), responseSchemas: ts.factory.createObjectLiteralExpression([], false) };
     }
 
-    const responseSchema = response.content['application/json'].schema;
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (responseSchema !== null && typeof responseSchema === 'object' && '$ref' in responseSchema) {
-      // eslint-disable-next-line @typescript-eslint/dot-notation
-      const ref = (responseSchema as { $ref: string })['$ref'];
-      if (typeof ref === 'string') {
-        const refName = ref.split('/').pop() ?? 'unknown';
-        return ts.factory.createIdentifier(this.typeBuilder.sanitizeIdentifier(refName));
+    const contents = declared.map(([key, response]) => ({ key, content: this.classifyResponseContent(response) }));
+    const inlineCount = contents.filter(({ content }) => content.kind === 'schema' && this.getSchemaRefName(content.schema) === undefined).length;
+    const baseName = `${this.typeBuilder.toPascalCase(operationName)}Response`;
+
+    const entries = contents.map(({ key, content }): { key: string; type: ts.TypeNode; schemaName?: string } => {
+      if (content.kind === 'schema') {
+        const refName = this.getSchemaRefName(content.schema);
+        if (refName !== undefined) {
+          const name = this.typeBuilder.sanitizeIdentifier(refName);
+          return { key, type: ts.factory.createTypeReferenceNode(name), schemaName: name };
+        }
+
+        const name = inlineCount > 1 && key !== '*' ? `${baseName}${key}` : baseName;
+        if (this.addResponseDeclarations(name, content.schema)) {
+          return { key, type: ts.factory.createTypeReferenceNode(name), schemaName: name };
+        }
       }
+
+      const keyword = content.kind === 'text' ? ts.SyntaxKind.StringKeyword : content.kind === 'empty' ? ts.SyntaxKind.UndefinedKeyword : ts.SyntaxKind.UnknownKeyword;
+      return { key, type: ts.factory.createKeywordTypeNode(keyword) };
+    });
+
+    // A declared status without a schema maps to null, so a different status's schema is never applied to it.
+    const properties = entries
+      .filter(({ key, schemaName }) => key !== '*' || schemaName !== undefined)
+      .map(({ key, schemaName }) =>
+        ts.factory.createPropertyAssignment(ts.factory.createStringLiteral(key, true), schemaName === undefined ? ts.factory.createNull() : ts.factory.createIdentifier(schemaName))
+      );
+
+    const fallbackNames = [...new Set(entries.flatMap(({ key, schemaName }) => (key !== '*' && schemaName !== undefined ? [schemaName] : [])))];
+    const [firstFallback] = fallbackNames;
+    if (firstFallback !== undefined) {
+      const fallback =
+        fallbackNames.length === 1
+          ? ts.factory.createIdentifier(firstFallback)
+          : ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('z'), 'union'), undefined, [
+              ts.factory.createArrayLiteralExpression(
+                fallbackNames.map((name) => ts.factory.createIdentifier(name)),
+                false
+              )
+            ]);
+      properties.push(ts.factory.createPropertyAssignment(ts.factory.createStringLiteral('*', true), fallback));
     }
 
-    // For inline schemas, we'd need to generate a schema, but for now return undefined
-    // This could be enhanced to generate inline schemas
-    return undefined;
+    const types = new Map(entries.map(({ type }) => [this.printer.printNode(ts.EmitHint.Unspecified, type, this.emptyFile), type]));
+    const resultTypes = [...types.values()];
+    const [onlyType] = resultTypes;
+    const resultType = resultTypes.every((type) => type.kind === ts.SyntaxKind.UndefinedKeyword)
+      ? ts.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword)
+      : resultTypes.length === 1 && onlyType !== undefined
+        ? onlyType
+        : ts.factory.createUnionTypeNode(resultTypes);
+
+    return { resultType, responseSchemas: ts.factory.createObjectLiteralExpression(properties, false) };
   }
 
-  private getResponseType(schema: MethodSchemaType, schemas: Record<string, ts.VariableStatement>): ts.TypeNode | undefined {
-    // Try to find a 200 response first, then 201, then default
-    const response200 = schema.responses?.['200'];
-    const response201 = schema.responses?.['201'];
-    const responseDefault = schema.responses?.['default'];
+  // readBody parses JSON media types (including +json and */*) and returns any other content as text.
+  private classifyResponseContent(response: z.infer<typeof ResponseObject>): { kind: 'schema'; schema: unknown } | { kind: 'json' | 'text' | 'empty' } {
+    const content = response.content ?? {};
+    const mediaTypes = Object.keys(content);
+    const jsonType = mediaTypes.find((type) => type === 'application/json') ?? mediaTypes.find((type) => type.endsWith('+json')) ?? mediaTypes.find((type) => type === '*/*');
 
-    const response = response200 ?? response201 ?? responseDefault;
-    if (!response?.content?.['application/json']?.schema) {
-      return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [ts.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword)]);
+    if (jsonType !== undefined) {
+      const jsonSchema = content[jsonType]?.schema;
+      return jsonSchema === undefined ? { kind: 'json' } : { kind: 'schema', schema: jsonSchema };
     }
 
-    const responseSchema = response.content['application/json'].schema;
-    const typeName = this.getSchemaTypeName(responseSchema, schemas);
+    return mediaTypes.length > 0 ? { kind: 'text' } : { kind: 'empty' };
+  }
 
-    // Handle array types like "Pet[]"
-    if (typeName.endsWith('[]')) {
-      const itemTypeName = typeName.slice(0, -2);
-      const sanitizedItemTypeName = this.typeBuilder.sanitizeIdentifier(itemTypeName);
+  private getSchemaRefName(schema: unknown): string | undefined {
+    const ref = this.isReference(schema) ? schema.$ref : undefined;
+    return ref?.startsWith('#/components/schemas/') ? ref.slice('#/components/schemas/'.length) : undefined;
+  }
 
-      // Check if the item type is a custom schema (we have a type alias for it)
-      if (schemas[sanitizedItemTypeName]) {
-        // Use the type alias directly (it already uses z.infer)
-        return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [
-          ts.factory.createArrayTypeNode(ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(sanitizedItemTypeName), undefined))
-        ]);
-      }
-
-      // If it's a primitive array, use the type name as-is
-      return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(typeName), undefined)]);
+  // Exports `type Name` and `const Name: z.ZodType<Name>` for an inline response schema.
+  private addResponseDeclarations(name: string, schema: unknown): boolean {
+    let schemaExpression: ts.Expression;
+    try {
+      schemaExpression = this.buildSchema(schema);
+    } catch {
+      return false;
     }
 
-    const sanitizedTypeName = this.typeBuilder.sanitizeIdentifier(typeName);
-
-    // Check if it's a custom schema type (we have a type alias for it)
-    if (schemas[sanitizedTypeName]) {
-      // Use the type name directly (we have a type alias that already uses z.infer)
-      return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [
-        ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(sanitizedTypeName), undefined)
-      ]);
-    }
-
-    // For primitive types and Record types, use the type name directly
-    return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(typeName), undefined)]);
+    const exportModifier = [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)];
+    this.responseDeclarations.push(
+      ts.factory.createTypeAliasDeclaration(exportModifier, name, undefined, this.buildTypeNode(schema)),
+      ts.factory.createVariableStatement(
+        exportModifier,
+        ts.factory.createVariableDeclarationList(
+          [
+            ts.factory.createVariableDeclaration(
+              name,
+              undefined,
+              ts.factory.createTypeReferenceNode(ts.factory.createQualifiedName(ts.factory.createIdentifier('z'), 'ZodType'), [ts.factory.createTypeReferenceNode(name)]),
+              schemaExpression
+            )
+          ],
+          ts.NodeFlags.Const
+        )
+      )
+    );
+    return true;
   }
 
   private buildServerConfiguration(openapi: OpenApiSpecType): ts.Statement[] {

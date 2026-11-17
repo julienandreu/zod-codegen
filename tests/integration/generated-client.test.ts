@@ -6,7 +6,7 @@ import { format, resolveConfig } from 'prettier';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TypeScriptCodeGeneratorService } from '../../src/services/code-generator.service';
 import type { OpenApiSpecType } from '../../src/types/openapi';
-import PetAPI, { HttpError, ResponseValidationError } from '../fixtures/error-schema/api';
+import PetAPI, { GetInventoryResponse, HttpError, ResponseValidationError } from '../fixtures/error-schema/api';
 import type { RequestOptions } from '../fixtures/error-schema/api';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -144,6 +144,51 @@ describe('Generated client', () => {
       const { api } = client(new Response(null, { status: 200 }));
 
       await expect(api.petExists_head(1)).resolves.toBeUndefined();
+    });
+  });
+
+  describe('validation', () => {
+    it('validates array responses', async () => {
+      const { api } = client(json([{ id: 1, name: 'Rex' }]), json([{ id: 1, name: 'Rex' }, { id: 'two' }]));
+
+      await expect(api.listPets()).resolves.toEqual([{ id: 1, name: 'Rex' }]);
+      const failure = await failureOf(api.listPets());
+      expect(failure).toBeInstanceOf(ResponseValidationError);
+      expect((failure as ResponseValidationError).error.issues.map((issue) => issue.path.join('.'))).toEqual(['1.id', '1.name']);
+    });
+
+    it('validates inline responses with the exported <Operation>Response schema, for any status in a 2XX range', async () => {
+      const { api } = client(json({ available: 3 }), json(['not', 'a', 'map'], { status: 206 }));
+
+      await expect(api.getInventory()).resolves.toEqual({ available: 3 });
+      await expect(failureOf(api.getInventory())).resolves.toBeInstanceOf(ResponseValidationError);
+      expect(GetInventoryResponse.safeParse({ available: 3 }).success).toBe(true);
+    });
+
+    it('picks the schema by status, and returns undefined for a declared response without content', async () => {
+      const { api } = client(json({ id: 1, name: 'Rex' }, { status: 201 }), new Response(null, { status: 204 }));
+
+      await expect(api.createPet({ id: 1, name: 'Rex' })).resolves.toEqual({ id: 1, name: 'Rex' });
+      await expect(api.createPet({ id: 1, name: 'Rex' })).resolves.toBeUndefined();
+    });
+
+    it('validates an undeclared 2xx status against the declared success schemas', async () => {
+      const { api } = client(json({ jobId: 'abc' }, { status: 202 }));
+
+      await expect(failureOf(api.createPet({ id: 1, name: 'Rex' }))).resolves.toBeInstanceOf(ResponseValidationError);
+    });
+
+    it('never validates a success against the default (error) schema', async () => {
+      const { api } = client(json({ message: 'an Error, not a Pet' }));
+
+      await expect(failureOf(api.getPet(1))).resolves.toBeInstanceOf(ResponseValidationError);
+    });
+
+    it('uses the default schema when the operation declares no 2xx response', async () => {
+      const { api } = client(json({ ok: true }), json({ ok: 'yes' }));
+
+      await expect(api.echo()).resolves.toEqual({ ok: true });
+      await expect(failureOf(api.echo())).resolves.toBeInstanceOf(ResponseValidationError);
     });
   });
 

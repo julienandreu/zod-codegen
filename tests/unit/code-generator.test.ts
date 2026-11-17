@@ -670,7 +670,92 @@ describe('TypeScriptCodeGeneratorService', () => {
 
       const code = generator.generate(spec);
       expect(code).toContain('async deletePet(id: number): Promise<void>');
-      expect(code).toMatch(/return this\.#parse<void>\(await this\.send\('DELETE', `\/pets\/\$\{id\}`, \{\}\), \{[^:}]*\}\);/);
+      expect(code).toContain("return this.#parse<void>(await this.send('DELETE', `/pets/${id}`, {}), { '204': null });");
+    });
+  });
+
+  describe('response schemas', () => {
+    const petSchemas = {
+      schemas: {
+        Pet: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
+        Error: { type: 'object', properties: { message: { type: 'string' } }, required: ['message'] }
+      }
+    };
+    const jsonOf = (schema: unknown) => ({ 'application/json': { schema } });
+    const specWith = (responses: Record<string, unknown>, method = 'get'): OpenApiSpecType =>
+      ({
+        openapi: '3.0.0',
+        info: { title: 'Test API', version: '1.0.0' },
+        paths: { '/things': { [method]: { operationId: 'doThing', responses } } },
+        components: petSchemas
+      }) as OpenApiSpecType;
+
+    it('maps each declared success status to its schema, with the declared successes as the fallback', () => {
+      const code = generator.generate(
+        specWith({
+          '201': { description: 'Created', content: jsonOf({ $ref: '#/components/schemas/Pet' }) },
+          '204': { description: 'No Content' },
+          'default': { description: 'Failure', content: jsonOf({ $ref: '#/components/schemas/Error' }) }
+        })
+      );
+
+      expect(code).toContain('async doThing(): Promise<Pet | undefined>');
+      expect(code).toContain("{ '201': Pet, '204': null, '*': Pet }");
+    });
+
+    it('exports a named type and schema for an inline success response', () => {
+      const code = generator.generate(specWith({ '200': { description: 'OK', content: jsonOf({ type: 'array', items: { $ref: '#/components/schemas/Pet' } }) } }));
+
+      expect(code).toContain('export type DoThingResponse = Pet[];');
+      expect(code).toContain('export const DoThingResponse: z.ZodType<DoThingResponse> = z.array(Pet);');
+      expect(code).toContain('async doThing(): Promise<DoThingResponse>');
+      expect(code).toContain("{ '200': DoThingResponse, '*': DoThingResponse }");
+    });
+
+    it('suffixes the status when an operation has several inline success responses', () => {
+      const code = generator.generate(
+        specWith({
+          '200': { description: 'OK', content: jsonOf({ type: 'string' }) },
+          '2xx': { description: 'Accepted', content: jsonOf({ type: 'object', properties: { jobId: { type: 'string' } }, required: ['jobId'] }) }
+        })
+      );
+
+      expect(code).toContain('export const DoThingResponse200: z.ZodType<DoThingResponse200> = z.string();');
+      expect(code).toContain('export const DoThingResponse2XX: z.ZodType<DoThingResponse2XX>');
+      expect(code).toContain('async doThing(): Promise<DoThingResponse200 | DoThingResponse2XX>');
+      expect(code).toContain("{ '200': DoThingResponse200, '2XX': DoThingResponse2XX, '*': z.union([DoThingResponse200, DoThingResponse2XX]) }");
+    });
+
+    it('uses default only when the operation declares no 2xx response', () => {
+      const withSuccess = generator.generate(
+        specWith({
+          '200': { description: 'OK', content: jsonOf({ $ref: '#/components/schemas/Pet' }) },
+          'default': { description: 'Failure', content: jsonOf({ $ref: '#/components/schemas/Error' }) }
+        })
+      );
+      const defaultOnly = generator.generate(specWith({ default: { description: 'Any', content: jsonOf({ $ref: '#/components/schemas/Pet' }) } }));
+
+      expect(withSuccess).toContain("{ '200': Pet, '*': Pet }");
+      expect(defaultOnly).toContain("{ '*': Pet }");
+      expect(defaultOnly).toContain('async doThing(): Promise<Pet>');
+    });
+
+    it('validates +json and */* media types, and types other content as text', () => {
+      const problemJson = generator.generate(specWith({ '200': { description: 'OK', content: { 'application/problem+json': { schema: { $ref: '#/components/schemas/Pet' } } } } }));
+      const anyType = generator.generate(specWith({ '200': { description: 'OK', content: { '*/*': { schema: { $ref: '#/components/schemas/Pet' } } } } }));
+      const text = generator.generate(specWith({ '200': { description: 'OK', content: { 'text/csv': { schema: { type: 'string' } } } } }));
+
+      expect(problemJson).toContain("{ '200': Pet, '*': Pet }");
+      expect(anyType).toContain("{ '200': Pet, '*': Pet }");
+      expect(text).toContain('async doThing(): Promise<string>');
+      expect(text).toContain("{ '200': null }");
+    });
+
+    it('reads no body and passes no schema for HEAD requests', () => {
+      const code = generator.generate(specWith({ '200': { description: 'OK', content: jsonOf({ $ref: '#/components/schemas/Pet' }) } }, 'head'));
+
+      expect(code).toContain('async doThing_head(): Promise<void>');
+      expect(code).toMatch(/this\.#parse<void>\(await this\.send\('HEAD', '\/things', \{\}\), \{\}\)/);
     });
   });
 

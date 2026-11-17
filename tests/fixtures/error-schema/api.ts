@@ -23,6 +23,18 @@ export const Pet: z.ZodType<Pet> = z.object({
 export const Error: z.ZodType<Error> = z.object({
   message: z.string()
 });
+
+// Response schemas
+export type ListPetsResponse = Pet[];
+export const ListPetsResponse: z.ZodType<ListPetsResponse> = z.array(Pet);
+export type GetInventoryResponse = Record<string, unknown>;
+export const GetInventoryResponse: z.ZodType<GetInventoryResponse> = z.record(z.string(), z.unknown());
+export type EchoResponse = {
+  ok: boolean;
+};
+export const EchoResponse: z.ZodType<EchoResponse> = z.object({
+  ok: z.boolean()
+});
 export const serverConfigurations = [
   {
     url: 'https://api.example.com/v1'
@@ -171,24 +183,24 @@ export default class PetAPI {
   }
   /**
    * @param tag
-   * @returns {Pet[]}
+   * @returns {ListPetsResponse}
    */
-  async listPets(tag?: string): Promise<Pet[]> {
-    return this.#parse<Pet[]>(await this.send('GET', '/pets', { params: { tag: tag } }), {});
+  async listPets(tag?: string): Promise<ListPetsResponse> {
+    return this.#parse<ListPetsResponse>(await this.send('GET', '/pets', { params: { tag: tag } }), { '200': ListPetsResponse, '*': ListPetsResponse });
   }
   /**
    * @param body
-   * @returns {Pet}
+   * @returns {Pet | undefined}
    */
-  async createPet(body: Pet): Promise<Pet> {
-    return this.#parse<Pet>(await this.send('POST', '/pets', { data: body }), { '*': Pet });
+  async createPet(body: Pet): Promise<Pet | undefined> {
+    return this.#parse<Pet | undefined>(await this.send('POST', '/pets', { data: body }), { '201': Pet, '204': null, '*': Pet });
   }
   /**
    * @param id
    * @returns {Pet}
    */
   async getPet(id: number): Promise<Pet> {
-    return this.#parse<Pet>(await this.send('GET', `/pets/${id}`, {}), { '*': Pet });
+    return this.#parse<Pet>(await this.send('GET', `/pets/${id}`, {}), { '200': Pet, '*': Pet });
   }
   /**
    * @param id
@@ -202,25 +214,25 @@ export default class PetAPI {
    * @returns {void}
    */
   async deletePet(id: number): Promise<void> {
-    return this.#parse<void>(await this.send('DELETE', `/pets/${id}`, {}), {});
+    return this.#parse<void>(await this.send('DELETE', `/pets/${id}`, {}), { '204': null });
   }
   /**
    * @param id
-   * @returns {void}
+   * @returns {string}
    */
-  async getPetStatus(id: number): Promise<void> {
-    return this.#parse<void>(await this.send('GET', `/pets/${id}/status`, {}), {});
+  async getPetStatus(id: number): Promise<string> {
+    return this.#parse<string>(await this.send('GET', `/pets/${id}/status`, {}), { '200': null });
   }
   /**
-   * @returns {void}
+   * @returns {GetInventoryResponse}
    */
-  async getInventory(): Promise<void> {
-    return this.#parse<void>(await this.send('GET', '/inventory', {}), {});
+  async getInventory(): Promise<GetInventoryResponse> {
+    return this.#parse<GetInventoryResponse>(await this.send('GET', '/inventory', {}), { '2XX': GetInventoryResponse, '*': GetInventoryResponse });
   }
   /**
-   * @returns {Record<string, unknown>}
+   * @returns {EchoResponse}
    */
-  async echo(): Promise<Record<string, unknown>> {
-    return this.#parse<Record<string, unknown>>(await this.send('GET', '/echo', {}), {});
+  async echo(): Promise<EchoResponse> {
+    return this.#parse<EchoResponse>(await this.send('GET', '/echo', {}), { '*': EchoResponse });
   }
 }
