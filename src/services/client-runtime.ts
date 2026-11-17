@@ -3,6 +3,9 @@
 // parameter properties): generated clients are loaded under Node type stripping. Avoid template
 // literals too, so the source needs no escaping here.
 
+// Generated code imports the consumer's zod; CI runs the generated-client tests at both ends of this range.
+export const SUPPORTED_ZOD_RANGE = '>=4.1.12 <5';
+
 export const buildRuntimeDeclarationsSource = (hasServers: boolean): string => String.raw`
 export type RequestOptions = {
     params?: Record<string, unknown>;

@@ -521,7 +521,7 @@ npm run test:ui
 
 - **Node.js**: ≥ 24
 - **TypeScript**: ≥ 5.9.3
-- **Zod**: ≥ 4.1.12
+- **Zod**: >=4.1.12 <5, installed in your project (generated code imports it; CI tests both ends of the range)
 
 ## 🤝 Contributing
 

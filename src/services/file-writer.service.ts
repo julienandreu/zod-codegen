@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import type { FileWriter } from '../interfaces/code-generator';
+import { SUPPORTED_ZOD_RANGE } from './client-runtime';
 
 export class SyncFileWriterService implements FileWriter {
   constructor(
@@ -28,6 +29,7 @@ export class SyncFileWriterService implements FileWriter {
       `// Built with ${this.name}@${this.version}`,
       `// Latest edit: ${new Date().toUTCString()}`,
       `// Source file: ${this.redactUrl(this.inputPath)}`,
+      `// Requires zod ${SUPPORTED_ZOD_RANGE} in your project`,
       '/* eslint-disable */',
       '// @ts-nocheck',
       '',

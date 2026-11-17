@@ -66,4 +66,15 @@ describe('SyncFileWriterService', () => {
       expect(content).toContain('// Source file: ./samples/openapi.json');
     });
   });
+
+  describe('header', () => {
+    it('should state the zod versions the generated code supports', () => {
+      const writer = new SyncFileWriterService('zod-codegen', '1.0.0', './samples/openapi.json');
+
+      const outPath = join(testOutputDir, 'api.ts');
+      writer.writeFile(outPath, 'const x = 1;');
+
+      expect(readFileSync(outPath, 'utf-8')).toContain('// Requires zod >=4.1.12 <5 in your project\n');
+    });
+  });
 });
