@@ -1404,7 +1404,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     // Add @param tag for request body if present
     if (schema.requestBody) {
       const bodyDesc = schema.requestBody.description ? ` ${schema.requestBody.description}` : '';
-      lines.push(` * @param body${bodyDesc}`);
+      lines.push(` * @param ${this.parameterIdentifier('body', 'body')}${bodyDesc}`);
     }
 
     // Add @returns tag if we have a response type

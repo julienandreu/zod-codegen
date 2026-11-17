@@ -753,6 +753,28 @@ describe('TypeScriptCodeGeneratorService', () => {
       expect(text).toContain("{ '200': null }");
     });
 
+    it('documents a renamed request body parameter under its new name', () => {
+      const code = generator.generate({
+        openapi: '3.0.0',
+        info: { title: 'Test API', version: '1.0.0' },
+        paths: {
+          '/things': {
+            post: {
+              operationId: 'doThing',
+              parameters: [{ name: 'body', in: 'query', schema: { type: 'string' } }],
+              requestBody: { required: true, content: jsonOf({ $ref: '#/components/schemas/Pet' }) },
+              responses: { '204': { description: 'No Content' } }
+            }
+          }
+        },
+        components: petSchemas
+      } as OpenApiSpecType);
+
+      expect(code).toContain('async doThing(body?: string, bodyParam: Pet)');
+      expect(code).toContain(' * @param bodyParam');
+      expect(code).toContain("{ params: { 'body': body }, data: bodyParam }");
+    });
+
     it('reads no body and passes no schema for HEAD requests', () => {
       const code = generator.generate(specWith({ '200': { description: 'OK', content: jsonOf({ $ref: '#/components/schemas/Pet' }) } }, 'head'));
 
