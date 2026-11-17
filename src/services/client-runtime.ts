@@ -74,7 +74,7 @@ class Client {
         }
         const baseOptions = this.getBaseRequestOptions();
         const headers = new globalThis.Headers(baseOptions.headers);
-        let body: string | undefined;
+        let body: string | null = null;
         if (options.data !== undefined) {
             if (options.contentType === 'application/x-www-form-urlencoded') {
                 const form = new globalThis.URLSearchParams();
