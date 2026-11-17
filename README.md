@@ -17,10 +17,11 @@ A powerful TypeScript code generator that creates **Zod schemas** and **type-saf
 - **⚡ Fast**: Optimized for performance with minimal dependencies
 - **🔧 Advanced Schema Support**: Handles logical operators (anyOf, oneOf, allOf, not), enums, discriminators, and complex nested schemas
 - **📦 Single File Output**: Generates all schemas and client in one convenient TypeScript file
-- **🛡️ Runtime Validation**: Built-in Zod validation for request/response data
-- **🌍 Form Support**: Supports both JSON and form-urlencoded request bodies
-- **🔐 Extensible**: Override `getBaseRequestOptions()` to add authentication, custom headers, CORS, and other fetch options
-- **🔄 Response Handling**: Override `handleResponse()` to implement custom retry logic, logging, error handling, and catch 4xx/5xx with custom errors
+- **🛡️ Runtime Validation**: Every success response with a schema is validated with Zod, picked by status code (`validateResponses: false` turns it off)
+- **🚨 Typed Errors**: `HttpError` for non-2xx responses (with the `Response`, status and decoded body) and `ResponseValidationError` for bodies that don't match their schema
+- **🌍 Form Support**: Supports both JSON and form-urlencoded request bodies, preferring JSON when an operation accepts both
+- **🔐 Extensible**: Override `getBaseRequestOptions()` for authentication, headers and other fetch options, and `send()`, `readBody()` or `handleResponse()` for transport, decoding, retries and logging
+- **🧪 Injectable fetch**: Pass `fetch` in the client options for tests or runtimes without a global `fetch`
 - **🌐 Server Configuration**: Full support for OpenAPI server variables and templating (e.g., `{environment}.example.com`)
 - **⚙️ Flexible Client Options**: Options-based constructor supporting server selection, variable overrides, and custom base URLs
 
@@ -142,48 +143,62 @@ const generator = new Generator('my-app', '1.0.0', reporter, './openapi.json', '
 
 The generator creates a single TypeScript file (`api.ts`) containing:
 
-- **Zod Schemas**: Exported Zod validation schemas for all component schemas defined in your OpenAPI spec
+- **Zod Schemas**: Exported Zod validation schemas and TypeScript types for all component schemas defined in your OpenAPI spec
+- **Response Schemas**: An exported `<Operation>Response` type and schema for each inline response schema (arrays, objects, primitives)
 - **API Client Class**: A type-safe client class with methods for each endpoint operation
-- **ResponseValidationError**: A generic error class thrown when response data fails Zod schema validation, carrying the parsed response body (`response`, also readable as `data`) and the `ZodError` (`error`)
+- **Error Classes**: `HttpError` for non-2xx responses and `ResponseValidationError` for bodies that fail their schema
 - **Server Configuration**: `serverConfigurations` array and `defaultBaseUrl` constant extracted from OpenAPI servers
-- **Client Options Type**: `ClientOptions` type for flexible server selection and variable overrides
-- **Protected Extension Points**:
-  - `getBaseRequestOptions()` method for customizing request options
-  - `handleResponse()` method for response handling (retries, circuit breakers, etc.)
+- **Client Options Type**: `ClientOptions` for server selection, variable overrides, a custom `fetch` and turning validation off
+- **Protected Extension Points**: `getBaseRequestOptions()`, `handleResponse()`, `send()` and `readBody()`
+
+Names that would clash with a JavaScript global, a reserved word or a generated name get a `Schema` suffix (then a number if needed), and every reference follows: a schema named `Error` is exported as `ErrorSchema`. Likewise, an operation named like a client method (`send`, `readBody`, `handleResponse`, `getBaseRequestOptions`, `constructor`) gets an `Operation` suffix, and a parameter that would shadow another name gets a `Param` suffix.
 
 ### Generated Client Structure
 
 The generated client class includes:
 
 ```typescript
-export class YourAPI {
-  readonly #baseUrl: string;
-
-  // Options-based constructor (if servers are defined in OpenAPI spec)
+export default class YourAPI {
+  // `options` defaults to {} when the spec defines servers; otherwise `baseUrl` is required
   constructor(options: ClientOptions);
 
-  // Or simple baseUrl constructor (if no servers defined)
-  constructor(baseUrl: string = '/', _?: unknown);
-
-  // Protected method - override to customize request options
+  // Override to customize request options: headers (authentication), signal, credentials, cache, ...
   protected getBaseRequestOptions(): Partial<Omit<RequestInit, 'method' | 'body'>>;
 
-  // Protected method - override to handle responses (retries, circuit breakers, etc.)
-  protected async handleResponse<T>(response: Response, method: string, path: string, options: {...}): Promise<Response>;
+  // Called by send() with each response before its body is read: retries, logging, custom errors
+  protected async handleResponse(response: Response, method: string, path: string, options: RequestOptions): Promise<Response>;
 
-  // Private method - handles all HTTP requests
-  async #makeRequest<T>(method: string, path: string, options: {...}): Promise<T>;
+  // Transport: builds the URL, headers and body, calls fetch and returns the Response (never reads the body)
+  protected async send(method: string, path: string, options?: RequestOptions): Promise<Response>;
+
+  // Decoding: reads the body once. Empty bodies, 204, 205 and HEAD give undefined, JSON is parsed, anything else is text
+  protected async readBody(response: Response): Promise<unknown>;
 
   // Generated endpoint methods (one per operationId)
   async yourEndpointMethod(...): Promise<ResponseType>;
 }
 
-// ClientOptions type (when servers are defined)
 export type ClientOptions = {
-  baseUrl?: string;                    // Override base URL directly
-  serverIndex?: number;                // Select server by index (0-based)
+  baseUrl?: string;                         // Override the base URL (required when the spec has no servers)
+  serverIndex?: number;                     // Select a server by index (0-based)
   serverVariables?: Record<string, string>; // Override server template variables
+  fetch?: typeof globalThis.fetch;          // Custom fetch, e.g. for tests
+  validateResponses?: boolean;              // Defaults to true; false returns decoded bodies unvalidated
 };
+
+// Thrown for any non-2xx status. Extends Error, with the message `HTTP <status>: <statusText>`
+export class HttpError extends Error {
+  readonly response: Response; // Status, statusText and headers, such as Retry-After
+  readonly body: unknown; // Already decoded, since the stream can only be read once
+  get status(): number;
+}
+
+// Thrown when a 2xx body does not match its schema
+export class ResponseValidationError<T = unknown> extends Error {
+  readonly response: Response;
+  readonly body: unknown; // The value that failed the schema
+  readonly error: z.ZodError<T>;
+}
 
 // Server configuration (when servers are defined)
 export const serverConfigurations: Array<{
@@ -198,6 +213,16 @@ export const serverConfigurations: Array<{
 
 export const defaultBaseUrl: string;   // First server with default variables
 ```
+
+### Response Validation
+
+Each method checks the response status, decodes the body once, then validates it against the schema declared for that status:
+
+1. A non-2xx status throws `HttpError`, even when the body is malformed JSON (the raw text is kept as `body`).
+2. A 2xx body is validated against the exact status (`201`), then its range (`2XX`), then the operation's other success schemas for any undeclared 2xx status. `default` is only used when an operation declares no 2xx response, so a success is never checked against an error schema.
+3. A status declared without content returns `undefined`, and non-JSON content (such as `text/plain`) is returned as text, unvalidated.
+
+The method's return type is the union of its declared success types, for example `Promise<Pet | undefined>` when an operation declares `200` with `Pet` and `204` without content.
 
 ### File Structure
 
@@ -253,11 +278,18 @@ components:
 ```typescript
 import { z } from 'zod';
 
+// Explicit type declarations
+export interface User {
+  id: number;
+  name: string;
+  email: string;
+}
+
 // Components schemas
-export const User = z.object({
+export const User: z.ZodType<User> = z.object({
   id: z.number().int(),
   name: z.string(),
-  email: z.string().email()
+  email: z.email()
 });
 
 // Server configuration (when servers are defined in OpenAPI spec)
@@ -267,61 +299,41 @@ export const serverConfigurations = [
   }
 ];
 export const defaultBaseUrl = 'https://api.example.com';
-export type ClientOptions = {
-  baseUrl?: string;
-  serverIndex?: number;
-  serverVariables?: Record<string, string>;
-};
 
-// ResponseValidationError class
-export class ResponseValidationError<T> extends globalThis.Error {
-  readonly response: unknown;
-  readonly error: z.ZodError<T>;
-  constructor(message: string, response: unknown, error: z.ZodError<T>) {
-    super(message);
-    this.name = 'ResponseValidationError' as const;
-    this.response = response;
-    this.error = error;
-  }
-  get data(): unknown {
-    return this.response;
-  }
-}
+// ... RequestOptions, ClientOptions, HttpError and ResponseValidationError (see above)
 
 // Client class
-export class UserAPI {
-  readonly #baseUrl: string;
-
+export default class UserAPI {
   constructor(options: ClientOptions = {}) {
-    this.#baseUrl = options.baseUrl || defaultBaseUrl;
+    // ...
   }
 
-  protected getBaseRequestOptions(): Partial<Omit<RequestInit, 'method' | 'body'>> {
-    return {};
-  }
+  // ... getBaseRequestOptions, handleResponse, send and readBody (see above)
 
   async getUserById(id: number): Promise<User> {
-    const response = await this.makeRequest('GET', `/users/${id}`, {});
-    const parsedUser = User.safeParse(response);
-    if (!parsedUser.success) {
-      throw new ResponseValidationError<User>(`Invalid user: ${parsedUser.error.issues.map((error) => error.message).join(', ')}`, response, parsedUser.error);
-    }
-    return parsedUser.data;
+    return this.#parse<User>(await this.send('GET', `/users/${id}`, {}), { '200': User, '*': User });
   }
-
-  // ... protected makeRequest method
 }
 ```
 
 **Usage:**
 
 ```typescript
-import UserAPI from './generated/api';
+import UserAPI, { HttpError, ResponseValidationError } from './generated/api';
 
 // Use default server from OpenAPI spec
 const client = new UserAPI({});
-const user = await client.getUserById(123);
-// user is fully typed and validated!
+
+try {
+  const user = await client.getUserById(123);
+  // user is fully typed and validated!
+} catch (error) {
+  if (error instanceof HttpError && error.status === 404) {
+    // error.body holds the decoded error body, error.response the headers
+  } else if (error instanceof ResponseValidationError) {
+    // error.body failed the User schema; error.error is the ZodError
+  }
+}
 ```
 
 ### Extending the Client
@@ -332,7 +344,15 @@ The generated client includes a protected `getBaseRequestOptions()` method that 
 - **CORS**: `mode`, `credentials` for cross-origin requests
 - **Request Options**: `signal` (AbortController), `cache`, `redirect`, `referrer`, etc.
 
-**Important**: Options from `getBaseRequestOptions()` are **merged with** (not replaced by) request-specific options. Base options like `mode`, `credentials`, and `signal` are preserved, while headers are merged (base headers + Content-Type + request headers). See [EXAMPLES.md](EXAMPLES.md) for detailed merging behavior.
+**Important**: Options from `getBaseRequestOptions()` are **merged with** (not replaced by) request-specific options. Base options like `mode`, `credentials`, and `signal` are preserved, while headers are merged: base headers, then `Content-Type` (only when the request has a body), then request headers. See [EXAMPLES.md](EXAMPLES.md) for detailed merging behavior.
+
+The other extension points:
+
+- **`handleResponse()`** runs inside `send()` for every response, before the body is read. Return the response to continue, call `this.send(method, path, options)` again to retry, or throw your own error. See [examples/petstore/retry-handler-usage.ts](examples/petstore/retry-handler-usage.ts).
+- **`send()`** performs the request and returns the `Response`. Override it to change how URLs or bodies are built.
+- **`readBody()`** decodes the body once. Override it for binary or other non-JSON responses, which are returned as text by default.
+
+To test a client without a network, pass a `fetch` function in the options: `new UserAPI({ fetch: async () => new Response(JSON.stringify(user), { headers: { 'Content-Type': 'application/json' } }) })`.
 
 #### Basic Authentication Example
 
@@ -434,6 +454,32 @@ See [EXAMPLES.md](EXAMPLES.md) for comprehensive examples including:
 - Environment-specific configurations
 - Response handling with custom retry logic, [4xx/5xx error handling](EXAMPLES.md#handling-4xx5xx-in-handleresponse), and error transformation
 
+## ⬆️ Migrating from 1.x to 2.0
+
+Regenerate your clients after upgrading, then check these changes:
+
+**Runtime**
+
+- Node.js 24 or later is required.
+
+**YAML specs**
+
+- Unquoted dates and timestamps are read as strings, as they would be in a JSON spec.
+- Explicit `!!timestamp`, `!!binary`, `!!set`, `!!omap` and `!!pairs` tags are rejected, and an empty file fails with a YAML error. Merge keys (`<<`) still work.
+
+**Generated client**
+
+- `makeRequest` is gone. Override `send()` for transport, `readBody()` for decoding or `handleResponse()` for retries and logging. `handleResponse()` is no longer generic, and its options are typed `RequestOptions`.
+- Non-2xx responses throw `HttpError` instead of `Error`. It extends `Error` and keeps the `HTTP <status>: <statusText>` message, but read `error.status`, `error.body` and `error.response` rather than parsing the message.
+- `ResponseValidationError` takes `(response, body, error)`: `response` is now the `Response`, the decoded body moved to `body`, and the `data` getter is removed.
+- More responses are validated: arrays, inline and primitive schemas, and `+json` or `*/*` media types. A response that doesn't match its schema now throws `ResponseValidationError`; pass `validateResponses: false` to skip validation.
+- Success bodies are validated against the schema for their status. `default` is only used when an operation declares no 2xx response.
+- Return types are the union of the declared success types (for example `Pet | undefined` when a 204 is also declared), and responses with non-JSON content are typed `string`.
+- Schemas named like a global, a reserved word or a generated name are exported with a `Schema` suffix: `Error` becomes `ErrorSchema`. Operations named `send`, `readBody`, `handleResponse`, `getBaseRequestOptions` or `constructor` become methods with an `Operation` suffix, such as `sendOperation()`.
+- Clients for specs without servers take `new Client({ baseUrl })` instead of `new Client(baseUrl)`.
+- Request URLs keep the server's base path (`https://api.example.com/v1` + `/pets` gives `/v1/pets`; 1.x dropped `/v1`).
+- `Content-Type` is only sent with a body, and JSON is sent when an operation accepts both JSON and form data.
+
 ## 📖 Examples
 
 Check out the [examples directory](./examples/) for complete, runnable examples:
@@ -521,7 +567,7 @@ npm run test:ui
 
 - **Node.js**: ≥ 24
 - **TypeScript**: ≥ 5.9.3
-- **Zod**: ≥ 4.1.12
+- **Zod**: >=4.1.12 <5, installed in your project (generated code imports it; CI tests both ends of the range)
 
 ## 🤝 Contributing
 

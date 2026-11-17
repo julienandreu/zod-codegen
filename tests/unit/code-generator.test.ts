@@ -268,7 +268,7 @@ describe('TypeScriptCodeGeneratorService', () => {
 
       const code = generator.generate(spec);
       expect(code).toContain('async getUsers');
-      expect(code).toContain('makeRequest');
+      expect(code).toContain("await this.send('GET', '/users', {})");
     });
 
     it('should generate getBaseRequestOptions method', () => {
@@ -401,7 +401,7 @@ describe('TypeScriptCodeGeneratorService', () => {
       expect(code).not.toContain('ExecutionMode: z.enum');
     });
 
-    it('should merge baseOptions with request-specific options in makeRequest', () => {
+    it('should merge the base request options into every request in send', () => {
       const spec: OpenApiSpecType = {
         openapi: '3.0.0',
         info: {
@@ -429,19 +429,13 @@ describe('TypeScriptCodeGeneratorService', () => {
 
       const code = generator.generate(spec);
 
-      // Should call getBaseRequestOptions()
-      expect(code).toContain('getBaseRequestOptions()');
+      // Headers start from the base options; Content-Type is only set with a body, then request headers win.
+      expect(code).toContain('const baseOptions = this.getBaseRequestOptions();');
+      expect(code).toContain('const headers = new globalThis.Headers(baseOptions.headers);');
+      expect(code).toMatch(/if \(options\.data !== undefined\) \{[\s\S]*headers\.set\('Content-Type'/);
 
-      // Should merge headers: baseHeaders + Content-Type + request headers
-      expect(code).toContain('Object.assign');
-      expect(code).toContain('baseHeaders');
-      expect(code).toContain('Content-Type');
-
-      // Should merge all options: baseOptions + {method, headers, body}
-      expect(code).toMatch(/Object\.assign\s*\(\s*\{\s*\}\s*,\s*baseOptions/);
-      expect(code).toContain('method');
-      expect(code).toContain('headers');
-      expect(code).toContain('body');
+      // Base options such as signal and credentials are kept; method, headers and body are per request.
+      expect(code).toContain('{ ...baseOptions, method, headers, body }');
     });
 
     it('should handle array types', () => {
@@ -501,7 +495,7 @@ describe('TypeScriptCodeGeneratorService', () => {
       expect(code).not.toContain('/api/v2/users/${user_id}/api/v2/users/${code}');
     });
 
-    it('should skip JSON parse in makeRequest for 204/205 No Content responses', () => {
+    it('should read no body for 204/205 No Content responses', () => {
       const spec: OpenApiSpecType = {
         openapi: '3.0.0',
         info: {
@@ -525,19 +519,16 @@ describe('TypeScriptCodeGeneratorService', () => {
 
       const code = generator.generate(spec);
 
-      // The generated makeRequest implementation must guard against parsing
-      // empty bodies for 204/205 responses. Without this guard, `response.json()`
-      // throws "Unexpected end of JSON input" for any endpoint that returns
-      // 204 No Content (commonly DELETE endpoints declared `Promise<void>`).
-      // Per RFC 7231 §6.3.5 / §6.3.6, 204 and 205 MUST have empty bodies.
-      expect(code).toContain('response.status === 204');
-      expect(code).toContain('response.status === 205');
-      expect(code).toContain('return undefined as T');
+      // Per RFC 7231 §6.3.5 / §6.3.6, 204 and 205 MUST have empty bodies, so readBody never parses them.
+      // Any other empty body also decodes to undefined instead of throwing "Unexpected end of JSON input".
+      expect(code).toContain('if (response.status === 204 || response.status === 205) {');
+      expect(code).toContain("if (text === '') {");
+      expect(code).not.toContain('response.json()');
     });
   });
 
   describe('ResponseValidationError', () => {
-    it('should generate ResponseValidationError class', () => {
+    it('should generate ResponseValidationError and HttpError classes', () => {
       const spec: OpenApiSpecType = {
         openapi: '3.0.0',
         info: {
@@ -548,13 +539,18 @@ describe('TypeScriptCodeGeneratorService', () => {
       };
 
       const code = generator.generate(spec);
-      expect(code).toContain('class ResponseValidationError<T> extends globalThis.Error');
-      expect(code).toContain('readonly response: unknown');
-      expect(code).toContain('readonly error: z.ZodError<T>');
-      expect(code).toContain('constructor(message: string, response: unknown, error: z.ZodError<T>)');
-      expect(code).toContain("this.name = 'ResponseValidationError' as const");
-      expect(code).toContain('get data(): unknown');
-      expect(code).not.toContain('.json() as T');
+      expect(code).toContain('export class ResponseValidationError<T = unknown> extends globalThis.Error');
+      expect(code).toContain('readonly response: Response;');
+      expect(code).toContain('readonly body: unknown;');
+      expect(code).toContain('readonly error: z.ZodError<T>;');
+      expect(code).toContain('constructor(response: Response, body: unknown, error: z.ZodError<T>)');
+      expect(code).toContain("this.name = 'ResponseValidationError';");
+      expect(code).not.toContain('get data()');
+
+      expect(code).toContain('export class HttpError extends globalThis.Error');
+      expect(code).toContain('constructor(response: Response, body: unknown)');
+      expect(code).toContain("this.name = 'HttpError';");
+      expect(code).toContain('get status(): number');
     });
 
     it('should reference the built-in Error through globalThis when a schema is named Error', () => {
@@ -579,10 +575,12 @@ describe('TypeScriptCodeGeneratorService', () => {
       };
 
       const code = generator.generate(spec);
-      expect(code).toContain('export interface Error {');
-      expect(code).toContain('export const Error: z.ZodType<Error>');
-      expect(code).toContain('class ResponseValidationError<T> extends globalThis.Error');
-      expect(code).toContain('throw new globalThis.Error(`HTTP ');
+      // The schema is renamed so its exported type stays usable next to the built-in Error.
+      expect(code).toContain('export interface ErrorSchema {');
+      expect(code).toContain('export const ErrorSchema: z.ZodType<ErrorSchema>');
+      expect(code).not.toMatch(/export (interface|const) Error\b/);
+      expect(code).toContain('class ResponseValidationError<T = unknown> extends globalThis.Error');
+      expect(code).toContain('class HttpError extends globalThis.Error');
       expect(code).not.toMatch(/extends Error\b/);
       expect(code).not.toMatch(/new Error\(/);
     });
@@ -633,16 +631,17 @@ describe('TypeScriptCodeGeneratorService', () => {
       };
 
       const code = generator.generate(spec);
-      expect(code).toContain('Pet.safeParse(response)');
-      expect(code).toContain('parsedPet.success');
-      expect(code).toContain('new ResponseValidationError<Pet>');
-      expect(code).toContain('parsedPet.error.issues.map(');
+      // The method hands its schemas to #parse, which validates with safeParse and returns the parsed data.
+      expect(code).toMatch(/return this\.#parse<Pet>\(await this\.send\('POST', '\/pets', \{ data: body \}\), \{[^}]*: Pet[^}]*\}\);/);
+      expect(code).toContain('const result = schema.safeParse(body);');
+      expect(code).toContain('throw new ResponseValidationError<T>(response, body, result.error as z.ZodError<T>);');
+      expect(code).toContain('return result.data as T;');
+      expect(code).toContain('error.issues.map(');
       expect(code).not.toContain('.error.errors');
-      expect(code).toContain('parsedPet.data');
       expect(code).not.toContain('Pet.parse(');
     });
 
-    it('should not use safeParse for methods without response schemas', () => {
+    it('should pass no schema for methods without response schemas', () => {
       const spec: OpenApiSpecType = {
         openapi: '3.0.0',
         info: {
@@ -672,9 +671,115 @@ describe('TypeScriptCodeGeneratorService', () => {
       };
 
       const code = generator.generate(spec);
-      expect(code).toContain('async deletePet');
-      expect(code).toContain('return await this.makeRequest');
-      expect(code).not.toContain('safeParse');
+      expect(code).toContain('async deletePet(id: number): Promise<void>');
+      expect(code).toContain("return this.#parse<void>(await this.send('DELETE', `/pets/${id}`, {}), { '204': null });");
+    });
+  });
+
+  describe('response schemas', () => {
+    const petSchemas = {
+      schemas: {
+        Pet: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
+        Error: { type: 'object', properties: { message: { type: 'string' } }, required: ['message'] }
+      }
+    };
+    const jsonOf = (schema: unknown) => ({ 'application/json': { schema } });
+    const specWith = (responses: Record<string, unknown>, method = 'get'): OpenApiSpecType =>
+      ({
+        openapi: '3.0.0',
+        info: { title: 'Test API', version: '1.0.0' },
+        paths: { '/things': { [method]: { operationId: 'doThing', responses } } },
+        components: petSchemas
+      }) as OpenApiSpecType;
+
+    it('maps each declared success status to its schema, with the declared successes as the fallback', () => {
+      const code = generator.generate(
+        specWith({
+          '201': { description: 'Created', content: jsonOf({ $ref: '#/components/schemas/Pet' }) },
+          '204': { description: 'No Content' },
+          'default': { description: 'Failure', content: jsonOf({ $ref: '#/components/schemas/Error' }) }
+        })
+      );
+
+      expect(code).toContain('async doThing(): Promise<Pet | undefined>');
+      expect(code).toContain("{ '201': Pet, '204': null, '*': Pet }");
+    });
+
+    it('exports a named type and schema for an inline success response', () => {
+      const code = generator.generate(specWith({ '200': { description: 'OK', content: jsonOf({ type: 'array', items: { $ref: '#/components/schemas/Pet' } }) } }));
+
+      expect(code).toContain('export type DoThingResponse = Pet[];');
+      expect(code).toContain('export const DoThingResponse: z.ZodType<DoThingResponse> = z.array(Pet);');
+      expect(code).toContain('async doThing(): Promise<DoThingResponse>');
+      expect(code).toContain("{ '200': DoThingResponse, '*': DoThingResponse }");
+    });
+
+    it('suffixes the status when an operation has several inline success responses', () => {
+      const code = generator.generate(
+        specWith({
+          '200': { description: 'OK', content: jsonOf({ type: 'string' }) },
+          '2xx': { description: 'Accepted', content: jsonOf({ type: 'object', properties: { jobId: { type: 'string' } }, required: ['jobId'] }) }
+        })
+      );
+
+      expect(code).toContain('export const DoThingResponse200: z.ZodType<DoThingResponse200> = z.string();');
+      expect(code).toContain('export const DoThingResponse2XX: z.ZodType<DoThingResponse2XX>');
+      expect(code).toContain('async doThing(): Promise<DoThingResponse200 | DoThingResponse2XX>');
+      expect(code).toContain("{ '200': DoThingResponse200, '2XX': DoThingResponse2XX, '*': z.union([DoThingResponse200, DoThingResponse2XX]) }");
+    });
+
+    it('uses default only when the operation declares no 2xx response', () => {
+      const withSuccess = generator.generate(
+        specWith({
+          '200': { description: 'OK', content: jsonOf({ $ref: '#/components/schemas/Pet' }) },
+          'default': { description: 'Failure', content: jsonOf({ $ref: '#/components/schemas/Error' }) }
+        })
+      );
+      const defaultOnly = generator.generate(specWith({ default: { description: 'Any', content: jsonOf({ $ref: '#/components/schemas/Pet' }) } }));
+
+      expect(withSuccess).toContain("{ '200': Pet, '*': Pet }");
+      expect(defaultOnly).toContain("{ '*': Pet }");
+      expect(defaultOnly).toContain('async doThing(): Promise<Pet>');
+    });
+
+    it('validates +json and */* media types, and types other content as text', () => {
+      const problemJson = generator.generate(specWith({ '200': { description: 'OK', content: { 'application/problem+json': { schema: { $ref: '#/components/schemas/Pet' } } } } }));
+      const anyType = generator.generate(specWith({ '200': { description: 'OK', content: { '*/*': { schema: { $ref: '#/components/schemas/Pet' } } } } }));
+      const text = generator.generate(specWith({ '200': { description: 'OK', content: { 'text/csv': { schema: { type: 'string' } } } } }));
+
+      expect(problemJson).toContain("{ '200': Pet, '*': Pet }");
+      expect(anyType).toContain("{ '200': Pet, '*': Pet }");
+      expect(text).toContain('async doThing(): Promise<string>');
+      expect(text).toContain("{ '200': null }");
+    });
+
+    it('documents a renamed request body parameter under its new name', () => {
+      const code = generator.generate({
+        openapi: '3.0.0',
+        info: { title: 'Test API', version: '1.0.0' },
+        paths: {
+          '/things': {
+            post: {
+              operationId: 'doThing',
+              parameters: [{ name: 'body', in: 'query', schema: { type: 'string' } }],
+              requestBody: { required: true, content: jsonOf({ $ref: '#/components/schemas/Pet' }) },
+              responses: { '204': { description: 'No Content' } }
+            }
+          }
+        },
+        components: petSchemas
+      } as OpenApiSpecType);
+
+      expect(code).toContain('async doThing(body?: string, bodyParam: Pet)');
+      expect(code).toContain(' * @param bodyParam');
+      expect(code).toContain("{ params: { 'body': body }, data: bodyParam }");
+    });
+
+    it('reads no body and passes no schema for HEAD requests', () => {
+      const code = generator.generate(specWith({ '200': { description: 'OK', content: jsonOf({ $ref: '#/components/schemas/Pet' }) } }, 'head'));
+
+      expect(code).toContain('async doThing_head(): Promise<void>');
+      expect(code).toMatch(/this\.#parse<void>\(await this\.send\('HEAD', '\/things', \{\}\), \{\}\)/);
     });
   });
 

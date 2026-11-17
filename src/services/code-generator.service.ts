@@ -3,10 +3,26 @@ import { z } from 'zod';
 import type { CodeGenerator, SchemaBuilder } from '../interfaces/code-generator';
 import type { GeneratorOptions } from '../types/generator-options';
 import type { MethodSchemaType, OpenApiSpecType, ReferenceType } from '../types/openapi';
-import { MethodSchema, Reference, SchemaProperties } from '../types/openapi';
+import { MethodSchema, Reference, type Response as ResponseObject, SchemaProperties } from '../types/openapi';
 import { type NamingConvention, type OperationDetails, type OperationNameTransformer, transformNamingConvention } from '../utils/naming-convention';
+import { buildClientMembersSource, buildRuntimeDeclarationsSource } from './client-runtime';
 import { TypeScriptImportBuilderService } from './import-builder.service';
 import { TypeScriptTypeBuilderService } from './type-builder.service';
+
+// Names a schema, parameter or client class must not take in a generated module: reserved words and
+// predefined types that cannot be declared, globals that generated code refers to, and generated names.
+const RESERVED_NAMES: ReadonlySet<string> = new Set([
+  ...['arguments', 'await', 'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger', 'default', 'delete', 'do', 'else', 'enum', 'eval', 'export', 'extends'],
+  ...['false', 'finally', 'for', 'function', 'if', 'implements', 'import', 'in', 'instanceof', 'interface', 'let', 'new', 'null', 'package', 'private'],
+  ...['protected', 'public', 'return', 'static', 'super', 'switch', 'this', 'throw', 'true', 'try', 'typeof', 'var', 'void', 'while', 'with', 'yield'],
+  ...['any', 'bigint', 'boolean', 'never', 'number', 'object', 'string', 'symbol', 'undefined', 'unknown'],
+  ...['Array', 'Boolean', 'Date', 'Error', 'Function', 'Headers', 'JSON', 'Map', 'Number', 'Object', 'Omit', 'Partial', 'Promise', 'Readonly', 'Record'],
+  ...['RegExp', 'Request', 'RequestInit', 'Response', 'Set', 'String', 'Symbol', 'URL', 'URLSearchParams', 'fetch', 'globalThis', 'z'],
+  ...['ClientOptions', 'HttpError', 'RequestOptions', 'ResponseValidationError', 'defaultBaseUrl', 'resolveServerUrl', 'serverConfigurations']
+]);
+
+// Public members of the generated client class (see client-runtime.ts) that an endpoint method must not replace.
+const RUNTIME_MEMBER_NAMES: readonly string[] = ['constructor', 'getBaseRequestOptions', 'handleResponse', 'readBody', 'send'];
 
 export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuilder {
   private readonly typeBuilder = new TypeScriptTypeBuilderService();
@@ -18,6 +34,19 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
   // Track circular dependencies for z.lazy() wrapping
   private circularSchemas = new Set<string>();
   private currentSchemaName: string | null = null;
+
+  // Exported <Operation>Response types and schemas, collected while the client methods are built
+  private responseDeclarations: ts.Statement[] = [];
+
+  // Module-level names of the file being generated: component schema name -> emitted identifier
+  private schemaNames = new Map<string, string>();
+  private usedNames = new Set<string>();
+  private clientName = '';
+
+  // Client class member names, and the parameter names of the method being built ('<in>:<name>' -> identifier)
+  private usedMethodNames = new Set<string>();
+  private parameterNames = new Map<string, string>();
+  private readonly emptyFile = ts.createSourceFile('api.ts', '', ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
 
   constructor(options: GeneratorOptions = {}) {
     this.namingConvention = options.namingConvention;
@@ -92,6 +121,8 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
   }
 
   private buildAST(openapi: OpenApiSpecType): ts.Statement[] {
+    this.responseDeclarations = [];
+    this.allocateNames(openapi);
     const imports = this.importBuilder.buildImports();
     const schemas = this.buildSchemas(openapi);
     const schemaTypeAliases = this.buildSchemaTypeAliases(schemas);
@@ -108,11 +139,130 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       this.createComment('Components schemas'),
       ...Object.values(schemas),
       ...schemaTypeAliases,
+      ...(this.responseDeclarations.length > 0 ? [this.createComment('Response schemas'), ...this.responseDeclarations] : []),
       ...serverConfig,
-      this.buildResponseValidationErrorClass(),
+      ...this.parseTemplate(buildRuntimeDeclarationsSource(this.hasServers(openapi))),
       this.createComment('Client class'),
       clientClass
     ];
+  }
+
+  /**
+   * Gives every component schema a module-level identifier. Schemas whose sanitized name is free keep it,
+   * whatever their order in the spec; the others get `Schema`, then a number, appended.
+   */
+  private allocateNames(openapi: OpenApiSpecType): void {
+    const clientName = this.generateClientName(openapi.info.title);
+    this.clientName = RESERVED_NAMES.has(clientName) ? `${clientName}Client` : clientName;
+    this.usedNames = new Set([...RESERVED_NAMES, this.clientName]);
+    this.schemaNames = new Map();
+
+    const names = Object.keys(openapi.components?.schemas ?? {});
+    for (const name of names) {
+      const sanitized = this.typeBuilder.sanitizeIdentifier(name);
+      if (!this.usedNames.has(sanitized)) {
+        this.schemaNames.set(name, sanitized);
+        this.usedNames.add(sanitized);
+      }
+    }
+
+    for (const name of names) {
+      if (!this.schemaNames.has(name)) {
+        this.schemaNames.set(name, this.allocateName(`${this.typeBuilder.sanitizeIdentifier(name)}Schema`));
+      }
+    }
+  }
+
+  // Claims `candidate`, or the first free `candidate2`, `candidate3`, ...
+  private allocateName(candidate: string): string {
+    let name = candidate;
+    for (let suffix = 2; this.usedNames.has(name); suffix++) {
+      name = `${candidate}${String(suffix)}`;
+    }
+
+    this.usedNames.add(name);
+    return name;
+  }
+
+  private schemaIdentifier(schemaName: string): string {
+    return this.schemaNames.get(schemaName) ?? this.typeBuilder.sanitizeIdentifier(schemaName);
+  }
+
+  // Endpoint methods share the class with the runtime members, which they must not replace.
+  private allocateMethodName(candidate: string): string {
+    let name = this.usedMethodNames.has(candidate) ? `${candidate}Operation` : candidate;
+    for (let suffix = 2; this.usedMethodNames.has(name); suffix++) {
+      name = `${candidate}Operation${String(suffix)}`;
+    }
+
+    this.usedMethodNames.add(name);
+    return name;
+  }
+
+  /**
+   * Names the parameters of the method being built. They must not shadow a module-level name (the body
+   * refers to response schemas and `z`) or each other: free names keep their sanitized form, whatever
+   * their order; the others get `Param`, then a number. Call it after the method's response names exist.
+   */
+  private allocateParameterNames(schema: MethodSchemaType): void {
+    const content = schema.requestBody?.content;
+    const parameters: (readonly [key: string, name: string])[] = [
+      ...(schema.parameters ?? []).filter((param) => param.in === 'path' || param.in === 'query').map((param) => [`${param.in}:${param.name}`, param.name] as const),
+      ...((content?.['application/json'] ?? content?.['application/x-www-form-urlencoded']) ? [['body:body', 'body'] as const] : [])
+    ];
+
+    const used = new Set(this.usedNames);
+    this.parameterNames = new Map();
+    for (const [key, name] of parameters) {
+      const sanitized = this.typeBuilder.sanitizeIdentifier(name);
+      if (!used.has(sanitized)) {
+        this.parameterNames.set(key, sanitized);
+        used.add(sanitized);
+      }
+    }
+
+    for (const [key, name] of parameters) {
+      if (!this.parameterNames.has(key)) {
+        const base = `${this.typeBuilder.sanitizeIdentifier(name)}Param`;
+        let candidate = base;
+        for (let suffix = 2; used.has(candidate); suffix++) {
+          candidate = `${base}${String(suffix)}`;
+        }
+
+        this.parameterNames.set(key, candidate);
+        used.add(candidate);
+      }
+    }
+  }
+
+  private parameterIdentifier(location: string, parameterName: string): string {
+    return this.parameterNames.get(`${location}:${parameterName}`) ?? this.typeBuilder.sanitizeIdentifier(parameterName);
+  }
+
+  private hasServers(openapi: OpenApiSpecType): boolean {
+    return (openapi.servers?.length ?? 0) > 0;
+  }
+
+  // Parsed nodes keep positions into the template text, and the printer would read those positions
+  // from the generated file instead. Clearing them makes the printer build the text, as it does for
+  // factory-built nodes.
+  private parseTemplate(source: string): readonly ts.Statement[] {
+    const file = ts.createSourceFile('template.ts', source, ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
+    const synthesize = (node: ts.Node): void => {
+      ts.setTextRange(node, { pos: -1, end: -1 });
+      if (ts.isStringLiteral(node)) {
+        // Print with the single quotes that factory-built literals use.
+        Object.assign(node, { singleQuote: true });
+      }
+
+      ts.forEachChild(node, synthesize, (nodes) => {
+        ts.setTextRange(nodes, { pos: -1, end: -1 });
+        nodes.forEach(synthesize);
+      });
+    };
+
+    file.statements.forEach(synthesize);
+    return file.statements;
   }
 
   private buildSchemas(openapi: OpenApiSpecType): Record<string, ts.VariableStatement> {
@@ -138,7 +288,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       // Clear context
       this.currentSchemaName = null;
 
-      const sanitizedName = this.typeBuilder.sanitizeIdentifier(name);
+      const sanitizedName = this.schemaIdentifier(name);
 
       // Add type annotation: z.ZodType<Name>
       const typeAnnotation = ts.factory.createTypeReferenceNode(ts.factory.createQualifiedName(ts.factory.createIdentifier('z'), ts.factory.createIdentifier('ZodType')), [
@@ -182,7 +332,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
         continue;
       }
 
-      const sanitizedName = this.typeBuilder.sanitizeIdentifier(name);
+      const sanitizedName = this.schemaIdentifier(name);
       const safeSchema = SchemaProperties.safeParse(schema);
 
       if (!safeSchema.success) {
@@ -231,7 +381,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     if (this.isReference(prop)) {
       const { $ref = '' } = Reference.parse(prop);
       const refName = $ref.split('/').pop() ?? 'never';
-      const sanitizedRefName = this.typeBuilder.sanitizeIdentifier(refName);
+      const sanitizedRefName = this.schemaIdentifier(refName);
       return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(sanitizedRefName), undefined);
     }
 
@@ -360,758 +510,19 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     return ts.factory.createInterfaceDeclaration([ts.factory.createToken(ts.SyntaxKind.ExportKeyword)], ts.factory.createIdentifier(name), undefined, undefined, members);
   }
 
-  private buildResponseValidationErrorClass(): ts.ClassDeclaration {
-    const typeParamT = ts.factory.createTypeParameterDeclaration(undefined, 'T');
-
-    // Generated methods pass the parsed JSON body, not a fetch Response, and that body failed the schema, so it is not a T.
-    const responseProperty = ts.factory.createPropertyDeclaration(
-      [ts.factory.createToken(ts.SyntaxKind.ReadonlyKeyword)],
-      'response',
-      undefined,
-      ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
-      undefined
-    );
-
-    const errorProperty = ts.factory.createPropertyDeclaration(
-      [ts.factory.createToken(ts.SyntaxKind.ReadonlyKeyword)],
-      'error',
-      undefined,
-      ts.factory.createTypeReferenceNode(ts.factory.createQualifiedName(ts.factory.createIdentifier('z'), 'ZodError'), [ts.factory.createTypeReferenceNode('T')]),
-      undefined
-    );
-
-    const constructorDecl = ts.factory.createConstructorDeclaration(
-      undefined,
-      [
-        ts.factory.createParameterDeclaration(undefined, undefined, 'message', undefined, ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)),
-        ts.factory.createParameterDeclaration(undefined, undefined, 'response', undefined, ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)),
-        ts.factory.createParameterDeclaration(
-          undefined,
-          undefined,
-          'error',
-          undefined,
-          ts.factory.createTypeReferenceNode(ts.factory.createQualifiedName(ts.factory.createIdentifier('z'), 'ZodError'), [ts.factory.createTypeReferenceNode('T')])
-        )
-      ],
-      ts.factory.createBlock(
-        [
-          ts.factory.createExpressionStatement(ts.factory.createCallExpression(ts.factory.createSuper(), undefined, [ts.factory.createIdentifier('message')])),
-          ts.factory.createExpressionStatement(
-            ts.factory.createBinaryExpression(
-              ts.factory.createPropertyAccessExpression(ts.factory.createThis(), 'name'),
-              ts.SyntaxKind.EqualsToken,
-              ts.factory.createAsExpression(ts.factory.createStringLiteral('ResponseValidationError', true), ts.factory.createTypeReferenceNode('const'))
-            )
-          ),
-          ts.factory.createExpressionStatement(
-            ts.factory.createBinaryExpression(
-              ts.factory.createPropertyAccessExpression(ts.factory.createThis(), 'response'),
-              ts.SyntaxKind.EqualsToken,
-              ts.factory.createIdentifier('response')
-            )
-          ),
-          ts.factory.createExpressionStatement(
-            ts.factory.createBinaryExpression(
-              ts.factory.createPropertyAccessExpression(ts.factory.createThis(), 'error'),
-              ts.SyntaxKind.EqualsToken,
-              ts.factory.createIdentifier('error')
-            )
-          )
-        ],
-        true
-      )
-    );
-
-    const dataGetter = ts.factory.createGetAccessorDeclaration(
-      undefined,
-      'data',
-      [],
-      ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
-      ts.factory.createBlock([ts.factory.createReturnStatement(ts.factory.createPropertyAccessExpression(ts.factory.createThis(), 'response'))], true)
-    );
-
-    return ts.factory.createClassDeclaration(
-      [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
-      'ResponseValidationError',
-      [typeParamT],
-      [ts.factory.createHeritageClause(ts.SyntaxKind.ExtendsKeyword, [ts.factory.createExpressionWithTypeArguments(this.buildGlobalErrorReference(), undefined)])],
-      [responseProperty, errorProperty, constructorDecl, dataGetter]
-    );
-  }
-
-  // A spec schema named `Error` is emitted as a module-level `Error`, which would shadow the built-in.
-  private buildGlobalErrorReference(): ts.Expression {
-    return ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('globalThis'), 'Error');
-  }
-
   private buildClientClass(openapi: OpenApiSpecType, schemas: Record<string, ts.VariableStatement>): ts.ClassDeclaration {
-    const clientName = this.generateClientName(openapi.info.title);
+    const clientName = this.clientName;
+    this.usedMethodNames = new Set(RUNTIME_MEMBER_NAMES);
     const methods = this.buildClientMethods(openapi, schemas);
+    const [template] = this.parseTemplate(buildClientMembersSource(this.hasServers(openapi)));
+    const runtimeMembers = template && ts.isClassDeclaration(template) ? template.members : [];
 
     return ts.factory.createClassDeclaration(
       [ts.factory.createToken(ts.SyntaxKind.ExportKeyword), ts.factory.createToken(ts.SyntaxKind.DefaultKeyword)],
       ts.factory.createIdentifier(clientName),
       undefined,
       undefined,
-      [
-        this.typeBuilder.createProperty('#baseUrl', 'string', true),
-        this.buildConstructor(openapi),
-        this.buildGetBaseRequestOptionsMethod(),
-        this.buildHandleResponseMethod(),
-        this.buildHttpRequestMethod(),
-        ...methods
-      ]
-    );
-  }
-
-  private buildConstructor(openapi: OpenApiSpecType): ts.ConstructorDeclaration {
-    const hasServers = openapi.servers && openapi.servers.length > 0;
-
-    if (hasServers) {
-      // Options-based constructor
-      return ts.factory.createConstructorDeclaration(
-        undefined,
-        [
-          ts.factory.createParameterDeclaration(
-            undefined,
-            undefined,
-            ts.factory.createIdentifier('options'),
-            undefined,
-            ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('ClientOptions'), undefined),
-            undefined
-          )
-        ],
-        ts.factory.createBlock(
-          [
-            ts.factory.createVariableStatement(
-              undefined,
-              ts.factory.createVariableDeclarationList(
-                [
-                  ts.factory.createVariableDeclaration(
-                    ts.factory.createIdentifier('resolvedUrl'),
-                    undefined,
-                    undefined,
-                    // An omitted baseUrl is undefined, not null, so only a nullish check falls back to the spec's servers.
-                    ts.factory.createBinaryExpression(
-                      ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('baseUrl')),
-                      ts.factory.createToken(ts.SyntaxKind.QuestionQuestionToken),
-                      ts.factory.createCallExpression(ts.factory.createIdentifier('resolveServerUrl'), undefined, [
-                        ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('serverIndex')),
-                        ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('serverVariables'))
-                      ])
-                    )
-                  )
-                ],
-                ts.NodeFlags.Const
-              )
-            ),
-            ts.factory.createExpressionStatement(
-              ts.factory.createBinaryExpression(
-                ts.factory.createPropertyAccessExpression(ts.factory.createThis(), ts.factory.createPrivateIdentifier('#baseUrl')),
-                ts.factory.createToken(ts.SyntaxKind.EqualsToken),
-                ts.factory.createIdentifier('resolvedUrl')
-              )
-            )
-          ],
-          true
-        )
-      );
-    } else {
-      // Fallback: simple baseUrl parameter
-      return ts.factory.createConstructorDeclaration(
-        undefined,
-        [this.typeBuilder.createParameter('baseUrl', 'string', ts.factory.createStringLiteral('/', true)), this.typeBuilder.createParameter('_', 'unknown', undefined, true)],
-        ts.factory.createBlock(
-          [
-            ts.factory.createExpressionStatement(
-              ts.factory.createBinaryExpression(
-                ts.factory.createPropertyAccessExpression(ts.factory.createThis(), ts.factory.createPrivateIdentifier('#baseUrl')),
-                ts.factory.createToken(ts.SyntaxKind.EqualsToken),
-                ts.factory.createIdentifier('baseUrl')
-              )
-            )
-          ],
-          true
-        )
-      );
-    }
-  }
-
-  private buildGetBaseRequestOptionsMethod(): ts.MethodDeclaration {
-    return ts.factory.createMethodDeclaration(
-      [ts.factory.createToken(ts.SyntaxKind.ProtectedKeyword)],
-      undefined,
-      ts.factory.createIdentifier('getBaseRequestOptions'),
-      undefined,
-      undefined,
-      [],
-      ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Partial'), [
-        ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Omit'), [
-          ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('RequestInit'), undefined),
-          ts.factory.createUnionTypeNode([
-            ts.factory.createLiteralTypeNode(ts.factory.createStringLiteral('method', true)),
-            ts.factory.createLiteralTypeNode(ts.factory.createStringLiteral('body', true))
-          ])
-        ])
-      ]),
-      ts.factory.createBlock([ts.factory.createReturnStatement(ts.factory.createObjectLiteralExpression([], false))], true)
-    );
-  }
-
-  private buildHandleResponseMethod(): ts.MethodDeclaration {
-    return ts.factory.createMethodDeclaration(
-      [ts.factory.createToken(ts.SyntaxKind.ProtectedKeyword), ts.factory.createToken(ts.SyntaxKind.AsyncKeyword)],
-      undefined,
-      ts.factory.createIdentifier('handleResponse'),
-      undefined,
-      [this.typeBuilder.createGenericType('T')],
-      [
-        this.typeBuilder.createParameter('response', 'Response'),
-        this.typeBuilder.createParameter('method', 'string'),
-        this.typeBuilder.createParameter('path', 'string'),
-        this.typeBuilder.createParameter('options', '{params?: Record<string, string | number | boolean>; data?: unknown; contentType?: string; headers?: Record<string, string>}')
-      ],
-      ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Response'), undefined)]),
-      ts.factory.createBlock([ts.factory.createReturnStatement(ts.factory.createIdentifier('response'))], true)
-    );
-  }
-
-  private buildHttpRequestMethod(): ts.MethodDeclaration {
-    return ts.factory.createMethodDeclaration(
-      [ts.factory.createToken(ts.SyntaxKind.ProtectedKeyword), ts.factory.createToken(ts.SyntaxKind.AsyncKeyword)],
-      undefined,
-      ts.factory.createIdentifier('makeRequest'),
-      undefined,
-      [this.typeBuilder.createGenericType('T')],
-      [
-        this.typeBuilder.createParameter('method', 'string'),
-        this.typeBuilder.createParameter('path', 'string'),
-        this.typeBuilder.createParameter(
-          'options',
-          '{params?: Record<string, string | number | boolean>; data?: unknown; contentType?: string; headers?: Record<string, string>}',
-          ts.factory.createObjectLiteralExpression([], false),
-          false
-        )
-      ],
-      ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('T'), undefined)]),
-      ts.factory.createBlock(
-        [
-          // Create initial URL object that we will use to build the final URL
-          ts.factory.createVariableStatement(
-            undefined,
-            ts.factory.createVariableDeclarationList(
-              [
-                ts.factory.createVariableDeclaration(
-                  ts.factory.createIdentifier('baseUrl'),
-                  undefined,
-                  undefined,
-                  ts.factory.createNewExpression(ts.factory.createIdentifier('URL'), undefined, [
-                    ts.factory.createIdentifier('path'),
-                    ts.factory.createPropertyAccessExpression(ts.factory.createThis(), ts.factory.createPrivateIdentifier('#baseUrl'))
-                  ])
-                )
-              ],
-              ts.NodeFlags.Const
-            )
-          ),
-          ts.factory.createVariableStatement(
-            undefined,
-            ts.factory.createVariableDeclarationList(
-              [
-                ts.factory.createVariableDeclaration(
-                  ts.factory.createIdentifier('url'),
-                  undefined,
-                  undefined,
-                  ts.factory.createConditionalExpression(
-                    ts.factory.createBinaryExpression(
-                      ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('params')),
-                      ts.factory.createToken(ts.SyntaxKind.AmpersandAmpersandToken),
-                      ts.factory.createBinaryExpression(
-                        ts.factory.createPropertyAccessExpression(
-                          ts.factory.createCallExpression(
-                            ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('Object'), ts.factory.createIdentifier('keys')),
-                            undefined,
-                            [ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('params'))]
-                          ),
-                          ts.factory.createIdentifier('length')
-                        ),
-                        ts.factory.createToken(ts.SyntaxKind.GreaterThanToken),
-                        ts.factory.createNumericLiteral('0')
-                      )
-                    ),
-                    undefined,
-                    ts.factory.createCallExpression(
-                      ts.factory.createParenthesizedExpression(
-                        ts.factory.createArrowFunction(
-                          undefined,
-                          undefined,
-                          [],
-                          undefined,
-                          ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
-                          ts.factory.createBlock(
-                            [
-                              ts.factory.createExpressionStatement(
-                                ts.factory.createCallExpression(
-                                  ts.factory.createPropertyAccessExpression(
-                                    ts.factory.createCallExpression(
-                                      ts.factory.createPropertyAccessExpression(
-                                        ts.factory.createCallExpression(
-                                          ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('Object'), ts.factory.createIdentifier('entries')),
-                                          undefined,
-                                          [ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('params'))]
-                                        ),
-                                        ts.factory.createIdentifier('filter')
-                                      ),
-                                      undefined,
-                                      [
-                                        ts.factory.createArrowFunction(
-                                          undefined,
-                                          undefined,
-                                          [
-                                            ts.factory.createParameterDeclaration(
-                                              undefined,
-                                              undefined,
-                                              ts.factory.createArrayBindingPattern([
-                                                ts.factory.createBindingElement(undefined, undefined, ts.factory.createIdentifier(''), undefined),
-                                                ts.factory.createBindingElement(undefined, undefined, ts.factory.createIdentifier('value'), undefined)
-                                              ]),
-                                              undefined,
-                                              undefined
-                                            )
-                                          ],
-                                          undefined,
-                                          ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
-                                          ts.factory.createBinaryExpression(
-                                            ts.factory.createIdentifier('value'),
-                                            ts.SyntaxKind.ExclamationEqualsEqualsToken,
-                                            ts.factory.createIdentifier('undefined')
-                                          )
-                                        )
-                                      ]
-                                    ),
-                                    ts.factory.createIdentifier('forEach')
-                                  ),
-                                  undefined,
-                                  [
-                                    ts.factory.createArrowFunction(
-                                      undefined,
-                                      undefined,
-                                      [
-                                        ts.factory.createParameterDeclaration(
-                                          undefined,
-                                          undefined,
-                                          ts.factory.createArrayBindingPattern([
-                                            ts.factory.createBindingElement(undefined, undefined, ts.factory.createIdentifier('key'), undefined),
-                                            ts.factory.createBindingElement(undefined, undefined, ts.factory.createIdentifier('value'), undefined)
-                                          ]),
-                                          undefined,
-                                          undefined
-                                        )
-                                      ],
-                                      undefined,
-                                      ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
-                                      ts.factory.createBlock(
-                                        [
-                                          ts.factory.createExpressionStatement(
-                                            ts.factory.createCallExpression(
-                                              ts.factory.createPropertyAccessExpression(
-                                                ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('baseUrl'), ts.factory.createIdentifier('searchParams')),
-                                                ts.factory.createIdentifier('set')
-                                              ),
-                                              undefined,
-                                              [
-                                                ts.factory.createIdentifier('key'),
-                                                ts.factory.createCallExpression(ts.factory.createIdentifier('String'), undefined, [ts.factory.createIdentifier('value')])
-                                              ]
-                                            )
-                                          )
-                                        ],
-                                        false
-                                      )
-                                    )
-                                  ]
-                                )
-                              ),
-                              ts.factory.createReturnStatement(
-                                ts.factory.createCallExpression(
-                                  ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('baseUrl'), ts.factory.createIdentifier('toString')),
-                                  undefined,
-                                  []
-                                )
-                              )
-                            ],
-                            true
-                          )
-                        )
-                      ),
-                      undefined,
-                      []
-                    ),
-                    undefined,
-                    ts.factory.createCallExpression(
-                      ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('baseUrl'), ts.factory.createIdentifier('toString')),
-                      undefined,
-                      []
-                    )
-                  )
-                )
-              ],
-              ts.NodeFlags.Const
-            )
-          ),
-          // Get base request options (headers, signal, credentials, etc.)
-          ts.factory.createVariableStatement(
-            undefined,
-            ts.factory.createVariableDeclarationList(
-              [
-                ts.factory.createVariableDeclaration(
-                  ts.factory.createIdentifier('baseOptions'),
-                  undefined,
-                  undefined,
-                  ts.factory.createCallExpression(
-                    ts.factory.createPropertyAccessExpression(ts.factory.createThis(), ts.factory.createIdentifier('getBaseRequestOptions')),
-                    undefined,
-                    []
-                  )
-                )
-              ],
-              ts.NodeFlags.Const
-            )
-          ),
-          // Build Content-Type header
-          ts.factory.createVariableStatement(
-            undefined,
-            ts.factory.createVariableDeclarationList(
-              [
-                ts.factory.createVariableDeclaration(
-                  ts.factory.createIdentifier('contentType'),
-                  undefined,
-                  undefined,
-                  ts.factory.createConditionalExpression(
-                    ts.factory.createBinaryExpression(
-                      ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('contentType')),
-                      ts.factory.createToken(ts.SyntaxKind.EqualsEqualsEqualsToken),
-                      ts.factory.createStringLiteral('application/x-www-form-urlencoded', true)
-                    ),
-                    undefined,
-                    ts.factory.createStringLiteral('application/x-www-form-urlencoded', true),
-                    undefined,
-                    ts.factory.createStringLiteral('application/json', true)
-                  )
-                )
-              ],
-              ts.NodeFlags.Const
-            )
-          ),
-          // Merge headers: base headers, Content-Type, and request-specific headers
-          ts.factory.createVariableStatement(
-            undefined,
-            ts.factory.createVariableDeclarationList(
-              [
-                ts.factory.createVariableDeclaration(
-                  ts.factory.createIdentifier('baseHeaders'),
-                  undefined,
-                  undefined,
-                  ts.factory.createConditionalExpression(
-                    ts.factory.createBinaryExpression(
-                      ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('baseOptions'), ts.factory.createIdentifier('headers')),
-                      ts.factory.createToken(ts.SyntaxKind.ExclamationEqualsEqualsToken),
-                      ts.factory.createIdentifier('undefined')
-                    ),
-                    undefined,
-                    ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('baseOptions'), ts.factory.createIdentifier('headers')),
-                    undefined,
-                    ts.factory.createObjectLiteralExpression([], false)
-                  )
-                )
-              ],
-              ts.NodeFlags.Const
-            )
-          ),
-          ts.factory.createVariableStatement(
-            undefined,
-            ts.factory.createVariableDeclarationList(
-              [
-                ts.factory.createVariableDeclaration(
-                  ts.factory.createIdentifier('headers'),
-                  undefined,
-                  undefined,
-                  ts.factory.createCallExpression(
-                    ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('Object'), ts.factory.createIdentifier('assign')),
-                    undefined,
-                    [
-                      ts.factory.createObjectLiteralExpression([], false),
-                      ts.factory.createIdentifier('baseHeaders'),
-                      ts.factory.createObjectLiteralExpression(
-                        [ts.factory.createPropertyAssignment(ts.factory.createStringLiteral('Content-Type', true), ts.factory.createIdentifier('contentType'))],
-                        false
-                      ),
-                      ts.factory.createConditionalExpression(
-                        ts.factory.createBinaryExpression(
-                          ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('headers')),
-                          ts.factory.createToken(ts.SyntaxKind.ExclamationEqualsEqualsToken),
-                          ts.factory.createIdentifier('undefined')
-                        ),
-                        undefined,
-                        ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('headers')),
-                        undefined,
-                        ts.factory.createObjectLiteralExpression([], false)
-                      )
-                    ]
-                  )
-                )
-              ],
-              ts.NodeFlags.Const
-            )
-          ),
-          // Build body with form-urlencoded support
-          ts.factory.createVariableStatement(
-            undefined,
-            ts.factory.createVariableDeclarationList(
-              [
-                ts.factory.createVariableDeclaration(
-                  ts.factory.createIdentifier('body'),
-                  undefined,
-                  undefined,
-                  ts.factory.createConditionalExpression(
-                    ts.factory.createBinaryExpression(
-                      ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('data')),
-                      ts.factory.createToken(ts.SyntaxKind.ExclamationEqualsEqualsToken),
-                      ts.factory.createIdentifier('undefined')
-                    ),
-                    undefined,
-                    ts.factory.createConditionalExpression(
-                      ts.factory.createBinaryExpression(
-                        ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('contentType')),
-                        ts.factory.createToken(ts.SyntaxKind.EqualsEqualsEqualsToken),
-                        ts.factory.createStringLiteral('application/x-www-form-urlencoded', true)
-                      ),
-                      undefined,
-                      // Form-urlencoded: convert object to URLSearchParams
-                      ts.factory.createCallExpression(
-                        ts.factory.createParenthesizedExpression(
-                          ts.factory.createArrowFunction(
-                            undefined,
-                            undefined,
-                            [],
-                            undefined,
-                            ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
-                            ts.factory.createBlock(
-                              [
-                                ts.factory.createVariableStatement(
-                                  undefined,
-                                  ts.factory.createVariableDeclarationList(
-                                    [
-                                      ts.factory.createVariableDeclaration(
-                                        ts.factory.createIdentifier('params'),
-                                        undefined,
-                                        undefined,
-                                        ts.factory.createNewExpression(ts.factory.createIdentifier('URLSearchParams'), undefined, [])
-                                      )
-                                    ],
-                                    ts.NodeFlags.Const
-                                  )
-                                ),
-                                ts.factory.createExpressionStatement(
-                                  ts.factory.createCallExpression(
-                                    ts.factory.createPropertyAccessExpression(
-                                      ts.factory.createCallExpression(
-                                        ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('Object'), ts.factory.createIdentifier('entries')),
-                                        undefined,
-                                        [ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('data'))]
-                                      ),
-                                      ts.factory.createIdentifier('forEach')
-                                    ),
-                                    undefined,
-                                    [
-                                      ts.factory.createArrowFunction(
-                                        undefined,
-                                        undefined,
-                                        [
-                                          ts.factory.createParameterDeclaration(
-                                            undefined,
-                                            undefined,
-                                            ts.factory.createArrayBindingPattern([
-                                              ts.factory.createBindingElement(undefined, undefined, ts.factory.createIdentifier('key'), undefined),
-                                              ts.factory.createBindingElement(undefined, undefined, ts.factory.createIdentifier('value'), undefined)
-                                            ]),
-                                            undefined,
-                                            undefined
-                                          )
-                                        ],
-                                        undefined,
-                                        ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
-                                        ts.factory.createBlock(
-                                          [
-                                            ts.factory.createExpressionStatement(
-                                              ts.factory.createCallExpression(
-                                                ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('params'), ts.factory.createIdentifier('set')),
-                                                undefined,
-                                                [
-                                                  ts.factory.createIdentifier('key'),
-                                                  ts.factory.createCallExpression(ts.factory.createIdentifier('String'), undefined, [ts.factory.createIdentifier('value')])
-                                                ]
-                                              )
-                                            )
-                                          ],
-                                          false
-                                        )
-                                      )
-                                    ]
-                                  )
-                                ),
-                                ts.factory.createReturnStatement(
-                                  ts.factory.createCallExpression(
-                                    ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('params'), ts.factory.createIdentifier('toString')),
-                                    undefined,
-                                    []
-                                  )
-                                )
-                              ],
-                              false
-                            )
-                          )
-                        ),
-                        undefined,
-                        []
-                      ),
-                      undefined,
-                      // JSON: stringify the data
-                      ts.factory.createCallExpression(
-                        ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('JSON'), ts.factory.createIdentifier('stringify')),
-                        undefined,
-                        [ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('data'))]
-                      )
-                    ),
-                    undefined,
-                    ts.factory.createNull()
-                  )
-                )
-              ],
-              ts.NodeFlags.Const
-            )
-          ),
-          // Make fetch request: merge base options with method, headers, and body
-          ts.factory.createVariableStatement(
-            undefined,
-            ts.factory.createVariableDeclarationList(
-              [
-                ts.factory.createVariableDeclaration(
-                  ts.factory.createIdentifier('rawResponse'),
-                  undefined,
-                  undefined,
-                  ts.factory.createAwaitExpression(
-                    ts.factory.createCallExpression(ts.factory.createIdentifier('fetch'), undefined, [
-                      ts.factory.createIdentifier('url'),
-                      ts.factory.createCallExpression(
-                        ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('Object'), ts.factory.createIdentifier('assign')),
-                        undefined,
-                        [
-                          ts.factory.createObjectLiteralExpression([], false),
-                          ts.factory.createIdentifier('baseOptions'),
-                          ts.factory.createObjectLiteralExpression(
-                            [
-                              ts.factory.createShorthandPropertyAssignment(ts.factory.createIdentifier('method'), undefined),
-                              ts.factory.createPropertyAssignment(ts.factory.createIdentifier('headers'), ts.factory.createIdentifier('headers')),
-                              ts.factory.createPropertyAssignment(ts.factory.createIdentifier('body'), ts.factory.createIdentifier('body'))
-                            ],
-                            false
-                          )
-                        ]
-                      )
-                    ])
-                  )
-                )
-              ],
-              ts.NodeFlags.Const
-            )
-          ),
-          // Handle response through hook (allows subclasses to intercept and modify response)
-          ts.factory.createVariableStatement(
-            undefined,
-            ts.factory.createVariableDeclarationList(
-              [
-                ts.factory.createVariableDeclaration(
-                  ts.factory.createIdentifier('response'),
-                  undefined,
-                  undefined,
-                  ts.factory.createAwaitExpression(
-                    ts.factory.createCallExpression(
-                      ts.factory.createPropertyAccessExpression(ts.factory.createThis(), ts.factory.createIdentifier('handleResponse')),
-                      [ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('T'), undefined)],
-                      [
-                        ts.factory.createIdentifier('rawResponse'),
-                        ts.factory.createIdentifier('method'),
-                        ts.factory.createIdentifier('path'),
-                        ts.factory.createIdentifier('options')
-                      ]
-                    )
-                  )
-                )
-              ],
-              ts.NodeFlags.Const
-            )
-          ),
-          // Check response status
-          ts.factory.createIfStatement(
-            ts.factory.createPrefixUnaryExpression(
-              ts.SyntaxKind.ExclamationToken,
-              ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('response'), ts.factory.createIdentifier('ok'))
-            ),
-            ts.factory.createThrowStatement(
-              ts.factory.createNewExpression(this.buildGlobalErrorReference(), undefined, [
-                ts.factory.createTemplateExpression(ts.factory.createTemplateHead('HTTP ', 'HTTP '), [
-                  ts.factory.createTemplateSpan(
-                    ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('response'), ts.factory.createIdentifier('status')),
-                    ts.factory.createTemplateMiddle(': ', ': ')
-                  ),
-                  ts.factory.createTemplateSpan(
-                    ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('response'), ts.factory.createIdentifier('statusText')),
-                    ts.factory.createTemplateTail('', '')
-                  )
-                ])
-              ])
-            ),
-            undefined
-          ),
-          // Skip JSON parse for 204 No Content / 205 Reset Content (RFC 7231: bodies MUST be empty)
-          ts.factory.createIfStatement(
-            ts.factory.createBinaryExpression(
-              ts.factory.createBinaryExpression(
-                ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('response'), ts.factory.createIdentifier('status')),
-                ts.factory.createToken(ts.SyntaxKind.EqualsEqualsEqualsToken),
-                ts.factory.createNumericLiteral(204)
-              ),
-              ts.factory.createToken(ts.SyntaxKind.BarBarToken),
-              ts.factory.createBinaryExpression(
-                ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('response'), ts.factory.createIdentifier('status')),
-                ts.factory.createToken(ts.SyntaxKind.EqualsEqualsEqualsToken),
-                ts.factory.createNumericLiteral(205)
-              )
-            ),
-            ts.factory.createBlock(
-              [
-                ts.factory.createReturnStatement(
-                  ts.factory.createAsExpression(ts.factory.createIdentifier('undefined'), ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('T'), undefined))
-                )
-              ],
-              true
-            ),
-            undefined
-          ),
-          // Return parsed JSON
-          ts.factory.createReturnStatement(
-            ts.factory.createAwaitExpression(
-              ts.factory.createCallExpression(
-                ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('response'), ts.factory.createIdentifier('json')),
-                undefined,
-                []
-              )
-            )
-          )
-        ],
-        true
-      )
+      [...runtimeMembers, ...methods]
     );
   }
 
@@ -1218,9 +629,12 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
   }
 
   private buildEndpointMethod(method: string, path: string, schema: MethodSchemaType, schemas: Record<string, ts.VariableStatement>): ts.MethodDeclaration {
+    // Order matters: response names are module-level names that the parameter names must avoid.
+    const methodName = this.allocateMethodName(this.transformOperationName(String(schema.operationId), method, path, schema));
+    const { resultType, responseSchemas } = this.buildResponsePlan(method, methodName, schema);
+    this.allocateParameterNames(schema);
     const { parameters, pathParams, queryParams, hasRequestBody, contentType } = this.buildMethodParameters(schema, schemas);
-    const responseType = this.getResponseType(schema, schemas);
-    const responseSchema = this.getResponseSchema(schema, schemas);
+    const responseType = ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [resultType]);
 
     const statements: ts.Statement[] = [];
 
@@ -1232,7 +646,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       queryParams.length > 0
         ? ts.factory.createObjectLiteralExpression(
             queryParams.map((param) => {
-              const paramName = this.typeBuilder.sanitizeIdentifier(param.name);
+              const paramName = this.parameterIdentifier('query', param.name);
               return ts.factory.createPropertyAssignment(ts.factory.createStringLiteral(param.name, true), ts.factory.createIdentifier(paramName));
             }),
             false
@@ -1240,9 +654,9 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
         : undefined;
 
     // Build request body
-    const requestBodyExpression: ts.Expression | undefined = hasRequestBody ? ts.factory.createIdentifier('body') : undefined;
+    const requestBodyExpression: ts.Expression | undefined = hasRequestBody ? ts.factory.createIdentifier(this.parameterIdentifier('body', 'body')) : undefined;
 
-    // Build options object for makeRequest
+    // Build options object for send
     const optionsProps: ts.ObjectLiteralElementLike[] = [];
     if (queryParamsExpression) {
       optionsProps.push(ts.factory.createPropertyAssignment(ts.factory.createIdentifier('params'), queryParamsExpression));
@@ -1259,113 +673,27 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
     const optionsExpression = ts.factory.createObjectLiteralExpression(optionsProps, false);
 
-    // Call makeRequest
-    const makeRequestCall = ts.factory.createCallExpression(
-      ts.factory.createPropertyAccessExpression(ts.factory.createThis(), ts.factory.createIdentifier('makeRequest')),
-      undefined,
-      [ts.factory.createStringLiteral(method.toUpperCase(), true), pathExpression, optionsExpression]
+    // return this.#parse<T>(await this.send(...), { '<status>': Schema })
+    const sendCall = ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(ts.factory.createThis(), ts.factory.createIdentifier('send')), undefined, [
+      ts.factory.createStringLiteral(method.toUpperCase(), true),
+      pathExpression,
+      optionsExpression
+    ]);
+
+    statements.push(
+      ts.factory.createReturnStatement(
+        ts.factory.createCallExpression(
+          ts.factory.createPropertyAccessExpression(ts.factory.createThis(), ts.factory.createPrivateIdentifier('#parse')),
+          [resultType],
+          [ts.factory.createAwaitExpression(sendCall), responseSchemas]
+        )
+      )
     );
-
-    if (responseSchema) {
-      const schemaName = responseSchema.text;
-      const schemaNameLower = schemaName.charAt(0).toLowerCase() + schemaName.slice(1);
-      const parsedVarName = `parsed${schemaName}`;
-
-      // const response = await this.makeRequest(...)
-      statements.push(
-        ts.factory.createVariableStatement(
-          undefined,
-          ts.factory.createVariableDeclarationList(
-            [ts.factory.createVariableDeclaration('response', undefined, undefined, ts.factory.createAwaitExpression(makeRequestCall))],
-            ts.NodeFlags.Const
-          )
-        )
-      );
-
-      // const parsed{Name} = {Schema}.safeParse(response)
-      statements.push(
-        ts.factory.createVariableStatement(
-          undefined,
-          ts.factory.createVariableDeclarationList(
-            [
-              ts.factory.createVariableDeclaration(
-                parsedVarName,
-                undefined,
-                undefined,
-                ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(responseSchema, ts.factory.createIdentifier('safeParse')), undefined, [
-                  ts.factory.createIdentifier('response')
-                ])
-              )
-            ],
-            ts.NodeFlags.Const
-          )
-        )
-      );
-
-      // if (!parsed{Name}.success) { throw new ResponseValidationError<{Type}>(...) }
-      // The message reads `error.issues`: Zod 4 removed `ZodError.errors`, and Zod 3 has `issues` too.
-      statements.push(
-        ts.factory.createIfStatement(
-          ts.factory.createPrefixUnaryExpression(ts.SyntaxKind.ExclamationToken, ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier(parsedVarName), 'success')),
-          ts.factory.createBlock(
-            [
-              ts.factory.createThrowStatement(
-                ts.factory.createNewExpression(
-                  ts.factory.createIdentifier('ResponseValidationError'),
-                  [ts.factory.createTypeReferenceNode(schemaName)],
-                  [
-                    ts.factory.createTemplateExpression(ts.factory.createTemplateHead(`Invalid ${schemaNameLower}: `), [
-                      ts.factory.createTemplateSpan(
-                        ts.factory.createCallExpression(
-                          ts.factory.createPropertyAccessExpression(
-                            ts.factory.createCallExpression(
-                              ts.factory.createPropertyAccessExpression(
-                                ts.factory.createPropertyAccessExpression(ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier(parsedVarName), 'error'), 'issues'),
-                                'map'
-                              ),
-                              undefined,
-                              [
-                                ts.factory.createArrowFunction(
-                                  undefined,
-                                  undefined,
-                                  [ts.factory.createParameterDeclaration(undefined, undefined, 'error')],
-                                  undefined,
-                                  ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
-                                  ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('error'), 'message')
-                                )
-                              ]
-                            ),
-                            'join'
-                          ),
-                          undefined,
-                          [ts.factory.createStringLiteral(', ', true)]
-                        ),
-                        ts.factory.createTemplateTail('')
-                      )
-                    ]),
-                    ts.factory.createIdentifier('response'),
-                    ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier(parsedVarName), 'error')
-                  ]
-                )
-              )
-            ],
-            true
-          )
-        )
-      );
-
-      // return parsed{Name}.data
-      statements.push(ts.factory.createReturnStatement(ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier(parsedVarName), 'data')));
-    } else {
-      statements.push(ts.factory.createReturnStatement(ts.factory.createAwaitExpression(makeRequestCall)));
-    }
-
-    const transformedOperationId = this.transformOperationName(String(schema.operationId), method, path, schema);
 
     const methodDeclaration = ts.factory.createMethodDeclaration(
       [ts.factory.createToken(ts.SyntaxKind.AsyncKeyword)],
       undefined,
-      ts.factory.createIdentifier(transformedOperationId),
+      ts.factory.createIdentifier(methodName),
       undefined,
       undefined,
       parameters,
@@ -1413,7 +741,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     const templateSpans: ts.TemplateSpan[] = [];
 
     for (const [index, m] of matches.entries()) {
-      const sanitizedName = this.typeBuilder.sanitizeIdentifier(m.name);
+      const sanitizedName = this.parameterIdentifier('path', m.name);
       const next = matches[index + 1];
 
       if (next === undefined) {
@@ -1451,7 +779,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     // Extract path and query parameters
     if (schema.parameters) {
       for (const param of schema.parameters) {
-        const paramName = this.typeBuilder.sanitizeIdentifier(param.name);
+        const paramName = this.parameterIdentifier(param.in, param.name);
         const paramType = this.getParameterType(param.schema);
 
         if (param.in === 'path') {
@@ -1505,7 +833,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
               if (ref && typeof ref === 'string' && ref.startsWith('#/components/schemas/')) {
                 const refName = ref.split('/').pop() ?? 'unknown';
-                return this.typeBuilder.sanitizeIdentifier(refName);
+                return this.schemaIdentifier(refName);
               }
 
               // Fallback to getSchemaTypeName for non-ref schemas
@@ -1513,11 +841,11 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
             })()
           : 'unknown';
 
-      parameters.push(this.typeBuilder.createParameter('body', bodyType, undefined, !schema.requestBody?.required));
+      parameters.push(this.typeBuilder.createParameter(this.parameterIdentifier('body', 'body'), bodyType, undefined, !schema.requestBody?.required));
     }
 
-    // Determine content type for request body
-    const contentType = hasRequestBody && schema.requestBody?.content?.['application/x-www-form-urlencoded'] ? 'application/x-www-form-urlencoded' : 'application/json';
+    // Send JSON whenever the operation accepts it; form encoding flattens nested values.
+    const contentType = !jsonContent && formContent ? 'application/x-www-form-urlencoded' : 'application/json';
 
     return { parameters, pathParams, queryParams, hasRequestBody, contentType };
   }
@@ -1537,7 +865,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
     if (schemaObj.$ref) {
       const refName = schemaObj.$ref.split('/').pop() ?? 'unknown';
-      return this.typeBuilder.sanitizeIdentifier(refName);
+      return this.schemaIdentifier(refName);
     }
 
     if (schemaObj.type === 'array' && schemaObj.items) {
@@ -1576,7 +904,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     const ref = schemaObj['$ref'];
     if (ref && typeof ref === 'string') {
       const refName = ref.split('/').pop() ?? 'unknown';
-      return this.typeBuilder.sanitizeIdentifier(refName);
+      return this.schemaIdentifier(refName);
     }
 
     if (schemaObj.type === 'array' && schemaObj.items) {
@@ -1599,76 +927,124 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     }
   }
 
-  private getResponseSchema(schema: MethodSchemaType, _schemas: Record<string, ts.VariableStatement>): ts.Identifier | undefined {
-    // Try to find a 200 response first, then 201, then default
-    const response200 = schema.responses?.['200'];
-    const response201 = schema.responses?.['201'];
-    const responseDefault = schema.responses?.['default'];
+  /**
+   * Decides what each success status returns: the method's return type, and the schemas #parse checks the
+   * body against (the exact status, then its NXX range, then '*' for any other 2xx). `default` is used only
+   * when the operation declares no 2xx response. Inline schemas are exported as <Operation>Response.
+   */
+  private buildResponsePlan(method: string, operationName: string, schema: MethodSchemaType): { resultType: ts.TypeNode; responseSchemas: ts.ObjectLiteralExpression } {
+    const responses = Object.entries(schema.responses ?? {});
+    const successes = responses.map(([status, response]) => [status.toUpperCase(), response] as const).filter(([status]) => /^2(\d\d|XX)$/.test(status));
+    const declared = successes.length > 0 ? successes : responses.filter(([status]) => status === 'default').map(([, response]) => ['*', response] as const);
 
-    const response = response200 ?? response201 ?? responseDefault;
-    if (!response?.content?.['application/json']?.schema) {
-      return undefined;
+    // A HEAD response has no body to read or validate.
+    if (method.toLowerCase() === 'head' || declared.length === 0) {
+      return { resultType: ts.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword), responseSchemas: ts.factory.createObjectLiteralExpression([], false) };
     }
 
-    const responseSchema = response.content['application/json'].schema;
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (responseSchema !== null && typeof responseSchema === 'object' && '$ref' in responseSchema) {
-      // eslint-disable-next-line @typescript-eslint/dot-notation
-      const ref = (responseSchema as { $ref: string })['$ref'];
-      if (typeof ref === 'string') {
-        const refName = ref.split('/').pop() ?? 'unknown';
-        return ts.factory.createIdentifier(this.typeBuilder.sanitizeIdentifier(refName));
+    const contents = declared.map(([key, response]) => ({ key, content: this.classifyResponseContent(response) }));
+    const inlineCount = contents.filter(({ content }) => content.kind === 'schema' && this.getSchemaRefName(content.schema) === undefined).length;
+    const baseName = `${this.typeBuilder.toPascalCase(operationName)}Response`;
+
+    const entries = contents.map(({ key, content }): { key: string; type: ts.TypeNode; schemaName?: string } => {
+      if (content.kind === 'schema') {
+        const refName = this.getSchemaRefName(content.schema);
+        if (refName !== undefined) {
+          const name = this.schemaIdentifier(refName);
+          return { key, type: ts.factory.createTypeReferenceNode(name), schemaName: name };
+        }
+
+        const name = this.allocateName(inlineCount > 1 && key !== '*' ? `${baseName}${key}` : baseName);
+        if (this.addResponseDeclarations(name, content.schema)) {
+          return { key, type: ts.factory.createTypeReferenceNode(name), schemaName: name };
+        }
       }
+
+      const keyword = content.kind === 'text' ? ts.SyntaxKind.StringKeyword : content.kind === 'empty' ? ts.SyntaxKind.UndefinedKeyword : ts.SyntaxKind.UnknownKeyword;
+      return { key, type: ts.factory.createKeywordTypeNode(keyword) };
+    });
+
+    // A declared status without a schema maps to null, so a different status's schema is never applied to it.
+    const properties = entries
+      .filter(({ key, schemaName }) => key !== '*' || schemaName !== undefined)
+      .map(({ key, schemaName }) =>
+        ts.factory.createPropertyAssignment(ts.factory.createStringLiteral(key, true), schemaName === undefined ? ts.factory.createNull() : ts.factory.createIdentifier(schemaName))
+      );
+
+    const fallbackNames = [...new Set(entries.flatMap(({ key, schemaName }) => (key !== '*' && schemaName !== undefined ? [schemaName] : [])))];
+    const [firstFallback] = fallbackNames;
+    if (firstFallback !== undefined) {
+      const fallback =
+        fallbackNames.length === 1
+          ? ts.factory.createIdentifier(firstFallback)
+          : ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('z'), 'union'), undefined, [
+              ts.factory.createArrayLiteralExpression(
+                fallbackNames.map((name) => ts.factory.createIdentifier(name)),
+                false
+              )
+            ]);
+      properties.push(ts.factory.createPropertyAssignment(ts.factory.createStringLiteral('*', true), fallback));
     }
 
-    // For inline schemas, we'd need to generate a schema, but for now return undefined
-    // This could be enhanced to generate inline schemas
-    return undefined;
+    const types = new Map(entries.map(({ type }) => [this.printer.printNode(ts.EmitHint.Unspecified, type, this.emptyFile), type]));
+    const resultTypes = [...types.values()];
+    const [onlyType] = resultTypes;
+    const resultType = resultTypes.every((type) => type.kind === ts.SyntaxKind.UndefinedKeyword)
+      ? ts.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword)
+      : resultTypes.length === 1 && onlyType !== undefined
+        ? onlyType
+        : ts.factory.createUnionTypeNode(resultTypes);
+
+    return { resultType, responseSchemas: ts.factory.createObjectLiteralExpression(properties, false) };
   }
 
-  private getResponseType(schema: MethodSchemaType, schemas: Record<string, ts.VariableStatement>): ts.TypeNode | undefined {
-    // Try to find a 200 response first, then 201, then default
-    const response200 = schema.responses?.['200'];
-    const response201 = schema.responses?.['201'];
-    const responseDefault = schema.responses?.['default'];
+  // readBody parses JSON media types (including +json and */*) and returns any other content as text.
+  private classifyResponseContent(response: z.infer<typeof ResponseObject>): { kind: 'schema'; schema: unknown } | { kind: 'json' | 'text' | 'empty' } {
+    const content = response.content ?? {};
+    const mediaTypes = Object.keys(content);
+    const jsonType = mediaTypes.find((type) => type === 'application/json') ?? mediaTypes.find((type) => type.endsWith('+json')) ?? mediaTypes.find((type) => type === '*/*');
 
-    const response = response200 ?? response201 ?? responseDefault;
-    if (!response?.content?.['application/json']?.schema) {
-      return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [ts.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword)]);
+    if (jsonType !== undefined) {
+      const jsonSchema = content[jsonType]?.schema;
+      return jsonSchema === undefined ? { kind: 'json' } : { kind: 'schema', schema: jsonSchema };
     }
 
-    const responseSchema = response.content['application/json'].schema;
-    const typeName = this.getSchemaTypeName(responseSchema, schemas);
+    return mediaTypes.length > 0 ? { kind: 'text' } : { kind: 'empty' };
+  }
 
-    // Handle array types like "Pet[]"
-    if (typeName.endsWith('[]')) {
-      const itemTypeName = typeName.slice(0, -2);
-      const sanitizedItemTypeName = this.typeBuilder.sanitizeIdentifier(itemTypeName);
+  private getSchemaRefName(schema: unknown): string | undefined {
+    const ref = this.isReference(schema) ? schema.$ref : undefined;
+    return ref?.startsWith('#/components/schemas/') ? ref.slice('#/components/schemas/'.length) : undefined;
+  }
 
-      // Check if the item type is a custom schema (we have a type alias for it)
-      if (schemas[sanitizedItemTypeName]) {
-        // Use the type alias directly (it already uses z.infer)
-        return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [
-          ts.factory.createArrayTypeNode(ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(sanitizedItemTypeName), undefined))
-        ]);
-      }
-
-      // If it's a primitive array, use the type name as-is
-      return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(typeName), undefined)]);
+  // Exports `type Name` and `const Name: z.ZodType<Name>` for an inline response schema.
+  private addResponseDeclarations(name: string, schema: unknown): boolean {
+    let schemaExpression: ts.Expression;
+    try {
+      schemaExpression = this.buildSchema(schema);
+    } catch {
+      return false;
     }
 
-    const sanitizedTypeName = this.typeBuilder.sanitizeIdentifier(typeName);
-
-    // Check if it's a custom schema type (we have a type alias for it)
-    if (schemas[sanitizedTypeName]) {
-      // Use the type name directly (we have a type alias that already uses z.infer)
-      return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [
-        ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(sanitizedTypeName), undefined)
-      ]);
-    }
-
-    // For primitive types and Record types, use the type name directly
-    return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(typeName), undefined)]);
+    const exportModifier = [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)];
+    this.responseDeclarations.push(
+      ts.factory.createTypeAliasDeclaration(exportModifier, name, undefined, this.buildTypeNode(schema)),
+      ts.factory.createVariableStatement(
+        exportModifier,
+        ts.factory.createVariableDeclarationList(
+          [
+            ts.factory.createVariableDeclaration(
+              name,
+              undefined,
+              ts.factory.createTypeReferenceNode(ts.factory.createQualifiedName(ts.factory.createIdentifier('z'), 'ZodType'), [ts.factory.createTypeReferenceNode(name)]),
+              schemaExpression
+            )
+          ],
+          ts.NodeFlags.Const
+        )
+      )
+    );
+    return true;
   }
 
   private buildServerConfiguration(openapi: OpenApiSpecType): ts.Statement[] {
@@ -1745,40 +1121,6 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
           [ts.factory.createVariableDeclaration(ts.factory.createIdentifier('defaultBaseUrl'), undefined, undefined, ts.factory.createStringLiteral(defaultBaseUrl, true))],
           ts.NodeFlags.Const
         )
-      )
-    );
-
-    // Build ClientOptions type
-    const optionProperties: ts.PropertySignature[] = [
-      ts.factory.createPropertySignature(
-        undefined,
-        ts.factory.createIdentifier('baseUrl'),
-        ts.factory.createToken(ts.SyntaxKind.QuestionToken),
-        ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
-      ),
-      ts.factory.createPropertySignature(
-        undefined,
-        ts.factory.createIdentifier('serverIndex'),
-        ts.factory.createToken(ts.SyntaxKind.QuestionToken),
-        ts.factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword)
-      ),
-      ts.factory.createPropertySignature(
-        undefined,
-        ts.factory.createIdentifier('serverVariables'),
-        ts.factory.createToken(ts.SyntaxKind.QuestionToken),
-        ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Record'), [
-          ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-          ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
-        ])
-      )
-    ];
-
-    statements.push(
-      ts.factory.createTypeAliasDeclaration(
-        [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
-        ts.factory.createIdentifier('ClientOptions'),
-        undefined,
-        ts.factory.createTypeLiteralNode(optionProperties)
       )
     );
 
@@ -2053,7 +1395,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       }
 
       for (const param of schema.parameters) {
-        const paramName = this.typeBuilder.sanitizeIdentifier(param.name);
+        const paramName = this.parameterIdentifier(param.in, param.name);
         const paramDesc = param.description ? ` ${param.description}` : '';
         lines.push(` * @param ${paramName}${paramDesc}`);
       }
@@ -2062,7 +1404,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     // Add @param tag for request body if present
     if (schema.requestBody) {
       const bodyDesc = schema.requestBody.description ? ` ${schema.requestBody.description}` : '';
-      lines.push(` * @param body${bodyDesc}`);
+      lines.push(` * @param ${this.parameterIdentifier('body', 'body')}${bodyDesc}`);
     }
 
     // Add @returns tag if we have a response type
@@ -2760,7 +2102,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
   private buildFromReference(reference: ReferenceType): ts.CallExpression | ts.Identifier {
     const { $ref = '' } = Reference.parse(reference);
     const refName = $ref.split('/').pop() ?? 'never';
-    const sanitizedRefName = this.typeBuilder.sanitizeIdentifier(refName);
+    const sanitizedRefName = this.schemaIdentifier(refName);
 
     // Check if this reference creates a circular dependency
     if (this.isCircularReference(refName)) {

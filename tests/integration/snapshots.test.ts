@@ -48,9 +48,11 @@ describe('Generated Code Snapshots', () => {
       expect(content).toContain('async addPet');
       expect(content).toContain('protected getBaseRequestOptions');
       expect(content).toContain('protected async handleResponse');
-      expect(content).toContain('class ResponseValidationError<T> extends globalThis.Error');
-      expect(content).toContain('Pet.safeParse(response)');
-      expect(content).toContain('new ResponseValidationError<Pet>');
+      expect(content).toContain('protected async send');
+      expect(content).toContain('protected async readBody');
+      expect(content).toContain('class ResponseValidationError<T = unknown> extends globalThis.Error');
+      expect(content).toContain('class HttpError extends globalThis.Error');
+      expect(content).toMatch(/return this\.#parse<Pet>\(await this\.send\('GET', `\/pet\/\$\{petId\}`, \{\}\), \{[^}]*: Pet[^}]*\}\);/);
     });
 
     it('should generate syntactically valid TypeScript code', async () => {

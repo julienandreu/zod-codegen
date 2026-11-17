@@ -33,7 +33,7 @@ npx ts-node examples/petstore/error-handling-usage.ts
 
 - `server-variables-usage.ts` - Using server variables for different environments
 - `retry-handler-usage.ts` - Custom retry handler implementation
-- `error-handling-usage.ts` - Handling 4xx/5xx with custom HttpError
+- `error-handling-usage.ts` - Catching `HttpError` and `ResponseValidationError`, and mapping 401 to a custom error
 
 ### ⚡ [PokéAPI](./pokeapi/)
 

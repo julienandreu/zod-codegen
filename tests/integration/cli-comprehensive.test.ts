@@ -138,7 +138,7 @@ describe('CLI Comprehensive Integration', () => {
 
       const content = readFileSync(outputFile, 'utf-8');
       expect(content).toContain('export default class');
-      expect(content).toContain('class ResponseValidationError<T> extends globalThis.Error');
+      expect(content).toContain('class ResponseValidationError<T = unknown> extends globalThis.Error');
       expect(content).toContain('import { z }');
     });
   });
