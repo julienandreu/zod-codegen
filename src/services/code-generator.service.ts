@@ -9,6 +9,18 @@ import { buildClientMembersSource, buildRuntimeDeclarationsSource } from './clie
 import { TypeScriptImportBuilderService } from './import-builder.service';
 import { TypeScriptTypeBuilderService } from './type-builder.service';
 
+// Names a schema, parameter or client class must not take in a generated module: reserved words and
+// predefined types that cannot be declared, globals that generated code refers to, and generated names.
+const RESERVED_NAMES: ReadonlySet<string> = new Set([
+  ...['arguments', 'await', 'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger', 'default', 'delete', 'do', 'else', 'enum', 'eval', 'export', 'extends'],
+  ...['false', 'finally', 'for', 'function', 'if', 'implements', 'import', 'in', 'instanceof', 'interface', 'let', 'new', 'null', 'package', 'private'],
+  ...['protected', 'public', 'return', 'static', 'super', 'switch', 'this', 'throw', 'true', 'try', 'typeof', 'var', 'void', 'while', 'with', 'yield'],
+  ...['any', 'bigint', 'boolean', 'never', 'number', 'object', 'string', 'symbol', 'undefined', 'unknown'],
+  ...['Array', 'Boolean', 'Date', 'Error', 'Function', 'Headers', 'JSON', 'Map', 'Number', 'Object', 'Omit', 'Partial', 'Promise', 'Readonly', 'Record'],
+  ...['RegExp', 'Request', 'RequestInit', 'Response', 'Set', 'String', 'Symbol', 'URL', 'URLSearchParams', 'fetch', 'globalThis', 'z'],
+  ...['ClientOptions', 'HttpError', 'RequestOptions', 'ResponseValidationError', 'defaultBaseUrl', 'resolveServerUrl', 'serverConfigurations']
+]);
+
 export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuilder {
   private readonly typeBuilder = new TypeScriptTypeBuilderService();
   private readonly importBuilder = new TypeScriptImportBuilderService();
@@ -22,6 +34,11 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
   // Exported <Operation>Response types and schemas, collected while the client methods are built
   private responseDeclarations: ts.Statement[] = [];
+
+  // Module-level names of the file being generated: component schema name -> emitted identifier
+  private schemaNames = new Map<string, string>();
+  private usedNames = new Set<string>();
+  private clientName = '';
   private readonly emptyFile = ts.createSourceFile('api.ts', '', ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
 
   constructor(options: GeneratorOptions = {}) {
@@ -98,6 +115,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
   private buildAST(openapi: OpenApiSpecType): ts.Statement[] {
     this.responseDeclarations = [];
+    this.allocateNames(openapi);
     const imports = this.importBuilder.buildImports();
     const schemas = this.buildSchemas(openapi);
     const schemaTypeAliases = this.buildSchemaTypeAliases(schemas);
@@ -120,6 +138,53 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       this.createComment('Client class'),
       clientClass
     ];
+  }
+
+  /**
+   * Gives every component schema a module-level identifier. Schemas whose sanitized name is free keep it,
+   * whatever their order in the spec; the others get `Schema`, then a number, appended.
+   */
+  private allocateNames(openapi: OpenApiSpecType): void {
+    const clientName = this.generateClientName(openapi.info.title);
+    this.clientName = RESERVED_NAMES.has(clientName) ? `${clientName}Client` : clientName;
+    this.usedNames = new Set([...RESERVED_NAMES, this.clientName]);
+    this.schemaNames = new Map();
+
+    const names = Object.keys(openapi.components?.schemas ?? {});
+    for (const name of names) {
+      const sanitized = this.typeBuilder.sanitizeIdentifier(name);
+      if (!this.usedNames.has(sanitized)) {
+        this.schemaNames.set(name, sanitized);
+        this.usedNames.add(sanitized);
+      }
+    }
+
+    for (const name of names) {
+      if (!this.schemaNames.has(name)) {
+        this.schemaNames.set(name, this.allocateName(`${this.typeBuilder.sanitizeIdentifier(name)}Schema`));
+      }
+    }
+  }
+
+  // Claims `candidate`, or the first free `candidate2`, `candidate3`, ...
+  private allocateName(candidate: string): string {
+    let name = candidate;
+    for (let suffix = 2; this.usedNames.has(name); suffix++) {
+      name = `${candidate}${String(suffix)}`;
+    }
+
+    this.usedNames.add(name);
+    return name;
+  }
+
+  private schemaIdentifier(schemaName: string): string {
+    return this.schemaNames.get(schemaName) ?? this.typeBuilder.sanitizeIdentifier(schemaName);
+  }
+
+  // A parameter named like a module-level identifier would shadow it inside the method body.
+  private parameterIdentifier(parameterName: string): string {
+    const sanitized = this.typeBuilder.sanitizeIdentifier(parameterName);
+    return this.usedNames.has(sanitized) ? `${sanitized}Param` : sanitized;
   }
 
   private hasServers(openapi: OpenApiSpecType): boolean {
@@ -171,7 +236,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       // Clear context
       this.currentSchemaName = null;
 
-      const sanitizedName = this.typeBuilder.sanitizeIdentifier(name);
+      const sanitizedName = this.schemaIdentifier(name);
 
       // Add type annotation: z.ZodType<Name>
       const typeAnnotation = ts.factory.createTypeReferenceNode(ts.factory.createQualifiedName(ts.factory.createIdentifier('z'), ts.factory.createIdentifier('ZodType')), [
@@ -215,7 +280,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
         continue;
       }
 
-      const sanitizedName = this.typeBuilder.sanitizeIdentifier(name);
+      const sanitizedName = this.schemaIdentifier(name);
       const safeSchema = SchemaProperties.safeParse(schema);
 
       if (!safeSchema.success) {
@@ -264,7 +329,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     if (this.isReference(prop)) {
       const { $ref = '' } = Reference.parse(prop);
       const refName = $ref.split('/').pop() ?? 'never';
-      const sanitizedRefName = this.typeBuilder.sanitizeIdentifier(refName);
+      const sanitizedRefName = this.schemaIdentifier(refName);
       return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(sanitizedRefName), undefined);
     }
 
@@ -394,7 +459,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
   }
 
   private buildClientClass(openapi: OpenApiSpecType, schemas: Record<string, ts.VariableStatement>): ts.ClassDeclaration {
-    const clientName = this.generateClientName(openapi.info.title);
+    const clientName = this.clientName;
     const methods = this.buildClientMethods(openapi, schemas);
     const [template] = this.parseTemplate(buildClientMembersSource(this.hasServers(openapi)));
     const runtimeMembers = template && ts.isClassDeclaration(template) ? template.members : [];
@@ -526,7 +591,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       queryParams.length > 0
         ? ts.factory.createObjectLiteralExpression(
             queryParams.map((param) => {
-              const paramName = this.typeBuilder.sanitizeIdentifier(param.name);
+              const paramName = this.parameterIdentifier(param.name);
               return ts.factory.createPropertyAssignment(ts.factory.createStringLiteral(param.name, true), ts.factory.createIdentifier(paramName));
             }),
             false
@@ -534,7 +599,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
         : undefined;
 
     // Build request body
-    const requestBodyExpression: ts.Expression | undefined = hasRequestBody ? ts.factory.createIdentifier('body') : undefined;
+    const requestBodyExpression: ts.Expression | undefined = hasRequestBody ? ts.factory.createIdentifier(this.parameterIdentifier('body')) : undefined;
 
     // Build options object for send
     const optionsProps: ts.ObjectLiteralElementLike[] = [];
@@ -621,7 +686,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     const templateSpans: ts.TemplateSpan[] = [];
 
     for (const [index, m] of matches.entries()) {
-      const sanitizedName = this.typeBuilder.sanitizeIdentifier(m.name);
+      const sanitizedName = this.parameterIdentifier(m.name);
       const next = matches[index + 1];
 
       if (next === undefined) {
@@ -659,7 +724,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     // Extract path and query parameters
     if (schema.parameters) {
       for (const param of schema.parameters) {
-        const paramName = this.typeBuilder.sanitizeIdentifier(param.name);
+        const paramName = this.parameterIdentifier(param.name);
         const paramType = this.getParameterType(param.schema);
 
         if (param.in === 'path') {
@@ -713,7 +778,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
               if (ref && typeof ref === 'string' && ref.startsWith('#/components/schemas/')) {
                 const refName = ref.split('/').pop() ?? 'unknown';
-                return this.typeBuilder.sanitizeIdentifier(refName);
+                return this.schemaIdentifier(refName);
               }
 
               // Fallback to getSchemaTypeName for non-ref schemas
@@ -721,7 +786,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
             })()
           : 'unknown';
 
-      parameters.push(this.typeBuilder.createParameter('body', bodyType, undefined, !schema.requestBody?.required));
+      parameters.push(this.typeBuilder.createParameter(this.parameterIdentifier('body'), bodyType, undefined, !schema.requestBody?.required));
     }
 
     // Send JSON whenever the operation accepts it; form encoding flattens nested values.
@@ -745,7 +810,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
     if (schemaObj.$ref) {
       const refName = schemaObj.$ref.split('/').pop() ?? 'unknown';
-      return this.typeBuilder.sanitizeIdentifier(refName);
+      return this.schemaIdentifier(refName);
     }
 
     if (schemaObj.type === 'array' && schemaObj.items) {
@@ -784,7 +849,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     const ref = schemaObj['$ref'];
     if (ref && typeof ref === 'string') {
       const refName = ref.split('/').pop() ?? 'unknown';
-      return this.typeBuilder.sanitizeIdentifier(refName);
+      return this.schemaIdentifier(refName);
     }
 
     if (schemaObj.type === 'array' && schemaObj.items) {
@@ -830,11 +895,11 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       if (content.kind === 'schema') {
         const refName = this.getSchemaRefName(content.schema);
         if (refName !== undefined) {
-          const name = this.typeBuilder.sanitizeIdentifier(refName);
+          const name = this.schemaIdentifier(refName);
           return { key, type: ts.factory.createTypeReferenceNode(name), schemaName: name };
         }
 
-        const name = inlineCount > 1 && key !== '*' ? `${baseName}${key}` : baseName;
+        const name = this.allocateName(inlineCount > 1 && key !== '*' ? `${baseName}${key}` : baseName);
         if (this.addResponseDeclarations(name, content.schema)) {
           return { key, type: ts.factory.createTypeReferenceNode(name), schemaName: name };
         }
@@ -1275,7 +1340,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       }
 
       for (const param of schema.parameters) {
-        const paramName = this.typeBuilder.sanitizeIdentifier(param.name);
+        const paramName = this.parameterIdentifier(param.name);
         const paramDesc = param.description ? ` ${param.description}` : '';
         lines.push(` * @param ${paramName}${paramDesc}`);
       }
@@ -1982,7 +2047,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
   private buildFromReference(reference: ReferenceType): ts.CallExpression | ts.Identifier {
     const { $ref = '' } = Reference.parse(reference);
     const refName = $ref.split('/').pop() ?? 'never';
-    const sanitizedRefName = this.typeBuilder.sanitizeIdentifier(refName);
+    const sanitizedRefName = this.schemaIdentifier(refName);
 
     // Check if this reference creates a circular dependency
     if (this.isCircularReference(refName)) {

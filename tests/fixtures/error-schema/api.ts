@@ -11,7 +11,7 @@ export interface Pet {
   id: number;
   name: string;
 }
-export interface Error {
+export interface ErrorSchema {
   message: string;
 }
 
@@ -20,7 +20,7 @@ export const Pet: z.ZodType<Pet> = z.object({
   id: z.number().int(),
   name: z.string()
 });
-export const Error: z.ZodType<Error> = z.object({
+export const ErrorSchema: z.ZodType<ErrorSchema> = z.object({
   message: z.string()
 });
 

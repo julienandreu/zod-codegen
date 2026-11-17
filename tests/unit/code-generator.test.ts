@@ -575,8 +575,10 @@ describe('TypeScriptCodeGeneratorService', () => {
       };
 
       const code = generator.generate(spec);
-      expect(code).toContain('export interface Error {');
-      expect(code).toContain('export const Error: z.ZodType<Error>');
+      // The schema is renamed so its exported type stays usable next to the built-in Error.
+      expect(code).toContain('export interface ErrorSchema {');
+      expect(code).toContain('export const ErrorSchema: z.ZodType<ErrorSchema>');
+      expect(code).not.toMatch(/export (interface|const) Error\b/);
       expect(code).toContain('class ResponseValidationError<T = unknown> extends globalThis.Error');
       expect(code).toContain('class HttpError extends globalThis.Error');
       expect(code).not.toMatch(/extends Error\b/);

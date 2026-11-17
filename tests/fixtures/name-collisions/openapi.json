@@ -1,0 +1,60 @@
+{
+  "openapi": "3.0.0",
+  "info": { "title": "Pet", "version": "1.0.0" },
+  "servers": [{ "url": "https://api.example.com" }],
+  "paths": {
+    "/pets/{z}": {
+      "get": {
+        "operationId": "getPet",
+        "parameters": [
+          { "name": "z", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "class", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+          },
+          "201": {
+            "description": "Created",
+            "content": { "application/json": { "schema": { "type": "string" } } }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "message": { "type": "string" },
+          "cause": { "$ref": "#/components/schemas/String" }
+        },
+        "required": ["message"]
+      },
+      "ErrorSchema": {
+        "type": "object",
+        "properties": { "code": { "type": "integer" } }
+      },
+      "String": { "type": "string" },
+      "RegExp": { "type": "string" },
+      "pet-item": {
+        "type": "object",
+        "properties": { "name": { "type": "string" } }
+      },
+      "pet_item": {
+        "type": "object",
+        "properties": { "id": { "type": "integer" } }
+      },
+      "Pet": {
+        "type": "object",
+        "properties": { "item": { "$ref": "#/components/schemas/pet-item" } }
+      },
+      "Node": {
+        "type": "object",
+        "properties": { "next": { "$ref": "#/components/schemas/Node" } }
+      }
+    }
+  }
+}
