@@ -108,7 +108,8 @@ describe('Generator', () => {
       expect(content).toMatch(/import\s*{\s*z\s*}\s*from\s*['"]zod['"]/);
       expect(content).toContain('export const');
       expect(content).toContain('protected getBaseRequestOptions');
-      expect(content).toContain('protected async makeRequest');
+      expect(content).toContain('protected async send');
+      expect(content).toContain('protected async readBody');
     });
 
     it('should include header comments in generated file', async () => {

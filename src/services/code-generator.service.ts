@@ -5,6 +5,7 @@ import type { GeneratorOptions } from '../types/generator-options';
 import type { MethodSchemaType, OpenApiSpecType, ReferenceType } from '../types/openapi';
 import { MethodSchema, Reference, SchemaProperties } from '../types/openapi';
 import { type NamingConvention, type OperationDetails, type OperationNameTransformer, transformNamingConvention } from '../utils/naming-convention';
+import { buildClientMembersSource, buildRuntimeDeclarationsSource } from './client-runtime';
 import { TypeScriptImportBuilderService } from './import-builder.service';
 import { TypeScriptTypeBuilderService } from './type-builder.service';
 
@@ -109,10 +110,36 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       ...Object.values(schemas),
       ...schemaTypeAliases,
       ...serverConfig,
-      this.buildResponseValidationErrorClass(),
+      ...this.parseTemplate(buildRuntimeDeclarationsSource(this.hasServers(openapi))),
       this.createComment('Client class'),
       clientClass
     ];
+  }
+
+  private hasServers(openapi: OpenApiSpecType): boolean {
+    return (openapi.servers?.length ?? 0) > 0;
+  }
+
+  // Parsed nodes keep positions into the template text, and the printer would read those positions
+  // from the generated file instead. Clearing them makes the printer build the text, as it does for
+  // factory-built nodes.
+  private parseTemplate(source: string): readonly ts.Statement[] {
+    const file = ts.createSourceFile('template.ts', source, ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
+    const synthesize = (node: ts.Node): void => {
+      ts.setTextRange(node, { pos: -1, end: -1 });
+      if (ts.isStringLiteral(node)) {
+        // Print with the single quotes that factory-built literals use.
+        Object.assign(node, { singleQuote: true });
+      }
+
+      ts.forEachChild(node, synthesize, (nodes) => {
+        ts.setTextRange(nodes, { pos: -1, end: -1 });
+        nodes.forEach(synthesize);
+      });
+    };
+
+    file.statements.forEach(synthesize);
+    return file.statements;
   }
 
   private buildSchemas(openapi: OpenApiSpecType): Record<string, ts.VariableStatement> {
@@ -360,758 +387,18 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     return ts.factory.createInterfaceDeclaration([ts.factory.createToken(ts.SyntaxKind.ExportKeyword)], ts.factory.createIdentifier(name), undefined, undefined, members);
   }
 
-  private buildResponseValidationErrorClass(): ts.ClassDeclaration {
-    const typeParamT = ts.factory.createTypeParameterDeclaration(undefined, 'T');
-
-    // Generated methods pass the parsed JSON body, not a fetch Response, and that body failed the schema, so it is not a T.
-    const responseProperty = ts.factory.createPropertyDeclaration(
-      [ts.factory.createToken(ts.SyntaxKind.ReadonlyKeyword)],
-      'response',
-      undefined,
-      ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
-      undefined
-    );
-
-    const errorProperty = ts.factory.createPropertyDeclaration(
-      [ts.factory.createToken(ts.SyntaxKind.ReadonlyKeyword)],
-      'error',
-      undefined,
-      ts.factory.createTypeReferenceNode(ts.factory.createQualifiedName(ts.factory.createIdentifier('z'), 'ZodError'), [ts.factory.createTypeReferenceNode('T')]),
-      undefined
-    );
-
-    const constructorDecl = ts.factory.createConstructorDeclaration(
-      undefined,
-      [
-        ts.factory.createParameterDeclaration(undefined, undefined, 'message', undefined, ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)),
-        ts.factory.createParameterDeclaration(undefined, undefined, 'response', undefined, ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)),
-        ts.factory.createParameterDeclaration(
-          undefined,
-          undefined,
-          'error',
-          undefined,
-          ts.factory.createTypeReferenceNode(ts.factory.createQualifiedName(ts.factory.createIdentifier('z'), 'ZodError'), [ts.factory.createTypeReferenceNode('T')])
-        )
-      ],
-      ts.factory.createBlock(
-        [
-          ts.factory.createExpressionStatement(ts.factory.createCallExpression(ts.factory.createSuper(), undefined, [ts.factory.createIdentifier('message')])),
-          ts.factory.createExpressionStatement(
-            ts.factory.createBinaryExpression(
-              ts.factory.createPropertyAccessExpression(ts.factory.createThis(), 'name'),
-              ts.SyntaxKind.EqualsToken,
-              ts.factory.createAsExpression(ts.factory.createStringLiteral('ResponseValidationError', true), ts.factory.createTypeReferenceNode('const'))
-            )
-          ),
-          ts.factory.createExpressionStatement(
-            ts.factory.createBinaryExpression(
-              ts.factory.createPropertyAccessExpression(ts.factory.createThis(), 'response'),
-              ts.SyntaxKind.EqualsToken,
-              ts.factory.createIdentifier('response')
-            )
-          ),
-          ts.factory.createExpressionStatement(
-            ts.factory.createBinaryExpression(
-              ts.factory.createPropertyAccessExpression(ts.factory.createThis(), 'error'),
-              ts.SyntaxKind.EqualsToken,
-              ts.factory.createIdentifier('error')
-            )
-          )
-        ],
-        true
-      )
-    );
-
-    const dataGetter = ts.factory.createGetAccessorDeclaration(
-      undefined,
-      'data',
-      [],
-      ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
-      ts.factory.createBlock([ts.factory.createReturnStatement(ts.factory.createPropertyAccessExpression(ts.factory.createThis(), 'response'))], true)
-    );
-
-    return ts.factory.createClassDeclaration(
-      [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
-      'ResponseValidationError',
-      [typeParamT],
-      [ts.factory.createHeritageClause(ts.SyntaxKind.ExtendsKeyword, [ts.factory.createExpressionWithTypeArguments(this.buildGlobalErrorReference(), undefined)])],
-      [responseProperty, errorProperty, constructorDecl, dataGetter]
-    );
-  }
-
-  // A spec schema named `Error` is emitted as a module-level `Error`, which would shadow the built-in.
-  private buildGlobalErrorReference(): ts.Expression {
-    return ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('globalThis'), 'Error');
-  }
-
   private buildClientClass(openapi: OpenApiSpecType, schemas: Record<string, ts.VariableStatement>): ts.ClassDeclaration {
     const clientName = this.generateClientName(openapi.info.title);
     const methods = this.buildClientMethods(openapi, schemas);
+    const [template] = this.parseTemplate(buildClientMembersSource(this.hasServers(openapi)));
+    const runtimeMembers = template && ts.isClassDeclaration(template) ? template.members : [];
 
     return ts.factory.createClassDeclaration(
       [ts.factory.createToken(ts.SyntaxKind.ExportKeyword), ts.factory.createToken(ts.SyntaxKind.DefaultKeyword)],
       ts.factory.createIdentifier(clientName),
       undefined,
       undefined,
-      [
-        this.typeBuilder.createProperty('#baseUrl', 'string', true),
-        this.buildConstructor(openapi),
-        this.buildGetBaseRequestOptionsMethod(),
-        this.buildHandleResponseMethod(),
-        this.buildHttpRequestMethod(),
-        ...methods
-      ]
-    );
-  }
-
-  private buildConstructor(openapi: OpenApiSpecType): ts.ConstructorDeclaration {
-    const hasServers = openapi.servers && openapi.servers.length > 0;
-
-    if (hasServers) {
-      // Options-based constructor
-      return ts.factory.createConstructorDeclaration(
-        undefined,
-        [
-          ts.factory.createParameterDeclaration(
-            undefined,
-            undefined,
-            ts.factory.createIdentifier('options'),
-            undefined,
-            ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('ClientOptions'), undefined),
-            undefined
-          )
-        ],
-        ts.factory.createBlock(
-          [
-            ts.factory.createVariableStatement(
-              undefined,
-              ts.factory.createVariableDeclarationList(
-                [
-                  ts.factory.createVariableDeclaration(
-                    ts.factory.createIdentifier('resolvedUrl'),
-                    undefined,
-                    undefined,
-                    // An omitted baseUrl is undefined, not null, so only a nullish check falls back to the spec's servers.
-                    ts.factory.createBinaryExpression(
-                      ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('baseUrl')),
-                      ts.factory.createToken(ts.SyntaxKind.QuestionQuestionToken),
-                      ts.factory.createCallExpression(ts.factory.createIdentifier('resolveServerUrl'), undefined, [
-                        ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('serverIndex')),
-                        ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('serverVariables'))
-                      ])
-                    )
-                  )
-                ],
-                ts.NodeFlags.Const
-              )
-            ),
-            ts.factory.createExpressionStatement(
-              ts.factory.createBinaryExpression(
-                ts.factory.createPropertyAccessExpression(ts.factory.createThis(), ts.factory.createPrivateIdentifier('#baseUrl')),
-                ts.factory.createToken(ts.SyntaxKind.EqualsToken),
-                ts.factory.createIdentifier('resolvedUrl')
-              )
-            )
-          ],
-          true
-        )
-      );
-    } else {
-      // Fallback: simple baseUrl parameter
-      return ts.factory.createConstructorDeclaration(
-        undefined,
-        [this.typeBuilder.createParameter('baseUrl', 'string', ts.factory.createStringLiteral('/', true)), this.typeBuilder.createParameter('_', 'unknown', undefined, true)],
-        ts.factory.createBlock(
-          [
-            ts.factory.createExpressionStatement(
-              ts.factory.createBinaryExpression(
-                ts.factory.createPropertyAccessExpression(ts.factory.createThis(), ts.factory.createPrivateIdentifier('#baseUrl')),
-                ts.factory.createToken(ts.SyntaxKind.EqualsToken),
-                ts.factory.createIdentifier('baseUrl')
-              )
-            )
-          ],
-          true
-        )
-      );
-    }
-  }
-
-  private buildGetBaseRequestOptionsMethod(): ts.MethodDeclaration {
-    return ts.factory.createMethodDeclaration(
-      [ts.factory.createToken(ts.SyntaxKind.ProtectedKeyword)],
-      undefined,
-      ts.factory.createIdentifier('getBaseRequestOptions'),
-      undefined,
-      undefined,
-      [],
-      ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Partial'), [
-        ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Omit'), [
-          ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('RequestInit'), undefined),
-          ts.factory.createUnionTypeNode([
-            ts.factory.createLiteralTypeNode(ts.factory.createStringLiteral('method', true)),
-            ts.factory.createLiteralTypeNode(ts.factory.createStringLiteral('body', true))
-          ])
-        ])
-      ]),
-      ts.factory.createBlock([ts.factory.createReturnStatement(ts.factory.createObjectLiteralExpression([], false))], true)
-    );
-  }
-
-  private buildHandleResponseMethod(): ts.MethodDeclaration {
-    return ts.factory.createMethodDeclaration(
-      [ts.factory.createToken(ts.SyntaxKind.ProtectedKeyword), ts.factory.createToken(ts.SyntaxKind.AsyncKeyword)],
-      undefined,
-      ts.factory.createIdentifier('handleResponse'),
-      undefined,
-      [this.typeBuilder.createGenericType('T')],
-      [
-        this.typeBuilder.createParameter('response', 'Response'),
-        this.typeBuilder.createParameter('method', 'string'),
-        this.typeBuilder.createParameter('path', 'string'),
-        this.typeBuilder.createParameter('options', '{params?: Record<string, string | number | boolean>; data?: unknown; contentType?: string; headers?: Record<string, string>}')
-      ],
-      ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Response'), undefined)]),
-      ts.factory.createBlock([ts.factory.createReturnStatement(ts.factory.createIdentifier('response'))], true)
-    );
-  }
-
-  private buildHttpRequestMethod(): ts.MethodDeclaration {
-    return ts.factory.createMethodDeclaration(
-      [ts.factory.createToken(ts.SyntaxKind.ProtectedKeyword), ts.factory.createToken(ts.SyntaxKind.AsyncKeyword)],
-      undefined,
-      ts.factory.createIdentifier('makeRequest'),
-      undefined,
-      [this.typeBuilder.createGenericType('T')],
-      [
-        this.typeBuilder.createParameter('method', 'string'),
-        this.typeBuilder.createParameter('path', 'string'),
-        this.typeBuilder.createParameter(
-          'options',
-          '{params?: Record<string, string | number | boolean>; data?: unknown; contentType?: string; headers?: Record<string, string>}',
-          ts.factory.createObjectLiteralExpression([], false),
-          false
-        )
-      ],
-      ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('T'), undefined)]),
-      ts.factory.createBlock(
-        [
-          // Create initial URL object that we will use to build the final URL
-          ts.factory.createVariableStatement(
-            undefined,
-            ts.factory.createVariableDeclarationList(
-              [
-                ts.factory.createVariableDeclaration(
-                  ts.factory.createIdentifier('baseUrl'),
-                  undefined,
-                  undefined,
-                  ts.factory.createNewExpression(ts.factory.createIdentifier('URL'), undefined, [
-                    ts.factory.createIdentifier('path'),
-                    ts.factory.createPropertyAccessExpression(ts.factory.createThis(), ts.factory.createPrivateIdentifier('#baseUrl'))
-                  ])
-                )
-              ],
-              ts.NodeFlags.Const
-            )
-          ),
-          ts.factory.createVariableStatement(
-            undefined,
-            ts.factory.createVariableDeclarationList(
-              [
-                ts.factory.createVariableDeclaration(
-                  ts.factory.createIdentifier('url'),
-                  undefined,
-                  undefined,
-                  ts.factory.createConditionalExpression(
-                    ts.factory.createBinaryExpression(
-                      ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('params')),
-                      ts.factory.createToken(ts.SyntaxKind.AmpersandAmpersandToken),
-                      ts.factory.createBinaryExpression(
-                        ts.factory.createPropertyAccessExpression(
-                          ts.factory.createCallExpression(
-                            ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('Object'), ts.factory.createIdentifier('keys')),
-                            undefined,
-                            [ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('params'))]
-                          ),
-                          ts.factory.createIdentifier('length')
-                        ),
-                        ts.factory.createToken(ts.SyntaxKind.GreaterThanToken),
-                        ts.factory.createNumericLiteral('0')
-                      )
-                    ),
-                    undefined,
-                    ts.factory.createCallExpression(
-                      ts.factory.createParenthesizedExpression(
-                        ts.factory.createArrowFunction(
-                          undefined,
-                          undefined,
-                          [],
-                          undefined,
-                          ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
-                          ts.factory.createBlock(
-                            [
-                              ts.factory.createExpressionStatement(
-                                ts.factory.createCallExpression(
-                                  ts.factory.createPropertyAccessExpression(
-                                    ts.factory.createCallExpression(
-                                      ts.factory.createPropertyAccessExpression(
-                                        ts.factory.createCallExpression(
-                                          ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('Object'), ts.factory.createIdentifier('entries')),
-                                          undefined,
-                                          [ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('params'))]
-                                        ),
-                                        ts.factory.createIdentifier('filter')
-                                      ),
-                                      undefined,
-                                      [
-                                        ts.factory.createArrowFunction(
-                                          undefined,
-                                          undefined,
-                                          [
-                                            ts.factory.createParameterDeclaration(
-                                              undefined,
-                                              undefined,
-                                              ts.factory.createArrayBindingPattern([
-                                                ts.factory.createBindingElement(undefined, undefined, ts.factory.createIdentifier(''), undefined),
-                                                ts.factory.createBindingElement(undefined, undefined, ts.factory.createIdentifier('value'), undefined)
-                                              ]),
-                                              undefined,
-                                              undefined
-                                            )
-                                          ],
-                                          undefined,
-                                          ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
-                                          ts.factory.createBinaryExpression(
-                                            ts.factory.createIdentifier('value'),
-                                            ts.SyntaxKind.ExclamationEqualsEqualsToken,
-                                            ts.factory.createIdentifier('undefined')
-                                          )
-                                        )
-                                      ]
-                                    ),
-                                    ts.factory.createIdentifier('forEach')
-                                  ),
-                                  undefined,
-                                  [
-                                    ts.factory.createArrowFunction(
-                                      undefined,
-                                      undefined,
-                                      [
-                                        ts.factory.createParameterDeclaration(
-                                          undefined,
-                                          undefined,
-                                          ts.factory.createArrayBindingPattern([
-                                            ts.factory.createBindingElement(undefined, undefined, ts.factory.createIdentifier('key'), undefined),
-                                            ts.factory.createBindingElement(undefined, undefined, ts.factory.createIdentifier('value'), undefined)
-                                          ]),
-                                          undefined,
-                                          undefined
-                                        )
-                                      ],
-                                      undefined,
-                                      ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
-                                      ts.factory.createBlock(
-                                        [
-                                          ts.factory.createExpressionStatement(
-                                            ts.factory.createCallExpression(
-                                              ts.factory.createPropertyAccessExpression(
-                                                ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('baseUrl'), ts.factory.createIdentifier('searchParams')),
-                                                ts.factory.createIdentifier('set')
-                                              ),
-                                              undefined,
-                                              [
-                                                ts.factory.createIdentifier('key'),
-                                                ts.factory.createCallExpression(ts.factory.createIdentifier('String'), undefined, [ts.factory.createIdentifier('value')])
-                                              ]
-                                            )
-                                          )
-                                        ],
-                                        false
-                                      )
-                                    )
-                                  ]
-                                )
-                              ),
-                              ts.factory.createReturnStatement(
-                                ts.factory.createCallExpression(
-                                  ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('baseUrl'), ts.factory.createIdentifier('toString')),
-                                  undefined,
-                                  []
-                                )
-                              )
-                            ],
-                            true
-                          )
-                        )
-                      ),
-                      undefined,
-                      []
-                    ),
-                    undefined,
-                    ts.factory.createCallExpression(
-                      ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('baseUrl'), ts.factory.createIdentifier('toString')),
-                      undefined,
-                      []
-                    )
-                  )
-                )
-              ],
-              ts.NodeFlags.Const
-            )
-          ),
-          // Get base request options (headers, signal, credentials, etc.)
-          ts.factory.createVariableStatement(
-            undefined,
-            ts.factory.createVariableDeclarationList(
-              [
-                ts.factory.createVariableDeclaration(
-                  ts.factory.createIdentifier('baseOptions'),
-                  undefined,
-                  undefined,
-                  ts.factory.createCallExpression(
-                    ts.factory.createPropertyAccessExpression(ts.factory.createThis(), ts.factory.createIdentifier('getBaseRequestOptions')),
-                    undefined,
-                    []
-                  )
-                )
-              ],
-              ts.NodeFlags.Const
-            )
-          ),
-          // Build Content-Type header
-          ts.factory.createVariableStatement(
-            undefined,
-            ts.factory.createVariableDeclarationList(
-              [
-                ts.factory.createVariableDeclaration(
-                  ts.factory.createIdentifier('contentType'),
-                  undefined,
-                  undefined,
-                  ts.factory.createConditionalExpression(
-                    ts.factory.createBinaryExpression(
-                      ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('contentType')),
-                      ts.factory.createToken(ts.SyntaxKind.EqualsEqualsEqualsToken),
-                      ts.factory.createStringLiteral('application/x-www-form-urlencoded', true)
-                    ),
-                    undefined,
-                    ts.factory.createStringLiteral('application/x-www-form-urlencoded', true),
-                    undefined,
-                    ts.factory.createStringLiteral('application/json', true)
-                  )
-                )
-              ],
-              ts.NodeFlags.Const
-            )
-          ),
-          // Merge headers: base headers, Content-Type, and request-specific headers
-          ts.factory.createVariableStatement(
-            undefined,
-            ts.factory.createVariableDeclarationList(
-              [
-                ts.factory.createVariableDeclaration(
-                  ts.factory.createIdentifier('baseHeaders'),
-                  undefined,
-                  undefined,
-                  ts.factory.createConditionalExpression(
-                    ts.factory.createBinaryExpression(
-                      ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('baseOptions'), ts.factory.createIdentifier('headers')),
-                      ts.factory.createToken(ts.SyntaxKind.ExclamationEqualsEqualsToken),
-                      ts.factory.createIdentifier('undefined')
-                    ),
-                    undefined,
-                    ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('baseOptions'), ts.factory.createIdentifier('headers')),
-                    undefined,
-                    ts.factory.createObjectLiteralExpression([], false)
-                  )
-                )
-              ],
-              ts.NodeFlags.Const
-            )
-          ),
-          ts.factory.createVariableStatement(
-            undefined,
-            ts.factory.createVariableDeclarationList(
-              [
-                ts.factory.createVariableDeclaration(
-                  ts.factory.createIdentifier('headers'),
-                  undefined,
-                  undefined,
-                  ts.factory.createCallExpression(
-                    ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('Object'), ts.factory.createIdentifier('assign')),
-                    undefined,
-                    [
-                      ts.factory.createObjectLiteralExpression([], false),
-                      ts.factory.createIdentifier('baseHeaders'),
-                      ts.factory.createObjectLiteralExpression(
-                        [ts.factory.createPropertyAssignment(ts.factory.createStringLiteral('Content-Type', true), ts.factory.createIdentifier('contentType'))],
-                        false
-                      ),
-                      ts.factory.createConditionalExpression(
-                        ts.factory.createBinaryExpression(
-                          ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('headers')),
-                          ts.factory.createToken(ts.SyntaxKind.ExclamationEqualsEqualsToken),
-                          ts.factory.createIdentifier('undefined')
-                        ),
-                        undefined,
-                        ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('headers')),
-                        undefined,
-                        ts.factory.createObjectLiteralExpression([], false)
-                      )
-                    ]
-                  )
-                )
-              ],
-              ts.NodeFlags.Const
-            )
-          ),
-          // Build body with form-urlencoded support
-          ts.factory.createVariableStatement(
-            undefined,
-            ts.factory.createVariableDeclarationList(
-              [
-                ts.factory.createVariableDeclaration(
-                  ts.factory.createIdentifier('body'),
-                  undefined,
-                  undefined,
-                  ts.factory.createConditionalExpression(
-                    ts.factory.createBinaryExpression(
-                      ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('data')),
-                      ts.factory.createToken(ts.SyntaxKind.ExclamationEqualsEqualsToken),
-                      ts.factory.createIdentifier('undefined')
-                    ),
-                    undefined,
-                    ts.factory.createConditionalExpression(
-                      ts.factory.createBinaryExpression(
-                        ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('contentType')),
-                        ts.factory.createToken(ts.SyntaxKind.EqualsEqualsEqualsToken),
-                        ts.factory.createStringLiteral('application/x-www-form-urlencoded', true)
-                      ),
-                      undefined,
-                      // Form-urlencoded: convert object to URLSearchParams
-                      ts.factory.createCallExpression(
-                        ts.factory.createParenthesizedExpression(
-                          ts.factory.createArrowFunction(
-                            undefined,
-                            undefined,
-                            [],
-                            undefined,
-                            ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
-                            ts.factory.createBlock(
-                              [
-                                ts.factory.createVariableStatement(
-                                  undefined,
-                                  ts.factory.createVariableDeclarationList(
-                                    [
-                                      ts.factory.createVariableDeclaration(
-                                        ts.factory.createIdentifier('params'),
-                                        undefined,
-                                        undefined,
-                                        ts.factory.createNewExpression(ts.factory.createIdentifier('URLSearchParams'), undefined, [])
-                                      )
-                                    ],
-                                    ts.NodeFlags.Const
-                                  )
-                                ),
-                                ts.factory.createExpressionStatement(
-                                  ts.factory.createCallExpression(
-                                    ts.factory.createPropertyAccessExpression(
-                                      ts.factory.createCallExpression(
-                                        ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('Object'), ts.factory.createIdentifier('entries')),
-                                        undefined,
-                                        [ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('data'))]
-                                      ),
-                                      ts.factory.createIdentifier('forEach')
-                                    ),
-                                    undefined,
-                                    [
-                                      ts.factory.createArrowFunction(
-                                        undefined,
-                                        undefined,
-                                        [
-                                          ts.factory.createParameterDeclaration(
-                                            undefined,
-                                            undefined,
-                                            ts.factory.createArrayBindingPattern([
-                                              ts.factory.createBindingElement(undefined, undefined, ts.factory.createIdentifier('key'), undefined),
-                                              ts.factory.createBindingElement(undefined, undefined, ts.factory.createIdentifier('value'), undefined)
-                                            ]),
-                                            undefined,
-                                            undefined
-                                          )
-                                        ],
-                                        undefined,
-                                        ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
-                                        ts.factory.createBlock(
-                                          [
-                                            ts.factory.createExpressionStatement(
-                                              ts.factory.createCallExpression(
-                                                ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('params'), ts.factory.createIdentifier('set')),
-                                                undefined,
-                                                [
-                                                  ts.factory.createIdentifier('key'),
-                                                  ts.factory.createCallExpression(ts.factory.createIdentifier('String'), undefined, [ts.factory.createIdentifier('value')])
-                                                ]
-                                              )
-                                            )
-                                          ],
-                                          false
-                                        )
-                                      )
-                                    ]
-                                  )
-                                ),
-                                ts.factory.createReturnStatement(
-                                  ts.factory.createCallExpression(
-                                    ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('params'), ts.factory.createIdentifier('toString')),
-                                    undefined,
-                                    []
-                                  )
-                                )
-                              ],
-                              false
-                            )
-                          )
-                        ),
-                        undefined,
-                        []
-                      ),
-                      undefined,
-                      // JSON: stringify the data
-                      ts.factory.createCallExpression(
-                        ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('JSON'), ts.factory.createIdentifier('stringify')),
-                        undefined,
-                        [ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('options'), ts.factory.createIdentifier('data'))]
-                      )
-                    ),
-                    undefined,
-                    ts.factory.createNull()
-                  )
-                )
-              ],
-              ts.NodeFlags.Const
-            )
-          ),
-          // Make fetch request: merge base options with method, headers, and body
-          ts.factory.createVariableStatement(
-            undefined,
-            ts.factory.createVariableDeclarationList(
-              [
-                ts.factory.createVariableDeclaration(
-                  ts.factory.createIdentifier('rawResponse'),
-                  undefined,
-                  undefined,
-                  ts.factory.createAwaitExpression(
-                    ts.factory.createCallExpression(ts.factory.createIdentifier('fetch'), undefined, [
-                      ts.factory.createIdentifier('url'),
-                      ts.factory.createCallExpression(
-                        ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('Object'), ts.factory.createIdentifier('assign')),
-                        undefined,
-                        [
-                          ts.factory.createObjectLiteralExpression([], false),
-                          ts.factory.createIdentifier('baseOptions'),
-                          ts.factory.createObjectLiteralExpression(
-                            [
-                              ts.factory.createShorthandPropertyAssignment(ts.factory.createIdentifier('method'), undefined),
-                              ts.factory.createPropertyAssignment(ts.factory.createIdentifier('headers'), ts.factory.createIdentifier('headers')),
-                              ts.factory.createPropertyAssignment(ts.factory.createIdentifier('body'), ts.factory.createIdentifier('body'))
-                            ],
-                            false
-                          )
-                        ]
-                      )
-                    ])
-                  )
-                )
-              ],
-              ts.NodeFlags.Const
-            )
-          ),
-          // Handle response through hook (allows subclasses to intercept and modify response)
-          ts.factory.createVariableStatement(
-            undefined,
-            ts.factory.createVariableDeclarationList(
-              [
-                ts.factory.createVariableDeclaration(
-                  ts.factory.createIdentifier('response'),
-                  undefined,
-                  undefined,
-                  ts.factory.createAwaitExpression(
-                    ts.factory.createCallExpression(
-                      ts.factory.createPropertyAccessExpression(ts.factory.createThis(), ts.factory.createIdentifier('handleResponse')),
-                      [ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('T'), undefined)],
-                      [
-                        ts.factory.createIdentifier('rawResponse'),
-                        ts.factory.createIdentifier('method'),
-                        ts.factory.createIdentifier('path'),
-                        ts.factory.createIdentifier('options')
-                      ]
-                    )
-                  )
-                )
-              ],
-              ts.NodeFlags.Const
-            )
-          ),
-          // Check response status
-          ts.factory.createIfStatement(
-            ts.factory.createPrefixUnaryExpression(
-              ts.SyntaxKind.ExclamationToken,
-              ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('response'), ts.factory.createIdentifier('ok'))
-            ),
-            ts.factory.createThrowStatement(
-              ts.factory.createNewExpression(this.buildGlobalErrorReference(), undefined, [
-                ts.factory.createTemplateExpression(ts.factory.createTemplateHead('HTTP ', 'HTTP '), [
-                  ts.factory.createTemplateSpan(
-                    ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('response'), ts.factory.createIdentifier('status')),
-                    ts.factory.createTemplateMiddle(': ', ': ')
-                  ),
-                  ts.factory.createTemplateSpan(
-                    ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('response'), ts.factory.createIdentifier('statusText')),
-                    ts.factory.createTemplateTail('', '')
-                  )
-                ])
-              ])
-            ),
-            undefined
-          ),
-          // Skip JSON parse for 204 No Content / 205 Reset Content (RFC 7231: bodies MUST be empty)
-          ts.factory.createIfStatement(
-            ts.factory.createBinaryExpression(
-              ts.factory.createBinaryExpression(
-                ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('response'), ts.factory.createIdentifier('status')),
-                ts.factory.createToken(ts.SyntaxKind.EqualsEqualsEqualsToken),
-                ts.factory.createNumericLiteral(204)
-              ),
-              ts.factory.createToken(ts.SyntaxKind.BarBarToken),
-              ts.factory.createBinaryExpression(
-                ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('response'), ts.factory.createIdentifier('status')),
-                ts.factory.createToken(ts.SyntaxKind.EqualsEqualsEqualsToken),
-                ts.factory.createNumericLiteral(205)
-              )
-            ),
-            ts.factory.createBlock(
-              [
-                ts.factory.createReturnStatement(
-                  ts.factory.createAsExpression(ts.factory.createIdentifier('undefined'), ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('T'), undefined))
-                )
-              ],
-              true
-            ),
-            undefined
-          ),
-          // Return parsed JSON
-          ts.factory.createReturnStatement(
-            ts.factory.createAwaitExpression(
-              ts.factory.createCallExpression(
-                ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('response'), ts.factory.createIdentifier('json')),
-                undefined,
-                []
-              )
-            )
-          )
-        ],
-        true
-      )
+      [...runtimeMembers, ...methods]
     );
   }
 
@@ -1242,7 +529,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     // Build request body
     const requestBodyExpression: ts.Expression | undefined = hasRequestBody ? ts.factory.createIdentifier('body') : undefined;
 
-    // Build options object for makeRequest
+    // Build options object for send
     const optionsProps: ts.ObjectLiteralElementLike[] = [];
     if (queryParamsExpression) {
       optionsProps.push(ts.factory.createPropertyAssignment(ts.factory.createIdentifier('params'), queryParamsExpression));
@@ -1259,106 +546,30 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
     const optionsExpression = ts.factory.createObjectLiteralExpression(optionsProps, false);
 
-    // Call makeRequest
-    const makeRequestCall = ts.factory.createCallExpression(
-      ts.factory.createPropertyAccessExpression(ts.factory.createThis(), ts.factory.createIdentifier('makeRequest')),
-      undefined,
-      [ts.factory.createStringLiteral(method.toUpperCase(), true), pathExpression, optionsExpression]
+    // return this.#parse<T>(await this.send(...), { '<status>': Schema })
+    const sendCall = ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(ts.factory.createThis(), ts.factory.createIdentifier('send')), undefined, [
+      ts.factory.createStringLiteral(method.toUpperCase(), true),
+      pathExpression,
+      optionsExpression
+    ]);
+    const responseSchemas = ts.factory.createObjectLiteralExpression(
+      responseSchema ? [ts.factory.createPropertyAssignment(ts.factory.createStringLiteral('*', true), responseSchema)] : [],
+      false
     );
+    const resultType =
+      responseType && ts.isTypeReferenceNode(responseType) && responseType.typeArguments?.[0]
+        ? responseType.typeArguments[0]
+        : ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword);
 
-    if (responseSchema) {
-      const schemaName = responseSchema.text;
-      const schemaNameLower = schemaName.charAt(0).toLowerCase() + schemaName.slice(1);
-      const parsedVarName = `parsed${schemaName}`;
-
-      // const response = await this.makeRequest(...)
-      statements.push(
-        ts.factory.createVariableStatement(
-          undefined,
-          ts.factory.createVariableDeclarationList(
-            [ts.factory.createVariableDeclaration('response', undefined, undefined, ts.factory.createAwaitExpression(makeRequestCall))],
-            ts.NodeFlags.Const
-          )
+    statements.push(
+      ts.factory.createReturnStatement(
+        ts.factory.createCallExpression(
+          ts.factory.createPropertyAccessExpression(ts.factory.createThis(), ts.factory.createPrivateIdentifier('#parse')),
+          [resultType],
+          [ts.factory.createAwaitExpression(sendCall), responseSchemas]
         )
-      );
-
-      // const parsed{Name} = {Schema}.safeParse(response)
-      statements.push(
-        ts.factory.createVariableStatement(
-          undefined,
-          ts.factory.createVariableDeclarationList(
-            [
-              ts.factory.createVariableDeclaration(
-                parsedVarName,
-                undefined,
-                undefined,
-                ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(responseSchema, ts.factory.createIdentifier('safeParse')), undefined, [
-                  ts.factory.createIdentifier('response')
-                ])
-              )
-            ],
-            ts.NodeFlags.Const
-          )
-        )
-      );
-
-      // if (!parsed{Name}.success) { throw new ResponseValidationError<{Type}>(...) }
-      // The message reads `error.issues`: Zod 4 removed `ZodError.errors`, and Zod 3 has `issues` too.
-      statements.push(
-        ts.factory.createIfStatement(
-          ts.factory.createPrefixUnaryExpression(ts.SyntaxKind.ExclamationToken, ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier(parsedVarName), 'success')),
-          ts.factory.createBlock(
-            [
-              ts.factory.createThrowStatement(
-                ts.factory.createNewExpression(
-                  ts.factory.createIdentifier('ResponseValidationError'),
-                  [ts.factory.createTypeReferenceNode(schemaName)],
-                  [
-                    ts.factory.createTemplateExpression(ts.factory.createTemplateHead(`Invalid ${schemaNameLower}: `), [
-                      ts.factory.createTemplateSpan(
-                        ts.factory.createCallExpression(
-                          ts.factory.createPropertyAccessExpression(
-                            ts.factory.createCallExpression(
-                              ts.factory.createPropertyAccessExpression(
-                                ts.factory.createPropertyAccessExpression(ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier(parsedVarName), 'error'), 'issues'),
-                                'map'
-                              ),
-                              undefined,
-                              [
-                                ts.factory.createArrowFunction(
-                                  undefined,
-                                  undefined,
-                                  [ts.factory.createParameterDeclaration(undefined, undefined, 'error')],
-                                  undefined,
-                                  ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
-                                  ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('error'), 'message')
-                                )
-                              ]
-                            ),
-                            'join'
-                          ),
-                          undefined,
-                          [ts.factory.createStringLiteral(', ', true)]
-                        ),
-                        ts.factory.createTemplateTail('')
-                      )
-                    ]),
-                    ts.factory.createIdentifier('response'),
-                    ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier(parsedVarName), 'error')
-                  ]
-                )
-              )
-            ],
-            true
-          )
-        )
-      );
-
-      // return parsed{Name}.data
-      statements.push(ts.factory.createReturnStatement(ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier(parsedVarName), 'data')));
-    } else {
-      statements.push(ts.factory.createReturnStatement(ts.factory.createAwaitExpression(makeRequestCall)));
-    }
+      )
+    );
 
     const transformedOperationId = this.transformOperationName(String(schema.operationId), method, path, schema);
 
@@ -1516,8 +727,8 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       parameters.push(this.typeBuilder.createParameter('body', bodyType, undefined, !schema.requestBody?.required));
     }
 
-    // Determine content type for request body
-    const contentType = hasRequestBody && schema.requestBody?.content?.['application/x-www-form-urlencoded'] ? 'application/x-www-form-urlencoded' : 'application/json';
+    // Send JSON whenever the operation accepts it; form encoding flattens nested values.
+    const contentType = !jsonContent && formContent ? 'application/x-www-form-urlencoded' : 'application/json';
 
     return { parameters, pathParams, queryParams, hasRequestBody, contentType };
   }
@@ -1745,40 +956,6 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
           [ts.factory.createVariableDeclaration(ts.factory.createIdentifier('defaultBaseUrl'), undefined, undefined, ts.factory.createStringLiteral(defaultBaseUrl, true))],
           ts.NodeFlags.Const
         )
-      )
-    );
-
-    // Build ClientOptions type
-    const optionProperties: ts.PropertySignature[] = [
-      ts.factory.createPropertySignature(
-        undefined,
-        ts.factory.createIdentifier('baseUrl'),
-        ts.factory.createToken(ts.SyntaxKind.QuestionToken),
-        ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
-      ),
-      ts.factory.createPropertySignature(
-        undefined,
-        ts.factory.createIdentifier('serverIndex'),
-        ts.factory.createToken(ts.SyntaxKind.QuestionToken),
-        ts.factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword)
-      ),
-      ts.factory.createPropertySignature(
-        undefined,
-        ts.factory.createIdentifier('serverVariables'),
-        ts.factory.createToken(ts.SyntaxKind.QuestionToken),
-        ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Record'), [
-          ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-          ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
-        ])
-      )
-    ];
-
-    statements.push(
-      ts.factory.createTypeAliasDeclaration(
-        [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
-        ts.factory.createIdentifier('ClientOptions'),
-        undefined,
-        ts.factory.createTypeLiteralNode(optionProperties)
       )
     );
 

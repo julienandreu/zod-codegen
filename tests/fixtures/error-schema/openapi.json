@@ -1,8 +1,41 @@
 {
   "openapi": "3.0.0",
   "info": { "title": "Pet API", "version": "1.0.0" },
-  "servers": [{ "url": "https://api.example.com" }],
+  "servers": [{ "url": "https://api.example.com/v1" }],
   "paths": {
+    "/pets": {
+      "get": {
+        "operationId": "listPets",
+        "parameters": [{ "name": "tag", "in": "query", "schema": { "type": "string" } }],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Pet" } } } }
+          },
+          "default": {
+            "description": "Failure",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createPet",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/Pet" } },
+            "application/x-www-form-urlencoded": { "schema": { "$ref": "#/components/schemas/Pet" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Pet" } } }
+          },
+          "204": { "description": "Already exists" }
+        }
+      }
+    },
     "/pets/{id}": {
       "get": {
         "operationId": "getPet",
@@ -15,6 +48,51 @@
           "default": {
             "description": "Failure",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+          }
+        }
+      },
+      "head": {
+        "operationId": "petExists",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": { "200": { "description": "Exists" } }
+      },
+      "delete": {
+        "operationId": "deletePet",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": { "204": { "description": "Deleted" } }
+      }
+    },
+    "/pets/{id}/status": {
+      "get": {
+        "operationId": "getPetStatus",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": {
+          "200": { "description": "Status", "content": { "text/plain": { "schema": { "type": "string" } } } }
+        }
+      }
+    },
+    "/inventory": {
+      "get": {
+        "operationId": "getInventory",
+        "responses": {
+          "2XX": {
+            "description": "Counts by status",
+            "content": { "application/json": { "schema": { "type": "object", "additionalProperties": { "type": "integer" } } } }
+          }
+        }
+      }
+    },
+    "/echo": {
+      "get": {
+        "operationId": "echo",
+        "responses": {
+          "default": {
+            "description": "Any status",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object", "properties": { "ok": { "type": "boolean" } }, "required": ["ok"] }
+              }
+            }
           }
         }
       }
