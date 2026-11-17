@@ -53,6 +53,10 @@ export const Node: z.ZodType<Node> = z.object({
 });
 
 // Response schemas
+export type SearchResponse = string;
+export const SearchResponse: z.ZodType<SearchResponse> = z.string();
+export type SendOperationResponse = string;
+export const SendOperationResponse: z.ZodType<SendOperationResponse> = z.string();
 export type GetPetResponse = string;
 export const GetPetResponse: z.ZodType<GetPetResponse> = z.string();
 export const serverConfigurations = [
@@ -200,6 +204,48 @@ export default class Pet {
       throw new ResponseValidationError<T>(response, body, result.error as z.ZodError<T>);
     }
     return result.data as T;
+  }
+  /**
+   * @param zParam2
+   * @param zParam
+   * @param SearchResponseParam
+   * @returns {SearchResponse}
+   */
+  async search(zParam2?: string, zParam?: string, SearchResponseParam?: string): Promise<SearchResponse> {
+    return this.#parse<SearchResponse>(await this.send('GET', '/search', { params: { z: zParam2, zParam: zParam, SearchResponse: SearchResponseParam } }), {
+      '200': SearchResponse,
+      '*': SearchResponse
+    });
+  }
+  /**
+   * @returns {SendOperationResponse}
+   */
+  async sendOperation(): Promise<SendOperationResponse> {
+    return this.#parse<SendOperationResponse>(await this.send('POST', '/send', {}), { '200': SendOperationResponse, '*': SendOperationResponse });
+  }
+  /**
+   * @returns {void}
+   */
+  async readBodyOperation(): Promise<void> {
+    return this.#parse<void>(await this.send('GET', '/read-body', {}), { '204': null });
+  }
+  /**
+   * @returns {void}
+   */
+  async handleResponseOperation(): Promise<void> {
+    return this.#parse<void>(await this.send('GET', '/handle-response', {}), { '204': null });
+  }
+  /**
+   * @returns {void}
+   */
+  async getBaseRequestOptionsOperation(): Promise<void> {
+    return this.#parse<void>(await this.send('GET', '/base-options', {}), { '204': null });
+  }
+  /**
+   * @returns {void}
+   */
+  async constructorOperation(): Promise<void> {
+    return this.#parse<void>(await this.send('GET', '/constructor', {}), { '204': null });
   }
   /**
    * @param zParam

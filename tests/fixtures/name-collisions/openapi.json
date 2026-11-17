@@ -3,6 +3,31 @@
   "info": { "title": "Pet", "version": "1.0.0" },
   "servers": [{ "url": "https://api.example.com" }],
   "paths": {
+    "/search": {
+      "get": {
+        "operationId": "search",
+        "parameters": [
+          { "name": "z", "in": "query", "schema": { "type": "string" } },
+          { "name": "zParam", "in": "query", "schema": { "type": "string" } },
+          { "name": "SearchResponse", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "string" } } } }
+        }
+      }
+    },
+    "/send": {
+      "post": {
+        "operationId": "send",
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "string" } } } }
+        }
+      }
+    },
+    "/read-body": { "get": { "operationId": "readBody", "responses": { "204": { "description": "No Content" } } } },
+    "/handle-response": { "get": { "operationId": "handleResponse", "responses": { "204": { "description": "No Content" } } } },
+    "/base-options": { "get": { "operationId": "getBaseRequestOptions", "responses": { "204": { "description": "No Content" } } } },
+    "/constructor": { "get": { "operationId": "constructor", "responses": { "204": { "description": "No Content" } } } },
     "/pets/{z}": {
       "get": {
         "operationId": "getPet",

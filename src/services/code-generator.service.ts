@@ -21,6 +21,9 @@ const RESERVED_NAMES: ReadonlySet<string> = new Set([
   ...['ClientOptions', 'HttpError', 'RequestOptions', 'ResponseValidationError', 'defaultBaseUrl', 'resolveServerUrl', 'serverConfigurations']
 ]);
 
+// Public members of the generated client class (see client-runtime.ts) that an endpoint method must not replace.
+const RUNTIME_MEMBER_NAMES: readonly string[] = ['constructor', 'getBaseRequestOptions', 'handleResponse', 'readBody', 'send'];
+
 export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuilder {
   private readonly typeBuilder = new TypeScriptTypeBuilderService();
   private readonly importBuilder = new TypeScriptImportBuilderService();
@@ -39,6 +42,10 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
   private schemaNames = new Map<string, string>();
   private usedNames = new Set<string>();
   private clientName = '';
+
+  // Client class member names, and the parameter names of the method being built ('<in>:<name>' -> identifier)
+  private usedMethodNames = new Set<string>();
+  private parameterNames = new Map<string, string>();
   private readonly emptyFile = ts.createSourceFile('api.ts', '', ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
 
   constructor(options: GeneratorOptions = {}) {
@@ -181,10 +188,55 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     return this.schemaNames.get(schemaName) ?? this.typeBuilder.sanitizeIdentifier(schemaName);
   }
 
-  // A parameter named like a module-level identifier would shadow it inside the method body.
-  private parameterIdentifier(parameterName: string): string {
-    const sanitized = this.typeBuilder.sanitizeIdentifier(parameterName);
-    return this.usedNames.has(sanitized) ? `${sanitized}Param` : sanitized;
+  // Endpoint methods share the class with the runtime members, which they must not replace.
+  private allocateMethodName(candidate: string): string {
+    let name = this.usedMethodNames.has(candidate) ? `${candidate}Operation` : candidate;
+    for (let suffix = 2; this.usedMethodNames.has(name); suffix++) {
+      name = `${candidate}Operation${String(suffix)}`;
+    }
+
+    this.usedMethodNames.add(name);
+    return name;
+  }
+
+  /**
+   * Names the parameters of the method being built. They must not shadow a module-level name (the body
+   * refers to response schemas and `z`) or each other: free names keep their sanitized form, whatever
+   * their order; the others get `Param`, then a number. Call it after the method's response names exist.
+   */
+  private allocateParameterNames(schema: MethodSchemaType): void {
+    const content = schema.requestBody?.content;
+    const parameters: (readonly [key: string, name: string])[] = [
+      ...(schema.parameters ?? []).filter((param) => param.in === 'path' || param.in === 'query').map((param) => [`${param.in}:${param.name}`, param.name] as const),
+      ...((content?.['application/json'] ?? content?.['application/x-www-form-urlencoded']) ? [['body:body', 'body'] as const] : [])
+    ];
+
+    const used = new Set(this.usedNames);
+    this.parameterNames = new Map();
+    for (const [key, name] of parameters) {
+      const sanitized = this.typeBuilder.sanitizeIdentifier(name);
+      if (!used.has(sanitized)) {
+        this.parameterNames.set(key, sanitized);
+        used.add(sanitized);
+      }
+    }
+
+    for (const [key, name] of parameters) {
+      if (!this.parameterNames.has(key)) {
+        const base = `${this.typeBuilder.sanitizeIdentifier(name)}Param`;
+        let candidate = base;
+        for (let suffix = 2; used.has(candidate); suffix++) {
+          candidate = `${base}${String(suffix)}`;
+        }
+
+        this.parameterNames.set(key, candidate);
+        used.add(candidate);
+      }
+    }
+  }
+
+  private parameterIdentifier(location: string, parameterName: string): string {
+    return this.parameterNames.get(`${location}:${parameterName}`) ?? this.typeBuilder.sanitizeIdentifier(parameterName);
   }
 
   private hasServers(openapi: OpenApiSpecType): boolean {
@@ -460,6 +512,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
 
   private buildClientClass(openapi: OpenApiSpecType, schemas: Record<string, ts.VariableStatement>): ts.ClassDeclaration {
     const clientName = this.clientName;
+    this.usedMethodNames = new Set(RUNTIME_MEMBER_NAMES);
     const methods = this.buildClientMethods(openapi, schemas);
     const [template] = this.parseTemplate(buildClientMembersSource(this.hasServers(openapi)));
     const runtimeMembers = template && ts.isClassDeclaration(template) ? template.members : [];
@@ -576,9 +629,11 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
   }
 
   private buildEndpointMethod(method: string, path: string, schema: MethodSchemaType, schemas: Record<string, ts.VariableStatement>): ts.MethodDeclaration {
+    // Order matters: response names are module-level names that the parameter names must avoid.
+    const methodName = this.allocateMethodName(this.transformOperationName(String(schema.operationId), method, path, schema));
+    const { resultType, responseSchemas } = this.buildResponsePlan(method, methodName, schema);
+    this.allocateParameterNames(schema);
     const { parameters, pathParams, queryParams, hasRequestBody, contentType } = this.buildMethodParameters(schema, schemas);
-    const transformedOperationId = this.transformOperationName(String(schema.operationId), method, path, schema);
-    const { resultType, responseSchemas } = this.buildResponsePlan(method, transformedOperationId, schema);
     const responseType = ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Promise'), [resultType]);
 
     const statements: ts.Statement[] = [];
@@ -591,7 +646,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       queryParams.length > 0
         ? ts.factory.createObjectLiteralExpression(
             queryParams.map((param) => {
-              const paramName = this.parameterIdentifier(param.name);
+              const paramName = this.parameterIdentifier('query', param.name);
               return ts.factory.createPropertyAssignment(ts.factory.createStringLiteral(param.name, true), ts.factory.createIdentifier(paramName));
             }),
             false
@@ -599,7 +654,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
         : undefined;
 
     // Build request body
-    const requestBodyExpression: ts.Expression | undefined = hasRequestBody ? ts.factory.createIdentifier(this.parameterIdentifier('body')) : undefined;
+    const requestBodyExpression: ts.Expression | undefined = hasRequestBody ? ts.factory.createIdentifier(this.parameterIdentifier('body', 'body')) : undefined;
 
     // Build options object for send
     const optionsProps: ts.ObjectLiteralElementLike[] = [];
@@ -638,7 +693,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     const methodDeclaration = ts.factory.createMethodDeclaration(
       [ts.factory.createToken(ts.SyntaxKind.AsyncKeyword)],
       undefined,
-      ts.factory.createIdentifier(transformedOperationId),
+      ts.factory.createIdentifier(methodName),
       undefined,
       undefined,
       parameters,
@@ -686,7 +741,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     const templateSpans: ts.TemplateSpan[] = [];
 
     for (const [index, m] of matches.entries()) {
-      const sanitizedName = this.parameterIdentifier(m.name);
+      const sanitizedName = this.parameterIdentifier('path', m.name);
       const next = matches[index + 1];
 
       if (next === undefined) {
@@ -724,7 +779,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
     // Extract path and query parameters
     if (schema.parameters) {
       for (const param of schema.parameters) {
-        const paramName = this.parameterIdentifier(param.name);
+        const paramName = this.parameterIdentifier(param.in, param.name);
         const paramType = this.getParameterType(param.schema);
 
         if (param.in === 'path') {
@@ -786,7 +841,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
             })()
           : 'unknown';
 
-      parameters.push(this.typeBuilder.createParameter(this.parameterIdentifier('body'), bodyType, undefined, !schema.requestBody?.required));
+      parameters.push(this.typeBuilder.createParameter(this.parameterIdentifier('body', 'body'), bodyType, undefined, !schema.requestBody?.required));
     }
 
     // Send JSON whenever the operation accepts it; form encoding flattens nested values.
@@ -1340,7 +1395,7 @@ export class TypeScriptCodeGeneratorService implements CodeGenerator, SchemaBuil
       }
 
       for (const param of schema.parameters) {
-        const paramName = this.parameterIdentifier(param.name);
+        const paramName = this.parameterIdentifier(param.in, param.name);
         const paramDesc = param.description ? ` ${param.description}` : '';
         lines.push(` * @param ${paramName}${paramDesc}`);
       }

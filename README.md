@@ -151,7 +151,7 @@ The generator creates a single TypeScript file (`api.ts`) containing:
 - **Client Options Type**: `ClientOptions` for server selection, variable overrides, a custom `fetch` and turning validation off
 - **Protected Extension Points**: `getBaseRequestOptions()`, `handleResponse()`, `send()` and `readBody()`
 
-Names that would clash with a JavaScript global, a reserved word or a generated name get a `Schema` suffix (then a number if needed), and every reference follows: a schema named `Error` is exported as `ErrorSchema`.
+Names that would clash with a JavaScript global, a reserved word or a generated name get a `Schema` suffix (then a number if needed), and every reference follows: a schema named `Error` is exported as `ErrorSchema`. Likewise, an operation named like a client method (`send`, `readBody`, `handleResponse`, `getBaseRequestOptions`, `constructor`) gets an `Operation` suffix, and a parameter that would shadow another name gets a `Param` suffix.
 
 ### Generated Client Structure
 
@@ -475,7 +475,7 @@ Regenerate your clients after upgrading, then check these changes:
 - More responses are validated: arrays, inline and primitive schemas, and `+json` or `*/*` media types. A response that doesn't match its schema now throws `ResponseValidationError`; pass `validateResponses: false` to skip validation.
 - Success bodies are validated against the schema for their status. `default` is only used when an operation declares no 2xx response.
 - Return types are the union of the declared success types (for example `Pet | undefined` when a 204 is also declared), and responses with non-JSON content are typed `string`.
-- Schemas named like a global, a reserved word or a generated name are exported with a `Schema` suffix: `Error` becomes `ErrorSchema`.
+- Schemas named like a global, a reserved word or a generated name are exported with a `Schema` suffix: `Error` becomes `ErrorSchema`. Operations named `send`, `readBody`, `handleResponse`, `getBaseRequestOptions` or `constructor` become methods with an `Operation` suffix, such as `sendOperation()`.
 - Clients for specs without servers take `new Client({ baseUrl })` instead of `new Client(baseUrl)`.
 - Request URLs keep the server's base path (`https://api.example.com/v1` + `/pets` gives `/v1/pets`; 1.x dropped `/v1`).
 - `Content-Type` is only sent with a body, and JSON is sent when an operation accepts both JSON and form data.

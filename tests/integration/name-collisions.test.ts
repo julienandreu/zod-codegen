@@ -40,6 +40,8 @@ describe('Generated names', () => {
       'PetSchema',
       'RegExpSchema',
       'ResponseValidationError',
+      'SearchResponse',
+      'SendOperationResponse',
       'StringSchema',
       'default',
       'defaultBaseUrl',
@@ -67,6 +69,43 @@ describe('Generated names', () => {
     // The 201 schema is a string, reached through `z.union`, which a parameter named `z` would shadow.
     await expect(new Pet({ fetch }).getPet('rex', 'mammal')).resolves.toBe('created');
     expect(calls).toEqual(['https://api.example.com/pets/rex?class=mammal']);
+  });
+
+  it('gives every parameter of an operation a distinct name, also next to its response names', async () => {
+    const calls: string[] = [];
+    const fetch = (input: string | URL | Request): Promise<Response> => {
+      calls.push(String(input));
+      return Promise.resolve(new Response(JSON.stringify('found'), { headers: { 'Content-Type': 'application/json' } }));
+    };
+
+    // `z` must not take `zParam` from the parameter actually named zParam, and `SearchResponse` must not shadow the schema.
+    await expect(new Pet({ fetch }).search('a', 'b', 'c')).resolves.toBe('found');
+    expect(calls).toEqual(['https://api.example.com/search?z=a&zParam=b&SearchResponse=c']);
+  });
+
+  it('renames operations named like client methods, which keep working', async () => {
+    const calls: string[] = [];
+    const fetch = (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+      calls.push(`${init?.method ?? 'GET'} ${String(input)}`);
+      return Promise.resolve(
+        init?.method === 'POST' ? new Response(JSON.stringify('sent'), { headers: { 'Content-Type': 'application/json' } }) : new Response(null, { status: 204 })
+      );
+    };
+    const api = new Pet({ fetch });
+
+    await expect(api.sendOperation()).resolves.toBe('sent');
+    await expect(api.readBodyOperation()).resolves.toBeUndefined();
+    await expect(api.handleResponseOperation()).resolves.toBeUndefined();
+    await expect(api.getBaseRequestOptionsOperation()).resolves.toBeUndefined();
+    await expect(api.constructorOperation()).resolves.toBeUndefined();
+    // One fetch per call: the runtime send and readBody were not replaced by the endpoints.
+    expect(calls).toEqual([
+      'POST https://api.example.com/send',
+      'GET https://api.example.com/read-body',
+      'GET https://api.example.com/handle-response',
+      'GET https://api.example.com/base-options',
+      'GET https://api.example.com/constructor'
+    ]);
   });
 
   it.skipIf(!process.features.typescript)('loads under Node type stripping', () => {
